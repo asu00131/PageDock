@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -20,6 +21,9 @@
 
     --todo-card-background: 0 0% 100%; /* Default card white for todo widget */
     --todo-card-foreground: 0 0% 20%; /* Default card foreground for todo widget */
+
+    --calendar-card-background: 0 0% 100%; /* Default card white for calendar widget */
+    --calendar-card-foreground: 0 0% 20%; /* Default card foreground for calendar widget */
 
 
     --popover: 0 0% 100%; /* White for popovers */
@@ -79,6 +83,9 @@
 
     --todo-card-background: 0 0% 15%;
     --todo-card-foreground: 0 0% 85%;
+
+    --calendar-card-background: 0 0% 15%; 
+    --calendar-card-foreground: 0 0% 85%;
 
     --popover: 0 0% 15%; 
     --popover-foreground: 0 0% 90%; 
@@ -314,7 +321,7 @@
     @apply space-y-1.5;
   }
   .todo-item {
-    @apply flex items-center; /* Removed group/todo-item from here */
+    @apply flex items-center; 
   }
   .todo-item__drag-handle {
     @apply cursor-grab text-muted-foreground hover:text-foreground mr-2 opacity-50 group-hover/todo-item:opacity-100;
@@ -339,6 +346,41 @@
   }
   .todo-widget__empty-prompt {
      @apply text-center text-muted-foreground py-4;
+  }
+
+  /* Specific to Calendar ICS Widget */
+  .calendar-widget .widget__container {
+    @apply bg-[hsl(var(--calendar-card-background))] text-[hsl(var(--calendar-card-foreground))];
+  }
+  .calendar-widget .widget-header__title-clickable-area .widget-header__text {
+    @apply text-[hsl(var(--calendar-card-foreground))];
+  }
+  .calendar-widget .widget-header__title-clickable-area .widget-header__feather-icon {
+     @apply text-[hsl(var(--calendar-card-foreground))];
+  }
+  .calendar-widget .widget__body {
+    @apply p-0 md:p-1; /* Less padding for calendar, responsive */
+  }
+  .calendar-widget .rdp { /* Targeting react-day-picker root */
+    @apply w-full;
+  }
+  .calendar-widget .rdp-months {
+    @apply justify-center;
+  }
+  .calendar-widget .rdp-caption_label {
+    @apply text-base font-medium; /* Adjusted for visibility */
+  }
+  .calendar-widget .rdp-nav_button {
+    @apply h-8 w-8; /* Larger touch targets */
+  }
+  .calendar-widget .rdp-day {
+    @apply h-10 w-10; /* Larger day cells */
+  }
+  .calendar-widget .rdp-day_selected {
+     @apply bg-primary text-primary-foreground hover:bg-primary/90 focus:bg-primary/90;
+  }
+   .calendar-widget__empty-prompt {
+    @apply text-center text-muted-foreground hover:text-foreground cursor-pointer py-4 min-h-[150px] flex flex-col justify-center items-center;
   }
 
 }

@@ -1,9 +1,10 @@
 
+
 "use client";
 
 import { useState, useEffect } from 'react';
-import type { LinkItem, AppWidget, LinkCollectionAppWidget, NoteAppWidget, TodoListAppWidget, TodoItem, WidgetType } from '@/types';
-import { isLinkCollectionWidget, isNoteWidget, isTodoListWidget } from '@/types';
+import type { AppWidget, LinkCollectionAppWidget, NoteAppWidget, TodoListAppWidget, CalendarIcsAppWidget, LinkItem, TodoItem, WidgetType } from '@/types';
+import { isLinkCollectionWidget, isNoteWidget, isTodoListWidget, isCalendarIcsWidget } from '@/types';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Button } from '@/components/ui/button';
 import { LinkDialog } from '@/components/LinkDialog';
@@ -12,13 +13,14 @@ import { NoteWidget } from '@/components/NoteWidget';
 import { TodoListWidget } from '@/components/TodoListWidget';
 import { NoteEditDialog } from '@/components/NoteEditDialog';
 import { WidgetTitleDialog } from '@/components/CategoryDialog'; 
-import { AppWindow, FolderPlus, PlusSquare, Bookmark, Rss, StickyNote, ListChecks, Code, GalleryVerticalEnd } from 'lucide-react';
+import { CalendarIcsDialog } from '@/components/CalendarIcsDialog';
+import { CalendarIcsWidget } from '@/components/CalendarIcsWidget';
+import { AppWindow, FolderPlus, PlusSquare, Bookmark, StickyNote, ListChecks, CalendarDays } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 
 // For migrating old data structures
@@ -34,10 +36,12 @@ export default function HomePage() {
   const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
   const [isWidgetTitleDialogOpen, setIsWidgetTitleDialogOpen] = useState(false);
   const [isNoteEditDialogOpen, setIsNoteEditDialogOpen] = useState(false);
+  const [isCalendarIcsDialogOpen, setIsCalendarIcsDialogOpen] = useState(false);
   
   const [editingLink, setEditingLink] = useState<LinkItem | undefined>(undefined);
   const [editingWidget, setEditingWidget] = useState<AppWidget | undefined>(undefined); 
   const [currentLinkCollectionWidgetId, setCurrentLinkCollectionWidgetId] = useState<string | undefined>(undefined);
+  const [currentCalendarIcsWidgetId, setCurrentCalendarIcsWidgetId] = useState<string | undefined>(undefined);
 
 
   useEffect(() => {
@@ -146,6 +150,21 @@ export default function HomePage() {
     setEditingWidget(undefined);
   };
 
+  const handleOpenCalendarIcsDialog = (widgetId: string) => {
+    const widgetToEdit = widgets.find(w => w.id === widgetId);
+    if (widgetToEdit && isCalendarIcsWidget(widgetToEdit)) {
+      setEditingWidget(widgetToEdit);
+      setCurrentCalendarIcsWidgetId(widgetId);
+      setIsCalendarIcsDialogOpen(true);
+    }
+  };
+
+  const handleCloseCalendarIcsDialog = () => {
+    setIsCalendarIcsDialogOpen(false);
+    setEditingWidget(undefined);
+    setCurrentCalendarIcsWidgetId(undefined);
+  };
+
   const handleSubmitLink = (data: Omit<LinkItem, 'id'>, linkId?: string) => {
     if (!currentLinkCollectionWidgetId) return;
 
@@ -235,6 +254,17 @@ export default function HomePage() {
             isCollapsed: false,
         } as TodoListAppWidget;
         break;
+      case 'calendarIcs':
+        newWidget = {
+          id: baseId,
+          type: 'calendarIcs',
+          title: 'New Calendar',
+          data: { icsUrl: '' },
+          isCollapsed: false,
+        } as CalendarIcsAppWidget;
+        setWidgets(prev => [...prev, newWidget]);
+        handleOpenCalendarIcsDialog(baseId);
+        return;
       default:
         console.error("Unsupported widget type:", type);
         return;
@@ -250,6 +280,21 @@ export default function HomePage() {
             ...widget,
             title,
             data: { ...widget.data, content },
+          };
+        }
+        return widget;
+      })
+    );
+  };
+
+  const handleSubmitCalendarIcs = (widgetId: string, title: string, icsUrl: string) => {
+    setWidgets(prevWidgets =>
+      prevWidgets.map(widget => {
+        if (isCalendarIcsWidget(widget) && widget.id === widgetId) {
+          return {
+            ...widget,
+            title, 
+            data: { ...widget.data, icsUrl },
           };
         }
         return widget;
@@ -344,11 +389,6 @@ export default function HomePage() {
   };
 
 
-  const handleAddNewsRss = () => console.log("Add News (RSS) clicked - Not implemented");
-  const handleAddEmbed = () => console.log("Add Embed clicked - Not implemented");
-  const handleBrowseAllWidgets = () => console.log("Browse all widgets clicked - Not implemented");
-
-
   return (
     <div className="container mx-auto px-4 py-8 min-h-screen">
       <header className="mb-8">
@@ -380,18 +420,9 @@ export default function HomePage() {
               <ListChecks className="mr-2 h-4 w-4" />
               <span>待办事项列表</span>
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleAddNewsRss} disabled>
-              <Rss className="mr-2 h-4 w-4" />
-              <span>新闻(RSS)</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleAddEmbed} disabled>
-              <Code className="mr-2 h-4 w-4" />
-              <span>嵌入</span>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleBrowseAllWidgets} disabled>
-               <GalleryVerticalEnd className="mr-2 h-4 w-4" />
-              <span>浏览所有微件</span>
+            <DropdownMenuItem onClick={() => handleAddWidget('calendarIcs')}>
+              <CalendarDays className="mr-2 h-4 w-4" />
+              <span>日历 (ics)</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -456,6 +487,18 @@ export default function HomePage() {
                 onToggleCollapse={handleToggleWidgetCollapse}
               />
             );
+          } else if (isCalendarIcsWidget(widget)) {
+             return (
+              <CalendarIcsWidget
+                key={widget.id}
+                widget={widget}
+                onOpenEditDialog={() => handleOpenCalendarIcsDialog(widget.id)}
+                onOpenWidgetTitleDialog={() => handleOpenWidgetTitleDialog(widget.id)}
+                onDeleteWidget={handleDeleteWidget}
+                isCollapsed={widget.isCollapsed}
+                onToggleCollapse={handleToggleWidgetCollapse}
+              />
+            );
           }
           return null; 
         })}
@@ -488,6 +531,15 @@ export default function HomePage() {
           defaultValues={editingWidget}
         />
       )}
+
+      {isCalendarIcsDialogOpen && editingWidget && isCalendarIcsWidget(editingWidget) && (
+        <CalendarIcsDialog
+          isOpen={isCalendarIcsDialogOpen}
+          onClose={handleCloseCalendarIcsDialog}
+          onSubmit={handleSubmitCalendarIcs}
+          defaultValues={editingWidget}
+        />
+      )}
       
       <footer className="mt-16 text-center text-muted-foreground text-sm">
         <p>&copy; {new Date().getFullYear()} PageDock. Built with Next.js and Tailwind CSS.</p>
@@ -495,3 +547,4 @@ export default function HomePage() {
     </div>
   );
 }
+

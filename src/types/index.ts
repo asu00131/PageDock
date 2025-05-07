@@ -27,7 +27,12 @@ export interface TodoListWidgetData {
   showCompleted: boolean;
 }
 
-export type WidgetType = 'linkCollection' | 'note' | 'todoList'; // Future: | 'rss' | 'embed';
+// Data specific to a Calendar ICS widget
+export interface CalendarIcsWidgetData {
+  icsUrl: string;
+}
+
+export type WidgetType = 'linkCollection' | 'note' | 'todoList' | 'calendarIcs'; // Added 'calendarIcs'
 
 // Base structure for all widgets
 interface BaseWidget {
@@ -53,8 +58,13 @@ export interface TodoListAppWidget extends BaseWidget {
   data: TodoListWidgetData;
 }
 
+export interface CalendarIcsAppWidget extends BaseWidget {
+  type: 'calendarIcs';
+  data: CalendarIcsWidgetData;
+}
+
 // Union type for all possible widgets
-export type AppWidget = LinkCollectionAppWidget | NoteAppWidget | TodoListAppWidget;
+export type AppWidget = LinkCollectionAppWidget | NoteAppWidget | TodoListAppWidget | CalendarIcsAppWidget; // Added CalendarIcsAppWidget
 
 // Type guard for LinkCollectionAppWidget
 export function isLinkCollectionWidget(widget: AppWidget): widget is LinkCollectionAppWidget {
@@ -70,3 +80,9 @@ export function isNoteWidget(widget: AppWidget): widget is NoteAppWidget {
 export function isTodoListWidget(widget: AppWidget): widget is TodoListAppWidget {
   return widget.type === 'todoList';
 }
+
+// Type guard for CalendarIcsAppWidget
+export function isCalendarIcsWidget(widget: AppWidget): widget is CalendarIcsAppWidget {
+  return widget.type === 'calendarIcs';
+}
+
