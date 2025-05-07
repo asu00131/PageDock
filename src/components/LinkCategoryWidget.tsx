@@ -4,7 +4,7 @@
 import type { LinkCategory, LinkItem } from '@/types';
 import { LinkGrid } from './LinkGrid';
 import { Button } from '@/components/ui/button';
-import { ChevronDown, Edit3, MoreVertical, PlusCircle } from 'lucide-react';
+import { ChevronDown, Edit3, MoreVertical, PlusCircle, Trash2 } from 'lucide-react'; // Added Trash2
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -120,3 +120,4 @@ export function LinkCategoryWidget({
     </div>
   );
 }
+
