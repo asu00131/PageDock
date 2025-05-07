@@ -187,6 +187,7 @@
     border: 1px solid hsl(var(--link-card-foreground) / 0.2); /* Fainter border for links */
     border-radius: 2px; /* Much smaller radius */
     @apply bg-[hsl(var(--link-card-background))] text-[hsl(var(--link-card-foreground))] flex items-center; 
+    padding: 1px .5em; /* Explicitly set padding */
   }
   .bookmark-item_mode_cloud:hover {
      @apply shadow-md border-[hsl(var(--primary)/0.7)];
@@ -229,10 +230,48 @@
     @apply p-4; /* More padding for note body */
   }
   .note-widget__content {
-    @apply prose prose-sm max-w-none text-note-card-foreground dark:prose-invert dark:text-note-card-foreground;
+    @apply prose prose-sm max-w-none dark:prose-invert;
+    
+    /* Configure prose colors to use theme variables */
+    --tw-prose-body: hsl(var(--note-card-foreground));
+    --tw-prose-headings: hsl(var(--note-card-foreground));
+    --tw-prose-lead: hsl(var(--note-card-foreground));
+    --tw-prose-links: hsl(var(--primary));
+    --tw-prose-bold: hsl(var(--note-card-foreground));
+    --tw-prose-counters: hsl(var(--muted-foreground));
+    --tw-prose-bullets: hsl(var(--muted-foreground));
+    --tw-prose-hr: hsl(var(--border));
+    --tw-prose-quotes: hsl(var(--note-card-foreground));
+    --tw-prose-quote-borders: hsl(var(--primary));
+    --tw-prose-captions: hsl(var(--muted-foreground));
+    --tw-prose-code: hsl(var(--note-card-foreground)); 
+    --tw-prose-pre-code: hsl(var(--card-foreground)); 
+    --tw-prose-pre-bg: hsl(var(--card)); 
+    --tw-prose-th-borders: hsl(var(--border));
+    --tw-prose-td-borders: hsl(var(--border));
+
+    /* Dark mode prose variables (used by dark:prose-invert) */
+    --tw-prose-invert-body: hsl(var(--note-card-foreground));
+    --tw-prose-invert-headings: hsl(var(--note-card-foreground));
+    --tw-prose-invert-lead: hsl(var(--note-card-foreground));
+    --tw-prose-invert-links: hsl(var(--primary));
+    --tw-prose-invert-bold: hsl(var(--note-card-foreground));
+    --tw-prose-invert-counters: hsl(var(--muted-foreground));
+    --tw-prose-invert-bullets: hsl(var(--muted-foreground));
+    --tw-prose-invert-hr: hsl(var(--border));
+    --tw-prose-invert-quotes: hsl(var(--note-card-foreground));
+    --tw-prose-invert-quote-borders: hsl(var(--primary));
+    --tw-prose-invert-captions: hsl(var(--muted-foreground));
+    --tw-prose-invert-code: hsl(var(--note-card-foreground));
+    --tw-prose-invert-pre-code: hsl(var(--card-foreground));
+    --tw-prose-invert-pre-bg: hsl(var(--card));
+    --tw-prose-invert-th-borders: hsl(var(--border));
+    --tw-prose-invert-td-borders: hsl(var(--border));
+
     min-height: 50px; /* Minimum height for the note content area */
   }
    .note-widget__empty-prompt {
     @apply text-center text-muted-foreground hover:text-foreground cursor-pointer py-4;
   }
 }
+
