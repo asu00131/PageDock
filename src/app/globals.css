@@ -18,6 +18,9 @@
     
     --note-widget-background-raw: 255 248 148; /* For direct use if needed, or for alpha */
 
+    --todo-card-background: 0 0% 100%; /* Default card white for todo widget */
+    --todo-card-foreground: 0 0% 20%; /* Default card foreground for todo widget */
+
 
     --popover: 0 0% 100%; /* White for popovers */
     --popover-foreground: 0 0% 20%; /* Dark gray text for popovers */
@@ -73,6 +76,9 @@
     --note-card-foreground: 56 75% 80%;
     
     --note-widget-background-raw: 50 40 20; /* Darker yellow equivalent */
+
+    --todo-card-background: 0 0% 15%;
+    --todo-card-foreground: 0 0% 85%;
 
     --popover: 0 0% 15%; 
     --popover-foreground: 0 0% 90%; 
@@ -156,6 +162,9 @@
   .widget-header__control .widget-header__feather-icon { /* Applied to icons within controls */
     @apply h-5 w-5 text-muted-foreground hover:text-foreground cursor-pointer;
   }
+  .widget-header__control-label {
+    @apply text-sm text-muted-foreground mr-1;
+  }
   .widget__box {
     /* No direct styles, acts as a container */
   }
@@ -168,10 +177,10 @@
      /* Uses default .widget__container */
   }
   .bookmark-widget .widget-header__title-clickable-area .widget-header__text {
-    @apply text-card-foreground; /* Specific title text color for bookmark widget */
+    @apply text-[hsl(var(--link-card-foreground))]; 
   }
   .bookmark-widget .widget-header__title-clickable-area .widget-header__feather-icon {
-     @apply text-card-foreground; /* Specific icon color in title for bookmark widget */
+     @apply text-[hsl(var(--link-card-foreground))];
   }
 
    .bookmark-widget__body_mode_cloud {
@@ -228,14 +237,13 @@
 
   /* Specific to Note Widget */
   .note-widget .widget__container {
-    background-color: hsla(var(--note-card-background), 0.97); /* Lighter yellow for body content */
-    color: hsl(var(--note-card-foreground));
+    @apply bg-[hsl(var(--note-card-background))] text-[hsl(var(--note-card-foreground))];
   }
    .note-widget .widget-header__title-clickable-area .widget-header__text {
-    color: hsl(var(--note-card-foreground)); /* Specific title text color for note widget */
+    @apply text-[hsl(var(--note-card-foreground))];
   }
   .note-widget .widget-header__title-clickable-area .widget-header__feather-icon {
-     color: hsl(var(--note-card-foreground)); /* Specific icon color in title for note widget */
+     @apply text-[hsl(var(--note-card-foreground))]; 
   }
   .note-widget .widget__body {
     @apply p-4; /* More padding for note body */
@@ -243,27 +251,23 @@
   .note-widget__content {
     @apply prose prose-sm max-w-none dark:prose-invert;
     
-    /* Configure prose colors to use theme variables */
-    /* Ensure these use the specific note-card-foreground for text within notes */
     --tw-prose-body: hsl(var(--note-card-foreground));
     --tw-prose-headings: hsl(var(--note-card-foreground));
     --tw-prose-lead: hsl(var(--note-card-foreground));
-    --tw-prose-links: hsl(var(--primary)); /* Links can use primary color for contrast */
+    --tw-prose-links: hsl(var(--primary)); 
     --tw-prose-bold: hsl(var(--note-card-foreground));
-    --tw-prose-counters: hsl(var(--note-card-foreground) / 0.7); /* Slightly muted counter */
-    --tw-prose-bullets: hsl(var(--note-card-foreground) / 0.7); /* Slightly muted bullet */
-    --tw-prose-hr: hsl(var(--note-card-foreground) / 0.3); /* Fainter HR */
+    --tw-prose-counters: hsl(var(--note-card-foreground) / 0.7); 
+    --tw-prose-bullets: hsl(var(--note-card-foreground) / 0.7); 
+    --tw-prose-hr: hsl(var(--note-card-foreground) / 0.3); 
     --tw-prose-quotes: hsl(var(--note-card-foreground));
-    --tw-prose-quote-borders: hsl(var(--primary)); /* Quote borders can use primary color */
-    --tw-prose-captions: hsl(var(--note-card-foreground) / 0.8); /* Muted caption */
+    --tw-prose-quote-borders: hsl(var(--primary)); 
+    --tw-prose-captions: hsl(var(--note-card-foreground) / 0.8); 
     --tw-prose-code: hsl(var(--note-card-foreground)); 
-    --tw-prose-pre-code: hsl(var(--card-foreground)); /* Code blocks can use card's text on card's background for contrast */
+    --tw-prose-pre-code: hsl(var(--card-foreground)); 
     --tw-prose-pre-bg: hsl(var(--card)); 
-    --tw-prose-th-borders: hsl(var(--note-card-foreground) / 0.4); /* Table borders */
-    --tw-prose-td-borders: hsl(var(--note-card-foreground) / 0.3); /* Table cell borders */
+    --tw-prose-th-borders: hsl(var(--note-card-foreground) / 0.4); 
+    --tw-prose-td-borders: hsl(var(--note-card-foreground) / 0.3); 
 
-    /* Dark mode prose variables for note widget (used by dark:prose-invert) */
-    /* Assuming note-card-foreground is already dark-mode appropriate */
     --tw-prose-invert-body: hsl(var(--note-card-foreground));
     --tw-prose-invert-headings: hsl(var(--note-card-foreground));
     --tw-prose-invert-lead: hsl(var(--note-card-foreground));
@@ -281,10 +285,61 @@
     --tw-prose-invert-th-borders: hsl(var(--note-card-foreground) / 0.4);
     --tw-prose-invert-td-borders: hsl(var(--note-card-foreground) / 0.3);
 
-    min-height: 50px; /* Minimum height for the note content area */
+    min-height: 50px; 
   }
    .note-widget__empty-prompt {
     @apply text-center text-muted-foreground hover:text-foreground cursor-pointer py-4;
   }
+
+  /* Specific to TodoList Widget */
+  .todo-widget .widget__container {
+    @apply bg-[hsl(var(--todo-card-background))] text-[hsl(var(--todo-card-foreground))];
+  }
+  .todo-widget .widget-header__title-clickable-area .widget-header__text {
+    @apply text-[hsl(var(--todo-card-foreground))];
+  }
+  .todo-widget .widget-header__title-clickable-area .widget-header__feather-icon {
+     @apply text-[hsl(var(--todo-card-foreground))];
+  }
+  .todo-widget .widget__body {
+    @apply p-3 space-y-3;
+  }
+  .todo-widget__progress-bar-container {
+    @apply flex items-center space-x-2 text-sm;
+  }
+  .todo-widget__progress-amount {
+    @apply text-muted-foreground w-10 text-right; /* Fixed width for alignment */
+  }
+  .todo-widget__list {
+    @apply space-y-1.5;
+  }
+  .todo-item {
+    @apply flex items-center; /* Removed group/todo-item from here */
+  }
+  .todo-item__drag-handle {
+    @apply cursor-grab text-muted-foreground hover:text-foreground mr-2 opacity-50 group-hover/todo-item:opacity-100;
+  }
+  .todo-item__checkbox { /* Wrapper for ShadCN checkbox to align */
+    @apply flex items-center justify-center h-5 w-5 mr-2;
+  }
+  .todo-item__text-content { /* For displaying text, allows strikethrough */
+    @apply flex-grow cursor-pointer break-all;
+  }
+  .todo-item__text-content_completed {
+    @apply line-through text-muted-foreground;
+  }
+  .todo-item__input { /* For editing text */
+    @apply flex-grow;
+  }
+  .todo-item__actions {
+    @apply ml-2 flex items-center space-x-1 opacity-0 group-hover/todo-item:opacity-100 transition-opacity;
+  }
+  .todo-widget__adder {
+    @apply flex space-x-2 mt-2;
+  }
+  .todo-widget__empty-prompt {
+     @apply text-center text-muted-foreground py-4;
+  }
+
 }
 

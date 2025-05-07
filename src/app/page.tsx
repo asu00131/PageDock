@@ -2,15 +2,16 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import type { LinkItem, AppWidget, LinkCollectionAppWidget, NoteAppWidget, LinkCollectionWidgetData, NoteWidgetData, WidgetType } from '@/types';
-import { isLinkCollectionWidget, isNoteWidget } from '@/types';
+import type { LinkItem, AppWidget, LinkCollectionAppWidget, NoteAppWidget, TodoListAppWidget, TodoItem, WidgetType } from '@/types';
+import { isLinkCollectionWidget, isNoteWidget, isTodoListWidget } from '@/types';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Button } from '@/components/ui/button';
 import { LinkDialog } from '@/components/LinkDialog';
-import { LinkCollectionWidget } from '@/components/LinkCategoryWidget'; // Renamed component file
+import { LinkCollectionWidget } from '@/components/LinkCategoryWidget';
 import { NoteWidget } from '@/components/NoteWidget';
+import { TodoListWidget } from '@/components/TodoListWidget';
 import { NoteEditDialog } from '@/components/NoteEditDialog';
-import { WidgetTitleDialog } from '@/components/CategoryDialog'; // Renamed component file
+import { WidgetTitleDialog } from '@/components/CategoryDialog'; 
 import { AppWindow, FolderPlus, PlusSquare, Bookmark, Rss, StickyNote, ListChecks, Code, GalleryVerticalEnd } from 'lucide-react';
 import {
   DropdownMenu,
@@ -35,7 +36,7 @@ export default function HomePage() {
   const [isNoteEditDialogOpen, setIsNoteEditDialogOpen] = useState(false);
   
   const [editingLink, setEditingLink] = useState<LinkItem | undefined>(undefined);
-  const [editingWidget, setEditingWidget] = useState<AppWidget | undefined>(undefined); // For title editing or note editing
+  const [editingWidget, setEditingWidget] = useState<AppWidget | undefined>(undefined); 
   const [currentLinkCollectionWidgetId, setCurrentLinkCollectionWidgetId] = useState<string | undefined>(undefined);
 
 
@@ -45,7 +46,6 @@ export default function HomePage() {
       const oldLinksRaw = window.localStorage.getItem('pageDockLinks');
 
       if (widgets.length > 0 && widgets.every(w => typeof w.isCollapsed === 'boolean')) {
-        // Already has new widget structure with isCollapsed or is intentionally empty
         return; 
       }
       
@@ -61,7 +61,7 @@ export default function HomePage() {
               type: 'linkCollection',
               title: cat.title,
               data: { links: cat.links },
-              isCollapsed: false, // Initialize collapsed state
+              isCollapsed: false, 
             }));
             migrated = true;
           }
@@ -79,7 +79,7 @@ export default function HomePage() {
               type: 'linkCollection',
               title: 'My Links',
               data: { links: oldLinks },
-              isCollapsed: false, // Initialize collapsed state
+              isCollapsed: false, 
             };
             newWidgetsFromMigration = [defaultLinkCollection];
             migrated = true;
@@ -91,25 +91,21 @@ export default function HomePage() {
 
       if (newWidgetsFromMigration) {
         setWidgets(newWidgetsFromMigration);
-        // Potentially remove old localStorage keys here if desired
-        // window.localStorage.removeItem('pageDockCategories');
-        // window.localStorage.removeItem('pageDockLinks');
-      } else if (widgets.length === 0) { // No old data, and widgets array is empty
+      } else if (widgets.length === 0) { 
         const defaultWidget: LinkCollectionAppWidget = {
           id: crypto.randomUUID(),
           type: 'linkCollection',
           title: 'My First Collection',
           data: { links: [] },
-          isCollapsed: false, // Initialize collapsed state
+          isCollapsed: false, 
         };
         setWidgets([defaultWidget]);
       } else if (widgets.length > 0 && widgets.some(w => typeof w.isCollapsed === 'undefined')) {
-        // Widgets exist but are missing isCollapsed, update them
         setWidgets(prevWidgets => prevWidgets.map(w => ({ ...w, isCollapsed: w.isCollapsed ?? false })));
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Run once on mount
+  }, []); 
 
 
   const handleOpenLinkDialog = (widgetId: string, link?: LinkItem) => {
@@ -157,11 +153,11 @@ export default function HomePage() {
       prevWidgets.map(widget => {
         if (isLinkCollectionWidget(widget) && widget.id === currentLinkCollectionWidgetId) {
           let updatedLinks;
-          if (linkId) { // Editing existing link
+          if (linkId) { 
             updatedLinks = widget.data.links.map(link => 
               link.id === linkId ? { ...link, ...data } : link
             );
-          } else { // Adding new link
+          } else { 
             const newLink: LinkItem = { id: crypto.randomUUID(), ...data };
             updatedLinks = [newLink, ...widget.data.links];
           }
@@ -228,10 +224,17 @@ export default function HomePage() {
           isCollapsed: false,
         } as NoteAppWidget;
         setWidgets(prev => [...prev, newWidget]);
-        // Ensure the note widget is expanded before opening edit dialog
-        // This is implicitly handled by isCollapsed: false above.
         handleOpenNoteEditDialog(baseId); 
         return; 
+      case 'todoList':
+        newWidget = {
+            id: baseId,
+            type: 'todoList',
+            title: 'New Todo List',
+            data: { items: [], showCompleted: true },
+            isCollapsed: false,
+        } as TodoListAppWidget;
+        break;
       default:
         console.error("Unsupported widget type:", type);
         return;
@@ -262,9 +265,86 @@ export default function HomePage() {
     );
   };
 
-  // Placeholder handlers for other widget types
+  // TodoList specific handlers
+  const handleAddTodoItem = (widgetId: string, text: string) => {
+    setWidgets(prev => prev.map(w => {
+      if (isTodoListWidget(w) && w.id === widgetId) {
+        const newItem: TodoItem = { id: crypto.randomUUID(), text, completed: false };
+        return { ...w, data: { ...w.data, items: [...w.data.items, newItem] } };
+      }
+      return w;
+    }));
+  };
+
+  const handleToggleTodoItem = (widgetId: string, itemId: string) => {
+    setWidgets(prev => prev.map(w => {
+      if (isTodoListWidget(w) && w.id === widgetId) {
+        return {
+          ...w,
+          data: {
+            ...w.data,
+            items: w.data.items.map(item =>
+              item.id === itemId ? { ...item, completed: !item.completed } : item
+            ),
+          },
+        };
+      }
+      return w;
+    }));
+  };
+
+  const handleDeleteTodoItem = (widgetId: string, itemId: string) => {
+    setWidgets(prev => prev.map(w => {
+      if (isTodoListWidget(w) && w.id === widgetId) {
+        return {
+          ...w,
+          data: {
+            ...w.data,
+            items: w.data.items.filter(item => item.id !== itemId),
+          },
+        };
+      }
+      return w;
+    }));
+  };
+
+  const handleUpdateTodoItemText = (widgetId: string, itemId: string, text: string) => {
+    setWidgets(prev => prev.map(w => {
+      if (isTodoListWidget(w) && w.id === widgetId) {
+        return {
+          ...w,
+          data: {
+            ...w.data,
+            items: w.data.items.map(item =>
+              item.id === itemId ? { ...item, text } : item
+            ),
+          },
+        };
+      }
+      return w;
+    }));
+  };
+  
+  const handleReorderTodoItems = (widgetId: string, newItems: TodoItem[]) => {
+    setWidgets(prev => prev.map(w => {
+        if (isTodoListWidget(w) && w.id === widgetId) {
+            return { ...w, data: { ...w.data, items: newItems } };
+        }
+        return w;
+    }));
+  };
+
+  const handleToggleShowCompleted = (widgetId: string) => {
+     setWidgets(prev => prev.map(w => {
+        if (isTodoListWidget(w) && w.id === widgetId) {
+            return { ...w, data: { ...w.data, showCompleted: !w.data.showCompleted } };
+        }
+        return w;
+    }));
+  };
+
+
   const handleAddNewsRss = () => console.log("Add News (RSS) clicked - Not implemented");
-  const handleAddTodoList = () => console.log("Add Todo List clicked - Not implemented");
   const handleAddEmbed = () => console.log("Add Embed clicked - Not implemented");
   const handleBrowseAllWidgets = () => console.log("Browse all widgets clicked - Not implemented");
 
@@ -296,13 +376,13 @@ export default function HomePage() {
               <StickyNote className="mr-2 h-4 w-4" />
               <span>笔记</span>
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleAddWidget('todoList')}>
+              <ListChecks className="mr-2 h-4 w-4" />
+              <span>待办事项列表</span>
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={handleAddNewsRss} disabled>
               <Rss className="mr-2 h-4 w-4" />
               <span>新闻(RSS)</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleAddTodoList} disabled>
-              <ListChecks className="mr-2 h-4 w-4" />
-              <span>待办事项列表</span>
             </DropdownMenuItem>
             <DropdownMenuItem onClick={handleAddEmbed} disabled>
               <Code className="mr-2 h-4 w-4" />
@@ -359,8 +439,25 @@ export default function HomePage() {
                 onToggleCollapse={handleToggleWidgetCollapse}
               />
             );
+          } else if (isTodoListWidget(widget)) {
+            return (
+              <TodoListWidget
+                key={widget.id}
+                widget={widget}
+                onOpenWidgetTitleDialog={() => handleOpenWidgetTitleDialog(widget.id)}
+                onDeleteWidget={handleDeleteWidget}
+                onAddItem={handleAddTodoItem}
+                onToggleItem={handleToggleTodoItem}
+                onDeleteItem={handleDeleteTodoItem}
+                onUpdateItemText={handleUpdateTodoItemText}
+                onReorderItems={handleReorderTodoItems}
+                onToggleShowCompleted={handleToggleShowCompleted}
+                isCollapsed={widget.isCollapsed}
+                onToggleCollapse={handleToggleWidgetCollapse}
+              />
+            );
           }
-          return null; // Or a placeholder for unknown widget types
+          return null; 
         })}
       </div>
 
