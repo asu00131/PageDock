@@ -104,3 +104,91 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer components {
+  .page-section__widget {
+    @apply mb-6;
+  }
+  .widget.bookmark-widget {
+    @apply transition-shadow duration-300 ease-in-out;
+  }
+  .widget__container {
+    @apply bg-card transition-shadow duration-300 ease-in-out rounded-lg shadow-md;
+     /* background-color: rgba(255, 255, 255, 0.97); /* Example uses specific rgba, using card for theme consistency */
+  }
+  .widget__header {
+    @apply flex items-center justify-between p-3 border-b border-border;
+  }
+  .widget-header__title {
+    @apply text-lg font-semibold text-card-foreground flex items-center;
+  }
+  .widget-header__text {
+    @apply mr-2;
+  }
+  .widget-header__chevron {
+    @apply h-4 w-4 text-muted-foreground;
+  }
+  .widget-header__controls {
+    @apply flex items-center space-x-2;
+  }
+  .widget-header__control .widget-header__feather-icon {
+    @apply h-5 w-5 text-muted-foreground hover:text-foreground cursor-pointer;
+  }
+  .widget__box {
+    /* No direct styles, acts as a container */
+  }
+  .widget__body {
+    @apply p-1; /* Reduced padding for a denser look if needed */
+  }
+   .bookmark-widget__body_mode_cloud {
+    /* Styles for cloud mode body can be added if different from generic widget__body */
+  }
+  .bookmark-widget__list {
+    @apply flex flex-wrap; /* This allows items to wrap like a cloud */
+  }
+  .bookmark-widget__item-wrapper {
+    /* Wrapper for each bookmark item, no specific styles from example here */
+    /* margin applied by bookmark-item_mode_cloud */
+  }
+
+  /* Styles for LinkCard (bookmark-item) based on user's CSS */
+  .bookmark-item {
+    @apply relative transition-all duration-200 ease-in-out;
+  }
+  .bookmark-item_mode_cloud {
+    max-width: 100%; /* Or a specific max-width if items should not be too wide */
+    padding: 0.25em 0.5em; /* Adjusted from 1px for better visual */
+    margin: 0.15em;
+    border: 1px solid hsl(var(--border) / 0.5); /* Using theme border with opacity */
+    border-radius: 2px; /* Much smaller radius */
+    @apply bg-card flex items-center; /* Use card background for consistency */
+  }
+  .bookmark-item_mode_cloud:hover {
+     @apply shadow-md border-[hsl(var(--primary)/0.7)];
+  }
+
+  .bookmark-item__link {
+    @apply flex items-center text-sm text-card-foreground no-underline w-full;
+  }
+  .bookmark-item__icon-wrapper {
+    @apply mr-2 flex-shrink-0;
+  }
+  .bookmark-item__icon {
+    @apply h-4 w-4 text-primary;
+  }
+  .bookmark-item__info {
+    @apply overflow-hidden flex-grow;
+  }
+  .bookmark-item__title-container {
+    @apply flex items-center;
+  }
+  .bookmark-item__title {
+    @apply font-medium truncate;
+  }
+  .bookmark-item__url { /* For URL if shown, not in current design but good to have */
+    @apply text-xs text-muted-foreground truncate mt-0.5;
+  }
+  .bookmark-item__actions {
+    @apply ml-2 flex-shrink-0 flex items-center space-x-1 opacity-0 group-hover/bookmark-item:opacity-100 transition-opacity;
+  }
+}

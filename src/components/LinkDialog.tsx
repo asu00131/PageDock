@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { LinkItem } from '@/types';
@@ -25,7 +26,7 @@ import { Input } from '@/components/ui/input';
 import { useEffect } from 'react';
 
 const linkSchema = z.object({
-  title: z.string().min(1, { message: 'Title is required.' }).max(50, { message: 'Title must be 50 characters or less.' }),
+  title: z.string().min(1, { message: 'Title is required.' }).max(100, { message: 'Title must be 100 characters or less.' }),
   url: z.string().url({ message: 'Please enter a valid URL.' }),
 });
 
@@ -34,31 +35,43 @@ type LinkFormData = z.infer<typeof linkSchema>;
 interface LinkDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: LinkFormData, id?: string) => void;
+  onSubmit: (data: LinkFormData, id?: string) => void; // categoryId is handled by parent through currentCategoryId state
   defaultValues?: LinkItem;
+  categoryId: string; // To ensure context, though not directly used in form submission data
 }
 
-export function LinkDialog({ isOpen, onClose, onSubmit, defaultValues }: LinkDialogProps) {
+export function LinkDialog({ isOpen, onClose, onSubmit, defaultValues, categoryId }: LinkDialogProps) {
   const form = useForm<LinkFormData>({
     resolver: zodResolver(linkSchema),
     defaultValues: {
-      title: defaultValues?.title || '',
-      url: defaultValues?.url || '',
+      title: '',
+      url: '',
     },
   });
 
   useEffect(() => {
-    if (defaultValues) {
-      form.reset({ title: defaultValues.title, url: defaultValues.url });
-    } else {
-      form.reset({ title: '', url: '' });
+    if (isOpen) { // Reset form only when dialog opens
+      if (defaultValues) {
+        form.reset({ title: defaultValues.title, url: defaultValues.url });
+      } else {
+        form.reset({ title: '', url: '' });
+      }
     }
   }, [defaultValues, form, isOpen]);
 
   const handleSubmit = (data: LinkFormData) => {
-    onSubmit(data, defaultValues?.id);
+    onSubmit(data, defaultValues?.id); // Pass linkId if editing
     onClose();
   };
+
+  // Ensure categoryId is present, though not part of form data schema
+  if (!categoryId && isOpen) {
+    console.error("LinkDialog opened without a categoryId!");
+    // Optionally, close dialog or show error
+    // onClose(); 
+    // return null;
+  }
+
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
