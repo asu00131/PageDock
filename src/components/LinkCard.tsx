@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { LinkItem } from '@/types';
@@ -24,31 +25,27 @@ interface LinkCardProps {
 
 export function LinkCard({ link, onEdit, onDelete }: LinkCardProps) {
   return (
-    <Card className="group relative transition-all duration-200 ease-in-out hover:shadow-xl">
+    <Card className="group relative transition-all duration-200 ease-in-out hover:shadow-xl rounded-sm m-0.5">
       <a href={link.url} target="_blank" rel="noopener noreferrer" className="absolute inset-0 z-0" aria-label={`Open ${link.title}`}></a>
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-           <div className="flex items-center gap-2">
-            <LinkIcon className="h-5 w-5 text-primary" />
-            <CardTitle className="text-lg font-semibold truncate" title={link.title}>
-                {link.title}
-            </CardTitle>
-           </div>
-        </div>
+      <CardHeader className="px-2 py-1 flex flex-row items-center space-x-2 space-y-0">
+        <LinkIcon className="h-4 w-4 text-primary shrink-0" />
+        <CardTitle className="text-base font-semibold truncate" title={link.title}>
+            {link.title}
+        </CardTitle>
       </CardHeader>
-      <CardContent className="relative z-10">
-        <p className="text-sm text-muted-foreground truncate" title={link.url}>
+      <CardContent className="relative z-10 px-2 py-1">
+        <p className="text-xs text-muted-foreground truncate" title={link.url}>
           {link.url}
         </p>
-        <div className="mt-4 flex justify-end space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+        <div className="mt-1 flex justify-end space-x-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
           <Button
             variant="ghost"
             size="icon"
             onClick={(e) => { e.stopPropagation(); e.preventDefault(); onEdit(link.id); }}
             aria-label={`Edit ${link.title}`}
-            className="h-8 w-8"
+            className="h-6 w-6"
           >
-            <Pencil className="h-4 w-4" />
+            <Pencil className="h-3 w-3" />
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
@@ -57,9 +54,9 @@ export function LinkCard({ link, onEdit, onDelete }: LinkCardProps) {
                 size="icon"
                 onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}
                 aria-label={`Delete ${link.title}`}
-                className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
+                className="h-6 w-6 hover:bg-destructive/10 hover:text-destructive"
               >
-                <Trash2 className="h-4 w-4" />
+                <Trash2 className="h-3 w-3" />
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
