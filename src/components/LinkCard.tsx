@@ -70,6 +70,7 @@ export function LinkCard({
         onClick={(e) => {
           if (e.ctrlKey || e.metaKey || e.button === 1) return;
         }}
+        draggable="false" // Prevents browser's default drag for the link itself
       >
         <div className="bookmark-item__icon-wrapper">
           <LinkIcon className="bookmark-item__icon" />
