@@ -136,19 +136,24 @@
   .widget__header {
     @apply flex items-center justify-between p-3 border-b border-border;
   }
-  .widget-header__title {
-    @apply text-lg font-semibold flex items-center;
+  .widget-header__title-clickable-area { /* Renamed for clarity, encompasses icon, title text, chevron */
+    @apply flex items-center flex-grow cursor-pointer mr-2;
+    /* Text and icon color will be inherited or set by specific widget type */
   }
-  .widget-header__text {
-    @apply mr-2;
+  .widget-header__title { /* This class is now more for the text part only, if needed, or remove if not directly styled */
+     @apply text-lg font-semibold flex items-center; /* Default title styling */
   }
-  .widget-header__chevron {
-    @apply h-4 w-4 text-muted-foreground;
+  .widget-header__text { /* Specific to the text part of the title */
+    @apply mr-2; /* Retain margin for spacing text and chevron */
+    /* Font size and weight now on .widget-header__title-clickable-area or .widget-header__title */
+  }
+  .widget-header__chevron { /* Chevron for collapse/expand */
+    @apply h-4 w-4 text-muted-foreground; /* Default chevron styling */
   }
   .widget-header__controls {
     @apply flex items-center space-x-2;
   }
-  .widget-header__control .widget-header__feather-icon {
+  .widget-header__control .widget-header__feather-icon { /* Applied to icons within controls */
     @apply h-5 w-5 text-muted-foreground hover:text-foreground cursor-pointer;
   }
   .widget__box {
@@ -162,8 +167,11 @@
   .bookmark-widget .widget__container {
      /* Uses default .widget__container */
   }
-  .bookmark-widget .widget-header__title {
-    @apply text-card-foreground; /* Default for general cards, can be overridden */
+  .bookmark-widget .widget-header__title-clickable-area .widget-header__text {
+    @apply text-card-foreground; /* Specific title text color for bookmark widget */
+  }
+  .bookmark-widget .widget-header__title-clickable-area .widget-header__feather-icon {
+     @apply text-card-foreground; /* Specific icon color in title for bookmark widget */
   }
 
    .bookmark-widget__body_mode_cloud {
@@ -223,8 +231,11 @@
     background-color: hsla(var(--note-card-background), 0.97); /* Lighter yellow for body content */
     color: hsl(var(--note-card-foreground));
   }
-   .note-widget .widget-header__title {
-    color: hsl(var(--note-card-foreground));
+   .note-widget .widget-header__title-clickable-area .widget-header__text {
+    color: hsl(var(--note-card-foreground)); /* Specific title text color for note widget */
+  }
+  .note-widget .widget-header__title-clickable-area .widget-header__feather-icon {
+     color: hsl(var(--note-card-foreground)); /* Specific icon color in title for note widget */
   }
   .note-widget .widget__body {
     @apply p-4; /* More padding for note body */
@@ -233,40 +244,42 @@
     @apply prose prose-sm max-w-none dark:prose-invert;
     
     /* Configure prose colors to use theme variables */
+    /* Ensure these use the specific note-card-foreground for text within notes */
     --tw-prose-body: hsl(var(--note-card-foreground));
     --tw-prose-headings: hsl(var(--note-card-foreground));
     --tw-prose-lead: hsl(var(--note-card-foreground));
-    --tw-prose-links: hsl(var(--primary));
+    --tw-prose-links: hsl(var(--primary)); /* Links can use primary color for contrast */
     --tw-prose-bold: hsl(var(--note-card-foreground));
-    --tw-prose-counters: hsl(var(--muted-foreground));
-    --tw-prose-bullets: hsl(var(--muted-foreground));
-    --tw-prose-hr: hsl(var(--border));
+    --tw-prose-counters: hsl(var(--note-card-foreground) / 0.7); /* Slightly muted counter */
+    --tw-prose-bullets: hsl(var(--note-card-foreground) / 0.7); /* Slightly muted bullet */
+    --tw-prose-hr: hsl(var(--note-card-foreground) / 0.3); /* Fainter HR */
     --tw-prose-quotes: hsl(var(--note-card-foreground));
-    --tw-prose-quote-borders: hsl(var(--primary));
-    --tw-prose-captions: hsl(var(--muted-foreground));
+    --tw-prose-quote-borders: hsl(var(--primary)); /* Quote borders can use primary color */
+    --tw-prose-captions: hsl(var(--note-card-foreground) / 0.8); /* Muted caption */
     --tw-prose-code: hsl(var(--note-card-foreground)); 
-    --tw-prose-pre-code: hsl(var(--card-foreground)); 
+    --tw-prose-pre-code: hsl(var(--card-foreground)); /* Code blocks can use card's text on card's background for contrast */
     --tw-prose-pre-bg: hsl(var(--card)); 
-    --tw-prose-th-borders: hsl(var(--border));
-    --tw-prose-td-borders: hsl(var(--border));
+    --tw-prose-th-borders: hsl(var(--note-card-foreground) / 0.4); /* Table borders */
+    --tw-prose-td-borders: hsl(var(--note-card-foreground) / 0.3); /* Table cell borders */
 
-    /* Dark mode prose variables (used by dark:prose-invert) */
+    /* Dark mode prose variables for note widget (used by dark:prose-invert) */
+    /* Assuming note-card-foreground is already dark-mode appropriate */
     --tw-prose-invert-body: hsl(var(--note-card-foreground));
     --tw-prose-invert-headings: hsl(var(--note-card-foreground));
     --tw-prose-invert-lead: hsl(var(--note-card-foreground));
     --tw-prose-invert-links: hsl(var(--primary));
     --tw-prose-invert-bold: hsl(var(--note-card-foreground));
-    --tw-prose-invert-counters: hsl(var(--muted-foreground));
-    --tw-prose-invert-bullets: hsl(var(--muted-foreground));
-    --tw-prose-invert-hr: hsl(var(--border));
+    --tw-prose-invert-counters: hsl(var(--note-card-foreground) / 0.7);
+    --tw-prose-invert-bullets: hsl(var(--note-card-foreground) / 0.7);
+    --tw-prose-invert-hr: hsl(var(--note-card-foreground) / 0.3);
     --tw-prose-invert-quotes: hsl(var(--note-card-foreground));
     --tw-prose-invert-quote-borders: hsl(var(--primary));
-    --tw-prose-invert-captions: hsl(var(--muted-foreground));
+    --tw-prose-invert-captions: hsl(var(--note-card-foreground) / 0.8);
     --tw-prose-invert-code: hsl(var(--note-card-foreground));
     --tw-prose-invert-pre-code: hsl(var(--card-foreground));
     --tw-prose-invert-pre-bg: hsl(var(--card));
-    --tw-prose-invert-th-borders: hsl(var(--border));
-    --tw-prose-invert-td-borders: hsl(var(--border));
+    --tw-prose-invert-th-borders: hsl(var(--note-card-foreground) / 0.4);
+    --tw-prose-invert-td-borders: hsl(var(--note-card-foreground) / 0.3);
 
     min-height: 50px; /* Minimum height for the note content area */
   }

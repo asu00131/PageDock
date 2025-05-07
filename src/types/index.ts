@@ -23,6 +23,7 @@ interface BaseWidget {
   id: string;
   type: WidgetType;
   title: string; // Title displayed in the widget header
+  isCollapsed?: boolean; // Added for collapse/expand functionality
 }
 
 // Specific widget types

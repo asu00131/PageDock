@@ -44,23 +44,25 @@ export default function HomePage() {
       const oldCategoriesRaw = window.localStorage.getItem('pageDockCategories');
       const oldLinksRaw = window.localStorage.getItem('pageDockLinks');
 
-      if (widgets.length > 0) return; // Already has new widget structure or is intentionally empty
-
+      if (widgets.length > 0 && widgets.every(w => typeof w.isCollapsed === 'boolean')) {
+        // Already has new widget structure with isCollapsed or is intentionally empty
+        return; 
+      }
+      
+      let newWidgetsFromMigration: AppWidget[] | null = null;
       let migrated = false;
 
       if (oldCategoriesRaw) {
         try {
           const oldCategories = JSON.parse(oldCategoriesRaw) as OldLinkCategory[];
           if (Array.isArray(oldCategories) && oldCategories.length > 0) {
-            const newWidgets: AppWidget[] = oldCategories.map(cat => ({
+            newWidgetsFromMigration = oldCategories.map(cat => ({
               id: cat.id,
               type: 'linkCollection',
               title: cat.title,
               data: { links: cat.links },
+              isCollapsed: false, // Initialize collapsed state
             }));
-            setWidgets(newWidgets);
-            // window.localStorage.removeItem('pageDockCategories'); // Consider removing old key
-            // console.log("Migrated old categories to new widget structure.");
             migrated = true;
           }
         } catch (error) {
@@ -77,10 +79,9 @@ export default function HomePage() {
               type: 'linkCollection',
               title: 'My Links',
               data: { links: oldLinks },
+              isCollapsed: false, // Initialize collapsed state
             };
-            setWidgets([defaultLinkCollection]);
-            // window.localStorage.removeItem('pageDockLinks'); // Consider removing old key
-            // console.log("Migrated old links to new widget structure.");
+            newWidgetsFromMigration = [defaultLinkCollection];
             migrated = true;
           }
         } catch (error) {
@@ -88,15 +89,23 @@ export default function HomePage() {
         }
       }
 
-      if (!migrated && widgets.length === 0) {
-        // If no data was migrated and widgets is still empty, create default
+      if (newWidgetsFromMigration) {
+        setWidgets(newWidgetsFromMigration);
+        // Potentially remove old localStorage keys here if desired
+        // window.localStorage.removeItem('pageDockCategories');
+        // window.localStorage.removeItem('pageDockLinks');
+      } else if (widgets.length === 0) { // No old data, and widgets array is empty
         const defaultWidget: LinkCollectionAppWidget = {
           id: crypto.randomUUID(),
           type: 'linkCollection',
           title: 'My First Collection',
           data: { links: [] },
+          isCollapsed: false, // Initialize collapsed state
         };
         setWidgets([defaultWidget]);
+      } else if (widgets.length > 0 && widgets.some(w => typeof w.isCollapsed === 'undefined')) {
+        // Widgets exist but are missing isCollapsed, update them
+        setWidgets(prevWidgets => prevWidgets.map(w => ({ ...w, isCollapsed: w.isCollapsed ?? false })));
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -207,6 +216,7 @@ export default function HomePage() {
           type: 'linkCollection',
           title: 'New Link Collection',
           data: { links: [] },
+          isCollapsed: false,
         } as LinkCollectionAppWidget;
         break;
       case 'note':
@@ -215,11 +225,13 @@ export default function HomePage() {
           type: 'note',
           title: 'New Note',
           data: { content: '' },
+          isCollapsed: false,
         } as NoteAppWidget;
         setWidgets(prev => [...prev, newWidget]);
-        handleOpenNoteEditDialog(baseId); // Open edit dialog for new note
-        return; // Return early as dialog is opened
-      // Add cases for other widget types here
+        // Ensure the note widget is expanded before opening edit dialog
+        // This is implicitly handled by isCollapsed: false above.
+        handleOpenNoteEditDialog(baseId); 
+        return; 
       default:
         console.error("Unsupported widget type:", type);
         return;
@@ -242,6 +254,13 @@ export default function HomePage() {
     );
   };
 
+  const handleToggleWidgetCollapse = (widgetId: string) => {
+    setWidgets(prevWidgets =>
+      prevWidgets.map(widget =>
+        widget.id === widgetId ? { ...widget, isCollapsed: !widget.isCollapsed } : widget
+      )
+    );
+  };
 
   // Placeholder handlers for other widget types
   const handleAddNewsRss = () => console.log("Add News (RSS) clicked - Not implemented");
@@ -325,6 +344,8 @@ export default function HomePage() {
                     }
                 }}
                 onDeleteLink={handleDeleteLink}
+                isCollapsed={widget.isCollapsed}
+                onToggleCollapse={handleToggleWidgetCollapse}
               />
             );
           } else if (isNoteWidget(widget)) {
@@ -334,6 +355,8 @@ export default function HomePage() {
                 widget={widget}
                 onOpenEditDialog={() => handleOpenNoteEditDialog(widget.id)}
                 onDeleteWidget={handleDeleteWidget}
+                isCollapsed={widget.isCollapsed}
+                onToggleCollapse={handleToggleWidgetCollapse}
               />
             );
           }
@@ -347,7 +370,7 @@ export default function HomePage() {
           onClose={handleCloseLinkDialog}
           onSubmit={handleSubmitLink}
           defaultValues={editingLink}
-          categoryId={currentLinkCollectionWidgetId} // This context is important for LinkDialog
+          categoryId={currentLinkCollectionWidgetId} 
         />
       )}
 
