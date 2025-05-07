@@ -156,10 +156,9 @@
     @apply relative transition-all duration-200 ease-in-out;
   }
   .bookmark-item_mode_cloud {
-    max-width: 100%; /* Or a specific max-width if items should not be too wide */
-    padding: 0.25em 0.5em; /* Adjusted from 1px for better visual */
+    max-width: 100%;
     margin: 0.15em;
-    border: 1px solid hsl(var(--border) / 0.5); /* Using theme border with opacity */
+    border: 1px solid hsl(var(--foreground) / 0.1); /* User requested faint border */
     border-radius: 2px; /* Much smaller radius */
     @apply bg-card flex items-center; /* Use card background for consistency */
   }

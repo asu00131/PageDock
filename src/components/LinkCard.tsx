@@ -22,11 +22,44 @@ interface LinkCardProps {
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
   className?: string;
+  onDragStartHandler: (e: React.DragEvent<HTMLDivElement>, id: string) => void;
+  onDragOverHandler: (e: React.DragEvent<HTMLDivElement>, id: string) => void;
+  onDropHandler: (e: React.DragEvent<HTMLDivElement>, id: string) => void;
+  onDragLeaveHandler: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDragEndHandler: (e: React.DragEvent<HTMLDivElement>) => void;
+  isDragging?: boolean;
+  isDragOver?: boolean;
 }
 
-export function LinkCard({ link, onEdit, onDelete, className }: LinkCardProps) {
+export function LinkCard({ 
+  link, 
+  onEdit, 
+  onDelete, 
+  className,
+  onDragStartHandler,
+  onDragOverHandler,
+  onDropHandler,
+  onDragLeaveHandler,
+  onDragEndHandler,
+  isDragging,
+  isDragOver,
+}: LinkCardProps) {
   return (
-    <div className={cn("bookmark-item bookmark-item_mode_cloud group/bookmark-item", className)}>
+    <div 
+      draggable={true}
+      onDragStart={(e) => onDragStartHandler(e, link.id)}
+      onDragOver={(e) => onDragOverHandler(e, link.id)}
+      onDrop={(e) => onDropHandler(e, link.id)}
+      onDragLeave={onDragLeaveHandler}
+      onDragEnd={onDragEndHandler}
+      className={cn(
+        "bookmark-item bookmark-item_mode_cloud group/bookmark-item",
+        "py-px px-[0.5em]", // Apply requested padding via Tailwind
+        className,
+        isDragging && "opacity-50 cursor-grabbing",
+        isDragOver && "ring-2 ring-primary ring-offset-1"
+      )}
+    >
       <GripVertical className="h-4 w-4 text-muted-foreground mr-2 cursor-grab flex-shrink-0" aria-label="Drag to reorder" />
       <a
         href={link.url}
@@ -35,10 +68,7 @@ export function LinkCard({ link, onEdit, onDelete, className }: LinkCardProps) {
         className="bookmark-item__link"
         title={`${link.title}\n${link.url}`}
         onClick={(e) => {
-          // Allow context menu or middle click to open in new tab without triggering SPA navigation if it were one
           if (e.ctrlKey || e.metaKey || e.button === 1) return;
-          // e.preventDefault(); // No longer needed as it's a real link
-          // window.open(link.url, '_blank');
         }}
       >
         <div className="bookmark-item__icon-wrapper">
@@ -48,8 +78,6 @@ export function LinkCard({ link, onEdit, onDelete, className }: LinkCardProps) {
           <span className="bookmark-item__title-container">
             <span className="bookmark-item__title">{link.title}</span>
           </span>
-          {/* Optionally show URL if design requires it later */}
-          {/* <p className="bookmark-item__url">{link.url}</p> */}
         </div>
       </a>
       <div className="bookmark-item__actions">

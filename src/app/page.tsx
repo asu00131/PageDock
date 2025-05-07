@@ -139,6 +139,14 @@ export default function HomePage() {
     setCategories(prev => prev.filter(cat => cat.id !== categoryId));
   };
 
+  const handleCategoryLinksReordered = (categoryId: string, newLinks: LinkItem[]) => {
+    setCategories(prevCategories =>
+      prevCategories.map(category =>
+        category.id === categoryId ? { ...category, links: newLinks } : category
+      )
+    );
+  };
+
   const handleAddNewsRss = () => {
     console.log("Add News (RSS) clicked");
     // Placeholder for actual functionality
@@ -229,6 +237,7 @@ export default function HomePage() {
             onOpenLinkDialog={handleOpenLinkDialog}
             onOpenCategoryDialog={handleOpenCategoryDialog}
             onDeleteCategory={handleDeleteCategory}
+            onCategoryLinksReordered={handleCategoryLinksReordered}
             onEditLink={(catId, linkId) => {
                 const cat = categories.find(c => c.id === catId);
                 const linkToEdit = cat?.links.find(l => l.id === linkId);

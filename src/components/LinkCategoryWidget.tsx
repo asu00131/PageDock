@@ -4,7 +4,7 @@
 import type { LinkCategory, LinkItem } from '@/types';
 import { LinkGrid } from './LinkGrid';
 import { Button } from '@/components/ui/button';
-import { ChevronDown, Edit3, MoreVertical, PlusCircle, Trash2 } from 'lucide-react'; // Added Trash2
+import { ChevronDown, Edit3, MoreVertical, PlusCircle, Trash2 } from 'lucide-react'; 
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,6 +31,7 @@ interface LinkCategoryWidgetProps {
   onDeleteCategory: (categoryId: string) => void;
   onEditLink: (categoryId: string, linkId: string) => void;
   onDeleteLink: (categoryId: string, linkId: string) => void;
+  onCategoryLinksReordered: (categoryId: string, newLinks: LinkItem[]) => void;
 }
 
 export function LinkCategoryWidget({
@@ -40,6 +41,7 @@ export function LinkCategoryWidget({
   onDeleteCategory,
   onEditLink,
   onDeleteLink,
+  onCategoryLinksReordered,
 }: LinkCategoryWidgetProps) {
   
   const handleEdit = (linkId: string) => {
@@ -48,6 +50,10 @@ export function LinkCategoryWidget({
 
   const handleDelete = (linkId: string) => {
     onDeleteLink(category.id, linkId);
+  };
+
+  const handleLinksReordered = (newLinks: LinkItem[]) => {
+    onCategoryLinksReordered(category.id, newLinks);
   };
 
   return (
@@ -112,6 +118,7 @@ export function LinkCategoryWidget({
                 links={category.links}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
+                onLinksReordered={handleLinksReordered}
               />
             </div>
           </div>
