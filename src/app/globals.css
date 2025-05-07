@@ -7,8 +7,17 @@
     --background: 0 0% 94.1%; /* #F0F0F0 Neutral gray */
     --foreground: 0 0% 20%; /* Dark gray for text */
 
-    --card: 190 75% 92.2%; /* #E0F7FA Light blue for link cards */
-    --card-foreground: 190 20% 30%; /* Darker text for on light blue cards */
+    --card: 0 0% 100%; /* #FFFFFF White for default cards */
+    --card-foreground: 0 0% 20%; /* Darker text for on white cards */
+
+    --link-card-background: 190 75% 92.2%; /* #E0F7FA Light blue for link cards */
+    --link-card-foreground: 190 20% 30%; /* Darker text for on light blue cards */
+
+    --note-card-background: 56 100% 93%; /* approx rgba(255, 248, 148, 0.97) -> hsl(56, 100%, 78%) but lighter for body*/
+    --note-card-foreground: 50 50% 20%; /* Darker text for on yellow cards */
+    
+    --note-widget-background-raw: 255 248 148; /* For direct use if needed, or for alpha */
+
 
     --popover: 0 0% 100%; /* White for popovers */
     --popover-foreground: 0 0% 20%; /* Dark gray text for popovers */
@@ -54,8 +63,16 @@
     --background: 0 0% 10%; 
     --foreground: 0 0% 90%; 
 
-    --card: 190 30% 20%; 
-    --card-foreground: 190 75% 85%; 
+    --card: 0 0% 15%; 
+    --card-foreground: 0 0% 85%; 
+
+    --link-card-background: 190 30% 20%; 
+    --link-card-foreground: 190 75% 85%;
+
+    --note-card-background: 56 40% 25%; 
+    --note-card-foreground: 56 75% 80%;
+    
+    --note-widget-background-raw: 50 40 20; /* Darker yellow equivalent */
 
     --popover: 0 0% 15%; 
     --popover-foreground: 0 0% 90%; 
@@ -109,18 +126,18 @@
   .page-section__widget {
     @apply mb-6;
   }
-  .widget.bookmark-widget {
+
+  .widget { /* Generic widget class */
     @apply transition-shadow duration-300 ease-in-out;
   }
   .widget__container {
-    @apply bg-card transition-shadow duration-300 ease-in-out rounded-lg shadow-md;
-     /* background-color: rgba(255, 255, 255, 0.97); /* Example uses specific rgba, using card for theme consistency */
+    @apply bg-card text-card-foreground transition-shadow duration-300 ease-in-out rounded-lg shadow-md;
   }
   .widget__header {
     @apply flex items-center justify-between p-3 border-b border-border;
   }
   .widget-header__title {
-    @apply text-lg font-semibold text-card-foreground flex items-center;
+    @apply text-lg font-semibold flex items-center;
   }
   .widget-header__text {
     @apply mr-2;
@@ -138,8 +155,17 @@
     /* No direct styles, acts as a container */
   }
   .widget__body {
-    @apply p-1; /* Reduced padding for a denser look if needed */
+    @apply p-1; 
   }
+  
+  /* Specific to Link Collection (Bookmark) Widget */
+  .bookmark-widget .widget__container {
+     /* Uses default .widget__container */
+  }
+  .bookmark-widget .widget-header__title {
+    @apply text-card-foreground; /* Default for general cards, can be overridden */
+  }
+
    .bookmark-widget__body_mode_cloud {
     /* Styles for cloud mode body can be added if different from generic widget__body */
   }
@@ -158,16 +184,16 @@
   .bookmark-item_mode_cloud {
     max-width: 100%;
     margin: 0.15em;
-    border: 1px solid hsl(var(--foreground) / 0.1); /* User requested faint border */
+    border: 1px solid hsl(var(--link-card-foreground) / 0.2); /* Fainter border for links */
     border-radius: 2px; /* Much smaller radius */
-    @apply bg-card flex items-center; /* Use card background for consistency */
+    @apply bg-[hsl(var(--link-card-background))] text-[hsl(var(--link-card-foreground))] flex items-center; 
   }
   .bookmark-item_mode_cloud:hover {
      @apply shadow-md border-[hsl(var(--primary)/0.7)];
   }
 
   .bookmark-item__link {
-    @apply flex items-center text-sm text-card-foreground no-underline w-full;
+    @apply flex items-center text-sm no-underline w-full; /* Text color will be inherited */
   }
   .bookmark-item__icon-wrapper {
     @apply mr-2 flex-shrink-0;
@@ -189,5 +215,24 @@
   }
   .bookmark-item__actions {
     @apply ml-2 flex-shrink-0 flex items-center space-x-1 opacity-0 group-hover/bookmark-item:opacity-100 transition-opacity;
+  }
+
+  /* Specific to Note Widget */
+  .note-widget .widget__container {
+    background-color: hsla(var(--note-card-background), 0.97); /* Lighter yellow for body content */
+    color: hsl(var(--note-card-foreground));
+  }
+   .note-widget .widget-header__title {
+    color: hsl(var(--note-card-foreground));
+  }
+  .note-widget .widget__body {
+    @apply p-4; /* More padding for note body */
+  }
+  .note-widget__content {
+    @apply prose prose-sm max-w-none text-note-card-foreground dark:prose-invert dark:text-note-card-foreground;
+    min-height: 50px; /* Minimum height for the note content area */
+  }
+   .note-widget__empty-prompt {
+    @apply text-center text-muted-foreground hover:text-foreground cursor-pointer py-4;
   }
 }

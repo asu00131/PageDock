@@ -1,10 +1,9 @@
 
 "use client";
 
-import type { LinkCollectionAppWidget, LinkItem, LinkCollectionWidgetData } from '@/types';
-import { LinkGrid } from './LinkGrid';
+import type { NoteAppWidget, NoteWidgetData } from '@/types';
 import { Button } from '@/components/ui/button';
-import { Edit3, MoreVertical, PlusCircle, Trash2, Bookmark } from 'lucide-react'; 
+import { MoreVertical, Edit3, Trash2, StickyNote } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,53 +21,30 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
-interface LinkCollectionWidgetProps {
-  widget: LinkCollectionAppWidget;
-  onOpenLinkDialog: (widgetId: string, link?: LinkItem) => void;
-  onOpenWidgetTitleDialog: (widgetId: string) => void;
+interface NoteWidgetProps {
+  widget: NoteAppWidget;
+  onOpenEditDialog: (widgetId: string) => void;
   onDeleteWidget: (widgetId: string) => void;
-  onEditLink: (widgetId: string, linkId: string) => void; // Pass widgetId for context
-  onDeleteLink: (widgetId: string, linkId: string) => void; // Pass widgetId for context
-  onLinksReordered: (widgetId: string, newLinks: LinkItem[]) => void; // Pass widgetId for context
 }
 
-export function LinkCollectionWidget({
+export function NoteWidget({
   widget,
-  onOpenLinkDialog,
-  onOpenWidgetTitleDialog,
+  onOpenEditDialog,
   onDeleteWidget,
-  onEditLink,
-  onDeleteLink,
-  onLinksReordered,
-}: LinkCollectionWidgetProps) {
-  
-  const handleEditLink = (linkId: string) => {
-    onEditLink(widget.id, linkId);
-  };
-
-  const handleDeleteLink = (linkId: string) => {
-    onDeleteLink(widget.id, linkId);
-  };
-
-  const handleLinksReordered = (newLinks: LinkItem[]) => {
-    onLinksReordered(widget.id, newLinks);
-  };
-
+}: NoteWidgetProps) {
   return (
     <div className="page-section__widget">
-      <article className="widget bookmark-widget">
+      <article className="widget note-widget">
         <div className="widget__container">
           <header className="widget__header widget-header_hovered">
             <h2 className="widget-header__title">
-              <Bookmark className="widget-header__feather-icon h-5 w-5 mr-2 text-[hsl(var(--link-card-foreground))]" />
-              <span className="widget-header__text text-[hsl(var(--link-card-foreground))]">{widget.title}</span>
+              <StickyNote className="widget-header__feather-icon h-5 w-5 mr-2" />
+              <span className="widget-header__text">{widget.title}</span>
             </h2>
             <div className="widget-header__controls">
-              <Button variant="ghost" size="icon" className="widget-header__control h-7 w-7" onClick={() => onOpenLinkDialog(widget.id)}>
-                <PlusCircle className="widget-header__feather-icon h-4 w-4" />
-                <span className="sr-only">Add link to {widget.title}</span>
-              </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="widget-header__control h-7 w-7">
@@ -77,22 +53,22 @@ export function LinkCollectionWidget({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => onOpenWidgetTitleDialog(widget.id)}>
+                  <DropdownMenuItem onClick={() => onOpenEditDialog(widget.id)}>
                     <Edit3 className="mr-2 h-4 w-4" />
-                    <span>Edit Collection Title</span>
+                    <span>Edit Note</span>
                   </DropdownMenuItem>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                       <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive hover:!bg-destructive/10 focus:!bg-destructive/10">
+                      <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive hover:!bg-destructive/10 focus:!bg-destructive/10">
                         <Trash2 className="mr-2 h-4 w-4" />
-                        <span>Delete Collection</span>
+                        <span>Delete Note</span>
                       </DropdownMenuItem>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
                         <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          This action cannot be undone. This will permanently delete the collection "{widget.title}" and all its links.
+                          This action cannot be undone. This will permanently delete the note "{widget.title}".
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
@@ -112,12 +88,21 @@ export function LinkCollectionWidget({
           </header>
           <div className="widget__box">
             <div className="widget__body">
-              <LinkGrid
-                links={widget.data.links}
-                onEdit={handleEditLink}
-                onDelete={handleDeleteLink}
-                onLinksReordered={handleLinksReordered}
-              />
+              {widget.data.content ? (
+                 <div className="note-widget__content" onClick={() => onOpenEditDialog(widget.id)} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && onOpenEditDialog(widget.id)} >
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{widget.data.content}</ReactMarkdown>
+                 </div>
+              ) : (
+                <div 
+                  className="note-widget__empty-prompt"
+                  onClick={() => onOpenEditDialog(widget.id)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => e.key === 'Enter' && onOpenEditDialog(widget.id)}
+                >
+                  <p>开始写...</p>
+                </div>
+              )}
             </div>
           </div>
         </div>

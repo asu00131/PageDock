@@ -2,13 +2,16 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import type { LinkItem, LinkCategory } from '@/types';
+import type { LinkItem, AppWidget, LinkCollectionAppWidget, NoteAppWidget, LinkCollectionWidgetData, NoteWidgetData, WidgetType } from '@/types';
+import { isLinkCollectionWidget, isNoteWidget } from '@/types';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Button } from '@/components/ui/button';
 import { LinkDialog } from '@/components/LinkDialog';
-import { LinkCategoryWidget } from '@/components/LinkCategoryWidget';
+import { LinkCollectionWidget } from '@/components/LinkCategoryWidget'; // Renamed component file
+import { NoteWidget } from '@/components/NoteWidget';
+import { NoteEditDialog } from '@/components/NoteEditDialog';
+import { WidgetTitleDialog } from '@/components/CategoryDialog'; // Renamed component file
 import { AppWindow, FolderPlus, PlusSquare, Bookmark, Rss, StickyNote, ListChecks, Code, GalleryVerticalEnd } from 'lucide-react';
-import { CategoryDialog } from '@/components/CategoryDialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,59 +20,91 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 
+// For migrating old data structures
+interface OldLinkCategory {
+  id: string;
+  title: string;
+  links: LinkItem[];
+}
+
 export default function HomePage() {
-  const [categories, setCategories] = useLocalStorage<LinkCategory[]>('pageDockCategories', []);
+  const [widgets, setWidgets] = useLocalStorage<AppWidget[]>('pageDockWidgets', []);
+  
   const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
-  const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
+  const [isWidgetTitleDialogOpen, setIsWidgetTitleDialogOpen] = useState(false);
+  const [isNoteEditDialogOpen, setIsNoteEditDialogOpen] = useState(false);
   
   const [editingLink, setEditingLink] = useState<LinkItem | undefined>(undefined);
-  const [editingCategory, setEditingCategory] = useState<LinkCategory | undefined>(undefined);
-  const [currentCategoryId, setCurrentCategoryId] = useState<string | undefined>(undefined);
+  const [editingWidget, setEditingWidget] = useState<AppWidget | undefined>(undefined); // For title editing or note editing
+  const [currentLinkCollectionWidgetId, setCurrentLinkCollectionWidgetId] = useState<string | undefined>(undefined);
 
-  // Data migration from old 'pageDockLinks' to new 'pageDockCategories'
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      const oldCategoriesRaw = window.localStorage.getItem('pageDockCategories');
       const oldLinksRaw = window.localStorage.getItem('pageDockLinks');
-      if (oldLinksRaw) {
+
+      if (widgets.length > 0) return; // Already has new widget structure or is intentionally empty
+
+      let migrated = false;
+
+      if (oldCategoriesRaw) {
+        try {
+          const oldCategories = JSON.parse(oldCategoriesRaw) as OldLinkCategory[];
+          if (Array.isArray(oldCategories) && oldCategories.length > 0) {
+            const newWidgets: AppWidget[] = oldCategories.map(cat => ({
+              id: cat.id,
+              type: 'linkCollection',
+              title: cat.title,
+              data: { links: cat.links },
+            }));
+            setWidgets(newWidgets);
+            // window.localStorage.removeItem('pageDockCategories'); // Consider removing old key
+            // console.log("Migrated old categories to new widget structure.");
+            migrated = true;
+          }
+        } catch (error) {
+          console.error("Error migrating old categories:", error);
+        }
+      }
+      
+      if (!migrated && oldLinksRaw) {
         try {
           const oldLinks = JSON.parse(oldLinksRaw) as LinkItem[];
-          if (Array.isArray(oldLinks) && oldLinks.length > 0 && categories.length === 0) {
-            const defaultCategory: LinkCategory = {
+          if (Array.isArray(oldLinks) && oldLinks.length > 0) {
+            const defaultLinkCollection: LinkCollectionAppWidget = {
               id: crypto.randomUUID(),
+              type: 'linkCollection',
               title: 'My Links',
-              links: oldLinks,
+              data: { links: oldLinks },
             };
-            setCategories([defaultCategory]);
-            // Optionally remove the old key, but be careful
-            // window.localStorage.removeItem('pageDockLinks'); 
-            // console.log("Migrated old links to new category structure.");
-          } else if (categories.length === 0 && oldLinks.length === 0) {
-             // If both are empty, create a default empty category
-            const defaultCategory: LinkCategory = {
-              id: crypto.randomUUID(),
-              title: 'My First Collection',
-              links: [],
-            };
-            setCategories([defaultCategory]);
+            setWidgets([defaultLinkCollection]);
+            // window.localStorage.removeItem('pageDockLinks'); // Consider removing old key
+            // console.log("Migrated old links to new widget structure.");
+            migrated = true;
           }
         } catch (error) {
           console.error("Error migrating old links:", error);
         }
-      } else if (categories.length === 0) {
-        // If no old links and no categories, create a default one
-        const defaultCategory: LinkCategory = {
+      }
+
+      if (!migrated && widgets.length === 0) {
+        // If no data was migrated and widgets is still empty, create default
+        const defaultWidget: LinkCollectionAppWidget = {
           id: crypto.randomUUID(),
+          type: 'linkCollection',
           title: 'My First Collection',
-          links: [],
+          data: { links: [] },
         };
-        setCategories([defaultCategory]);
+        setWidgets([defaultWidget]);
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run once on mount
 
-  const handleOpenLinkDialog = (categoryId: string, link?: LinkItem) => {
-    setCurrentCategoryId(categoryId);
+
+  const handleOpenLinkDialog = (widgetId: string, link?: LinkItem) => {
+    setCurrentLinkCollectionWidgetId(widgetId);
     setEditingLink(link);
     setIsLinkDialogOpen(true);
   };
@@ -77,100 +112,142 @@ export default function HomePage() {
   const handleCloseLinkDialog = () => {
     setIsLinkDialogOpen(false);
     setEditingLink(undefined);
-    setCurrentCategoryId(undefined);
+    setCurrentLinkCollectionWidgetId(undefined);
   };
 
-  const handleOpenCategoryDialog = (category?: LinkCategory) => {
-    setEditingCategory(category);
-    setIsCategoryDialogOpen(true);
+  const handleOpenWidgetTitleDialog = (widgetId: string) => {
+    const widgetToEdit = widgets.find(w => w.id === widgetId);
+    if (widgetToEdit) {
+      setEditingWidget(widgetToEdit);
+      setIsWidgetTitleDialogOpen(true);
+    }
   };
 
-  const handleCloseCategoryDialog = () => {
-    setIsCategoryDialogOpen(false);
-    setEditingCategory(undefined);
+  const handleCloseWidgetTitleDialog = () => {
+    setIsWidgetTitleDialogOpen(false);
+    setEditingWidget(undefined);
+  };
+  
+  const handleOpenNoteEditDialog = (widgetId: string) => {
+    const widgetToEdit = widgets.find(w => w.id === widgetId);
+    if (widgetToEdit && isNoteWidget(widgetToEdit)) {
+      setEditingWidget(widgetToEdit);
+      setIsNoteEditDialogOpen(true);
+    }
+  };
+
+  const handleCloseNoteEditDialog = () => {
+    setIsNoteEditDialogOpen(false);
+    setEditingWidget(undefined);
   };
 
   const handleSubmitLink = (data: Omit<LinkItem, 'id'>, linkId?: string) => {
-    if (!currentCategoryId) return;
+    if (!currentLinkCollectionWidgetId) return;
 
-    setCategories(prevCategories => 
-      prevCategories.map(category => {
-        if (category.id === currentCategoryId) {
+    setWidgets(prevWidgets => 
+      prevWidgets.map(widget => {
+        if (isLinkCollectionWidget(widget) && widget.id === currentLinkCollectionWidgetId) {
           let updatedLinks;
           if (linkId) { // Editing existing link
-            updatedLinks = category.links.map(link => 
+            updatedLinks = widget.data.links.map(link => 
               link.id === linkId ? { ...link, ...data } : link
             );
           } else { // Adding new link
             const newLink: LinkItem = { id: crypto.randomUUID(), ...data };
-            updatedLinks = [newLink, ...category.links];
+            updatedLinks = [newLink, ...widget.data.links];
           }
-          return { ...category, links: updatedLinks };
+          return { ...widget, data: { ...widget.data, links: updatedLinks } };
         }
-        return category;
+        return widget;
       })
     );
   };
 
-  const handleDeleteLink = (categoryId: string, linkId: string) => {
-    setCategories(prevCategories =>
-      prevCategories.map(category => {
-        if (category.id === categoryId) {
+  const handleDeleteLink = (widgetId: string, linkId: string) => {
+    setWidgets(prevWidgets =>
+      prevWidgets.map(widget => {
+        if (isLinkCollectionWidget(widget) && widget.id === widgetId) {
           return {
-            ...category,
-            links: category.links.filter(link => link.id !== linkId),
+            ...widget,
+            data: {
+              ...widget.data,
+              links: widget.data.links.filter(link => link.id !== linkId),
+            }
           };
         }
-        return category;
+        return widget;
       })
     );
   };
   
-  const handleSubmitCategory = (title: string, categoryId?: string) => {
-    if (categoryId) { // Editing category
-      setCategories(prev => prev.map(cat => cat.id === categoryId ? { ...cat, title } : cat));
-    } else { // Adding new category
-      const newCategory: LinkCategory = { id: crypto.randomUUID(), title, links: [] };
-      setCategories(prev => [...prev, newCategory]);
-    }
+  const handleSubmitWidgetTitle = (title: string, widgetId: string) => {
+    setWidgets(prev => prev.map(w => w.id === widgetId ? { ...w, title } : w));
   };
 
-  const handleDeleteCategory = (categoryId: string) => {
-    setCategories(prev => prev.filter(cat => cat.id !== categoryId));
+  const handleDeleteWidget = (widgetId: string) => {
+    setWidgets(prev => prev.filter(w => w.id !== widgetId));
   };
 
-  const handleCategoryLinksReordered = (categoryId: string, newLinks: LinkItem[]) => {
-    setCategories(prevCategories =>
-      prevCategories.map(category =>
-        category.id === categoryId ? { ...category, links: newLinks } : category
+  const handleLinksReordered = (widgetId: string, newLinks: LinkItem[]) => {
+    setWidgets(prevWidgets =>
+      prevWidgets.map(widget =>
+        isLinkCollectionWidget(widget) && widget.id === widgetId ? { ...widget, data: { ...widget.data, links: newLinks } } : widget
       )
     );
   };
+  
+  const handleAddWidget = (type: WidgetType) => {
+    let newWidget: AppWidget;
+    const baseId = crypto.randomUUID();
 
-  const handleAddNewsRss = () => {
-    console.log("Add News (RSS) clicked");
-    // Placeholder for actual functionality
+    switch (type) {
+      case 'linkCollection':
+        newWidget = {
+          id: baseId,
+          type: 'linkCollection',
+          title: 'New Link Collection',
+          data: { links: [] },
+        } as LinkCollectionAppWidget;
+        break;
+      case 'note':
+        newWidget = {
+          id: baseId,
+          type: 'note',
+          title: 'New Note',
+          data: { content: '' },
+        } as NoteAppWidget;
+        setWidgets(prev => [...prev, newWidget]);
+        handleOpenNoteEditDialog(baseId); // Open edit dialog for new note
+        return; // Return early as dialog is opened
+      // Add cases for other widget types here
+      default:
+        console.error("Unsupported widget type:", type);
+        return;
+    }
+    setWidgets(prev => [...prev, newWidget]);
   };
 
-  const handleAddNote = () => {
-    console.log("Add Note clicked");
-    // Placeholder for actual functionality
+  const handleSubmitNote = (widgetId: string, title: string, content: string) => {
+    setWidgets(prevWidgets =>
+      prevWidgets.map(widget => {
+        if (isNoteWidget(widget) && widget.id === widgetId) {
+          return {
+            ...widget,
+            title,
+            data: { ...widget.data, content },
+          };
+        }
+        return widget;
+      })
+    );
   };
 
-  const handleAddTodoList = () => {
-    console.log("Add Todo List clicked");
-    // Placeholder for actual functionality
-  };
 
-  const handleAddEmbed = () => {
-    console.log("Add Embed clicked");
-    // Placeholder for actual functionality
-  };
-
-  const handleBrowseAllWidgets = () => {
-    console.log("Browse all widgets clicked");
-    // Placeholder for actual functionality
-  };
+  // Placeholder handlers for other widget types
+  const handleAddNewsRss = () => console.log("Add News (RSS) clicked - Not implemented");
+  const handleAddTodoList = () => console.log("Add Todo List clicked - Not implemented");
+  const handleAddEmbed = () => console.log("Add Embed clicked - Not implemented");
+  const handleBrowseAllWidgets = () => console.log("Browse all widgets clicked - Not implemented");
 
 
   return (
@@ -180,7 +257,7 @@ export default function HomePage() {
           <AppWindow className="h-10 w-10 text-primary" />
           <h1 className="text-4xl font-bold text-foreground">PageDock</h1>
         </div>
-        <p className="text-muted-foreground">Your personal dashboard for quick access to your favorite web pages.</p>
+        <p className="text-muted-foreground">Your personal dashboard for quick access to your favorite web pages and tools.</p>
       </header>
 
       <div className="mb-8 text-right">
@@ -192,28 +269,28 @@ export default function HomePage() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => handleOpenCategoryDialog()}>
+            <DropdownMenuItem onClick={() => handleAddWidget('linkCollection')}>
               <Bookmark className="mr-2 h-4 w-4" />
               <span>书签</span>
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleAddNewsRss}>
-              <Rss className="mr-2 h-4 w-4" />
-              <span>新闻(RSS)</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleAddNote}>
+            <DropdownMenuItem onClick={() => handleAddWidget('note')}>
               <StickyNote className="mr-2 h-4 w-4" />
               <span>笔记</span>
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleAddTodoList}>
+            <DropdownMenuItem onClick={handleAddNewsRss} disabled>
+              <Rss className="mr-2 h-4 w-4" />
+              <span>新闻(RSS)</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleAddTodoList} disabled>
               <ListChecks className="mr-2 h-4 w-4" />
               <span>待办事项列表</span>
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleAddEmbed}>
+            <DropdownMenuItem onClick={handleAddEmbed} disabled>
               <Code className="mr-2 h-4 w-4" />
               <span>嵌入</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleBrowseAllWidgets}>
+            <DropdownMenuItem onClick={handleBrowseAllWidgets} disabled>
                <GalleryVerticalEnd className="mr-2 h-4 w-4" />
               <span>浏览所有微件</span>
             </DropdownMenuItem>
@@ -221,51 +298,74 @@ export default function HomePage() {
         </DropdownMenu>
       </div>
       
-      {categories.length === 0 && (
+      {widgets.length === 0 && (
          <div className="flex flex-col items-center justify-center text-center p-10 border-2 border-dashed border-muted rounded-lg min-h-[200px]">
             <FolderPlus className="h-12 w-12 text-muted-foreground mb-4" />
-            <h2 className="text-xl font-semibold text-foreground">No Link Collections Yet</h2>
-            <p className="text-muted-foreground mt-1">Use the "Add Tool" button and select "书签" (Bookmark) to create your first link collection.</p>
+            <h2 className="text-xl font-semibold text-foreground">No Tools Yet</h2>
+            <p className="text-muted-foreground mt-1">Use the "Add Tool" button to add your first widget.</p>
         </div>
       )}
 
       <div className="space-y-8">
-        {categories.map(category => (
-          <LinkCategoryWidget
-            key={category.id}
-            category={category}
-            onOpenLinkDialog={handleOpenLinkDialog}
-            onOpenCategoryDialog={handleOpenCategoryDialog}
-            onDeleteCategory={handleDeleteCategory}
-            onCategoryLinksReordered={handleCategoryLinksReordered}
-            onEditLink={(catId, linkId) => {
-                const cat = categories.find(c => c.id === catId);
-                const linkToEdit = cat?.links.find(l => l.id === linkId);
-                if (cat && linkToEdit) {
-                    handleOpenLinkDialog(cat.id, linkToEdit);
-                }
-            }}
-            onDeleteLink={handleDeleteLink}
-          />
-        ))}
+        {widgets.map(widget => {
+          if (isLinkCollectionWidget(widget)) {
+            return (
+              <LinkCollectionWidget
+                key={widget.id}
+                widget={widget}
+                onOpenLinkDialog={handleOpenLinkDialog}
+                onOpenWidgetTitleDialog={() => handleOpenWidgetTitleDialog(widget.id)}
+                onDeleteWidget={handleDeleteWidget}
+                onLinksReordered={handleLinksReordered}
+                onEditLink={(widgetId, linkId) => {
+                    const collWidget = widgets.find(w => w.id === widgetId) as LinkCollectionAppWidget | undefined;
+                    const linkToEdit = collWidget?.data.links.find(l => l.id === linkId);
+                    if (collWidget && linkToEdit) {
+                        handleOpenLinkDialog(collWidget.id, linkToEdit);
+                    }
+                }}
+                onDeleteLink={handleDeleteLink}
+              />
+            );
+          } else if (isNoteWidget(widget)) {
+            return (
+              <NoteWidget
+                key={widget.id}
+                widget={widget}
+                onOpenEditDialog={() => handleOpenNoteEditDialog(widget.id)}
+                onDeleteWidget={handleDeleteWidget}
+              />
+            );
+          }
+          return null; // Or a placeholder for unknown widget types
+        })}
       </div>
 
-      {isLinkDialogOpen && currentCategoryId && (
+      {isLinkDialogOpen && currentLinkCollectionWidgetId && (
         <LinkDialog
           isOpen={isLinkDialogOpen}
           onClose={handleCloseLinkDialog}
           onSubmit={handleSubmitLink}
           defaultValues={editingLink}
-          categoryId={currentCategoryId} 
+          categoryId={currentLinkCollectionWidgetId} // This context is important for LinkDialog
         />
       )}
 
-      {isCategoryDialogOpen && (
-        <CategoryDialog
-            isOpen={isCategoryDialogOpen}
-            onClose={handleCloseCategoryDialog}
-            onSubmit={handleSubmitCategory}
-            defaultValues={editingCategory}
+      {isWidgetTitleDialogOpen && editingWidget && (
+        <WidgetTitleDialog
+            isOpen={isWidgetTitleDialogOpen}
+            onClose={handleCloseWidgetTitleDialog}
+            onSubmit={handleSubmitWidgetTitle}
+            defaultValues={{id: editingWidget.id, title: editingWidget.title }}
+        />
+      )}
+
+      {isNoteEditDialogOpen && editingWidget && isNoteWidget(editingWidget) && (
+        <NoteEditDialog
+          isOpen={isNoteEditDialogOpen}
+          onClose={handleCloseNoteEditDialog}
+          onSubmit={handleSubmitNote}
+          defaultValues={editingWidget}
         />
       )}
       
@@ -275,4 +375,3 @@ export default function HomePage() {
     </div>
   );
 }
-
