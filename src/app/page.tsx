@@ -7,8 +7,15 @@ import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Button } from '@/components/ui/button';
 import { LinkDialog } from '@/components/LinkDialog';
 import { LinkCategoryWidget } from '@/components/LinkCategoryWidget';
-import { PlusCircle, AppWindow, FolderPlus } from 'lucide-react';
-import { CategoryDialog } from '@/components/CategoryDialog'; // To be created
+import { AppWindow, FolderPlus, PlusSquare, Bookmark, Rss, StickyNote, ListChecks, Code, GalleryVerticalEnd } from 'lucide-react';
+import { CategoryDialog } from '@/components/CategoryDialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 
 export default function HomePage() {
   const [categories, setCategories] = useLocalStorage<LinkCategory[]>('pageDockCategories', []);
@@ -132,6 +139,31 @@ export default function HomePage() {
     setCategories(prev => prev.filter(cat => cat.id !== categoryId));
   };
 
+  const handleAddNewsRss = () => {
+    console.log("Add News (RSS) clicked");
+    // Placeholder for actual functionality
+  };
+
+  const handleAddNote = () => {
+    console.log("Add Note clicked");
+    // Placeholder for actual functionality
+  };
+
+  const handleAddTodoList = () => {
+    console.log("Add Todo List clicked");
+    // Placeholder for actual functionality
+  };
+
+  const handleAddEmbed = () => {
+    console.log("Add Embed clicked");
+    // Placeholder for actual functionality
+  };
+
+  const handleBrowseAllWidgets = () => {
+    console.log("Browse all widgets clicked");
+    // Placeholder for actual functionality
+  };
+
 
   return (
     <div className="container mx-auto px-4 py-8 min-h-screen">
@@ -144,17 +176,48 @@ export default function HomePage() {
       </header>
 
       <div className="mb-8 text-right">
-        <Button onClick={() => handleOpenCategoryDialog()} size="lg">
-          <FolderPlus className="mr-2 h-5 w-5" />
-          Add New Collection
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="lg">
+              <PlusSquare className="mr-2 h-5 w-5" />
+              Add Tool
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => handleOpenCategoryDialog()}>
+              <Bookmark className="mr-2 h-4 w-4" />
+              <span>书签</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleAddNewsRss}>
+              <Rss className="mr-2 h-4 w-4" />
+              <span>新闻(RSS)</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleAddNote}>
+              <StickyNote className="mr-2 h-4 w-4" />
+              <span>笔记</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleAddTodoList}>
+              <ListChecks className="mr-2 h-4 w-4" />
+              <span>待办事项列表</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleAddEmbed}>
+              <Code className="mr-2 h-4 w-4" />
+              <span>嵌入</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={handleBrowseAllWidgets}>
+               <GalleryVerticalEnd className="mr-2 h-4 w-4" />
+              <span>浏览所有微件</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
       
       {categories.length === 0 && (
          <div className="flex flex-col items-center justify-center text-center p-10 border-2 border-dashed border-muted rounded-lg min-h-[200px]">
             <FolderPlus className="h-12 w-12 text-muted-foreground mb-4" />
-            <h2 className="text-xl font-semibold text-foreground">No Collections Yet</h2>
-            <p className="text-muted-foreground mt-1">Click "Add New Collection" to get started.</p>
+            <h2 className="text-xl font-semibold text-foreground">No Link Collections Yet</h2>
+            <p className="text-muted-foreground mt-1">Use the "Add Tool" button and select "书签" (Bookmark) to create your first link collection.</p>
         </div>
       )}
 
@@ -203,3 +266,4 @@ export default function HomePage() {
     </div>
   );
 }
+
