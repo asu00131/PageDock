@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -32,6 +30,7 @@ interface OldLinkCategory {
 
 export default function HomePage() {
   const [widgets, setWidgets] = useLocalStorage<AppWidget[]>('pageDockWidgets', []);
+  const [isClientHydratedAndSetup, setIsClientHydratedAndSetup] = useState(false);
   
   const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
   const [isWidgetTitleDialogOpen, setIsWidgetTitleDialogOpen] = useState(false);
@@ -45,28 +44,28 @@ export default function HomePage() {
 
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const oldCategoriesRaw = window.localStorage.getItem('pageDockCategories');
-      const oldLinksRaw = window.localStorage.getItem('pageDockLinks');
-
-      if (widgets.length > 0 && widgets.every(w => typeof w.isCollapsed === 'boolean')) {
-        return; 
-      }
-      
-      let newWidgetsFromMigration: AppWidget[] | null = null;
+    // This effect runs only on the client.
+    let currentWidgetsSnapshot = [...widgets]; // Take a snapshot of widgets from useLocalStorage
+    let widgetsWereModifiedDuringSetup = false;
+  
+    const oldCategoriesRaw = window.localStorage.getItem('pageDockCategories');
+    const oldLinksRaw = window.localStorage.getItem('pageDockLinks');
+  
+    // Only attempt migration if currentWidgetsSnapshot is empty (meaning useLocalStorage found nothing or initialized with empty)
+    if (currentWidgetsSnapshot.length === 0) {
       let migrated = false;
-
       if (oldCategoriesRaw) {
         try {
           const oldCategories = JSON.parse(oldCategoriesRaw) as OldLinkCategory[];
           if (Array.isArray(oldCategories) && oldCategories.length > 0) {
-            newWidgetsFromMigration = oldCategories.map(cat => ({
+            currentWidgetsSnapshot = oldCategories.map(cat => ({
               id: cat.id,
               type: 'linkCollection',
               title: cat.title,
               data: { links: cat.links },
-              isCollapsed: false, 
+              isCollapsed: false,
             }));
+            widgetsWereModifiedDuringSetup = true;
             migrated = true;
           }
         } catch (error) {
@@ -78,38 +77,48 @@ export default function HomePage() {
         try {
           const oldLinks = JSON.parse(oldLinksRaw) as LinkItem[];
           if (Array.isArray(oldLinks) && oldLinks.length > 0) {
-            const defaultLinkCollection: LinkCollectionAppWidget = {
+            currentWidgetsSnapshot = [{
               id: crypto.randomUUID(),
               type: 'linkCollection',
               title: 'My Links',
               data: { links: oldLinks },
-              isCollapsed: false, 
-            };
-            newWidgetsFromMigration = [defaultLinkCollection];
-            migrated = true;
+              isCollapsed: false,
+            }];
+            widgetsWereModifiedDuringSetup = true;
           }
         } catch (error) {
           console.error("Error migrating old links:", error);
         }
       }
-
-      if (newWidgetsFromMigration) {
-        setWidgets(newWidgetsFromMigration);
-      } else if (widgets.length === 0) { 
-        const defaultWidget: LinkCollectionAppWidget = {
-          id: crypto.randomUUID(),
-          type: 'linkCollection',
-          title: 'My First Collection',
-          data: { links: [] },
-          isCollapsed: false, 
-        };
-        setWidgets([defaultWidget]);
-      } else if (widgets.length > 0 && widgets.some(w => typeof w.isCollapsed === 'undefined')) {
-        setWidgets(prevWidgets => prevWidgets.map(w => ({ ...w, isCollapsed: w.isCollapsed ?? false })));
-      }
     }
+  
+    // After potential migration, if still no widgets, add a default one.
+    if (currentWidgetsSnapshot.length === 0) {
+      currentWidgetsSnapshot = [{
+        id: crypto.randomUUID(),
+        type: 'linkCollection',
+        title: 'My First Collection',
+        data: { links: [] },
+        isCollapsed: false,
+      }];
+      widgetsWereModifiedDuringSetup = true;
+    }
+  
+    // Ensure all widgets have isCollapsed property.
+    const needsCollapseDefaulting = currentWidgetsSnapshot.some(w => typeof w.isCollapsed === 'undefined');
+    if (needsCollapseDefaulting) {
+      currentWidgetsSnapshot = currentWidgetsSnapshot.map(w => ({ ...w, isCollapsed: w.isCollapsed ?? false }));
+      widgetsWereModifiedDuringSetup = true;
+    }
+  
+    if (widgetsWereModifiedDuringSetup) {
+      setWidgets(currentWidgetsSnapshot); // Update state if modifications occurred
+    }
+  
+    setIsClientHydratedAndSetup(true); // Mark setup as complete
+  
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); 
+  }, []); // Run once on mount.
 
 
   const handleOpenLinkDialog = (widgetId: string, link?: LinkItem) => {
@@ -388,6 +397,13 @@ export default function HomePage() {
     }));
   };
 
+  const renderEmptyState = () => (
+    <div className="flex flex-col items-center justify-center text-center p-10 border-2 border-dashed border-muted rounded-lg min-h-[200px]">
+      <FolderPlus className="h-12 w-12 text-muted-foreground mb-4" />
+      <h2 className="text-xl font-semibold text-foreground">No Tools Yet</h2>
+      <p className="text-muted-foreground mt-1">Use the "Add Tool" button to add your first widget.</p>
+    </div>
+  );
 
   return (
     <div className="container mx-auto px-4 py-8 min-h-screen">
@@ -428,81 +444,80 @@ export default function HomePage() {
         </DropdownMenu>
       </div>
       
-      {widgets.length === 0 && (
-         <div className="flex flex-col items-center justify-center text-center p-10 border-2 border-dashed border-muted rounded-lg min-h-[200px]">
-            <FolderPlus className="h-12 w-12 text-muted-foreground mb-4" />
-            <h2 className="text-xl font-semibold text-foreground">No Tools Yet</h2>
-            <p className="text-muted-foreground mt-1">Use the "Add Tool" button to add your first widget.</p>
+      {!isClientHydratedAndSetup ? (
+        // Render placeholder matching server initial render if widgets would be empty
+        renderEmptyState()
+      ) : widgets.length === 0 ? (
+        renderEmptyState()
+      ) : (
+        <div className="space-y-8">
+          {widgets.map(widget => {
+            if (isLinkCollectionWidget(widget)) {
+              return (
+                <LinkCollectionWidget
+                  key={widget.id}
+                  widget={widget}
+                  onOpenLinkDialog={handleOpenLinkDialog}
+                  onOpenWidgetTitleDialog={() => handleOpenWidgetTitleDialog(widget.id)}
+                  onDeleteWidget={handleDeleteWidget}
+                  onLinksReordered={handleLinksReordered}
+                  onEditLink={(widgetId, linkId) => {
+                      const collWidget = widgets.find(w => w.id === widgetId) as LinkCollectionAppWidget | undefined;
+                      const linkToEdit = collWidget?.data.links.find(l => l.id === linkId);
+                      if (collWidget && linkToEdit) {
+                          handleOpenLinkDialog(collWidget.id, linkToEdit);
+                      }
+                  }}
+                  onDeleteLink={handleDeleteLink}
+                  isCollapsed={widget.isCollapsed}
+                  onToggleCollapse={handleToggleWidgetCollapse}
+                />
+              );
+            } else if (isNoteWidget(widget)) {
+              return (
+                <NoteWidget
+                  key={widget.id}
+                  widget={widget}
+                  onOpenEditDialog={() => handleOpenNoteEditDialog(widget.id)}
+                  onDeleteWidget={handleDeleteWidget}
+                  isCollapsed={widget.isCollapsed}
+                  onToggleCollapse={handleToggleWidgetCollapse}
+                />
+              );
+            } else if (isTodoListWidget(widget)) {
+              return (
+                <TodoListWidget
+                  key={widget.id}
+                  widget={widget}
+                  onOpenWidgetTitleDialog={() => handleOpenWidgetTitleDialog(widget.id)}
+                  onDeleteWidget={handleDeleteWidget}
+                  onAddItem={handleAddTodoItem}
+                  onToggleItem={handleToggleTodoItem}
+                  onDeleteItem={handleDeleteTodoItem}
+                  onUpdateItemText={handleUpdateTodoItemText}
+                  onReorderItems={handleReorderTodoItems}
+                  onToggleShowCompleted={handleToggleShowCompleted}
+                  isCollapsed={widget.isCollapsed}
+                  onToggleCollapse={handleToggleWidgetCollapse}
+                />
+              );
+            } else if (isCalendarIcsWidget(widget)) {
+               return (
+                <CalendarIcsWidget
+                  key={widget.id}
+                  widget={widget}
+                  onOpenEditDialog={() => handleOpenCalendarIcsDialog(widget.id)}
+                  onOpenWidgetTitleDialog={() => handleOpenWidgetTitleDialog(widget.id)}
+                  onDeleteWidget={handleDeleteWidget}
+                  isCollapsed={widget.isCollapsed}
+                  onToggleCollapse={handleToggleWidgetCollapse}
+                />
+              );
+            }
+            return null; 
+          })}
         </div>
       )}
-
-      <div className="space-y-8">
-        {widgets.map(widget => {
-          if (isLinkCollectionWidget(widget)) {
-            return (
-              <LinkCollectionWidget
-                key={widget.id}
-                widget={widget}
-                onOpenLinkDialog={handleOpenLinkDialog}
-                onOpenWidgetTitleDialog={() => handleOpenWidgetTitleDialog(widget.id)}
-                onDeleteWidget={handleDeleteWidget}
-                onLinksReordered={handleLinksReordered}
-                onEditLink={(widgetId, linkId) => {
-                    const collWidget = widgets.find(w => w.id === widgetId) as LinkCollectionAppWidget | undefined;
-                    const linkToEdit = collWidget?.data.links.find(l => l.id === linkId);
-                    if (collWidget && linkToEdit) {
-                        handleOpenLinkDialog(collWidget.id, linkToEdit);
-                    }
-                }}
-                onDeleteLink={handleDeleteLink}
-                isCollapsed={widget.isCollapsed}
-                onToggleCollapse={handleToggleWidgetCollapse}
-              />
-            );
-          } else if (isNoteWidget(widget)) {
-            return (
-              <NoteWidget
-                key={widget.id}
-                widget={widget}
-                onOpenEditDialog={() => handleOpenNoteEditDialog(widget.id)}
-                onDeleteWidget={handleDeleteWidget}
-                isCollapsed={widget.isCollapsed}
-                onToggleCollapse={handleToggleWidgetCollapse}
-              />
-            );
-          } else if (isTodoListWidget(widget)) {
-            return (
-              <TodoListWidget
-                key={widget.id}
-                widget={widget}
-                onOpenWidgetTitleDialog={() => handleOpenWidgetTitleDialog(widget.id)}
-                onDeleteWidget={handleDeleteWidget}
-                onAddItem={handleAddTodoItem}
-                onToggleItem={handleToggleTodoItem}
-                onDeleteItem={handleDeleteTodoItem}
-                onUpdateItemText={handleUpdateTodoItemText}
-                onReorderItems={handleReorderTodoItems}
-                onToggleShowCompleted={handleToggleShowCompleted}
-                isCollapsed={widget.isCollapsed}
-                onToggleCollapse={handleToggleWidgetCollapse}
-              />
-            );
-          } else if (isCalendarIcsWidget(widget)) {
-             return (
-              <CalendarIcsWidget
-                key={widget.id}
-                widget={widget}
-                onOpenEditDialog={() => handleOpenCalendarIcsDialog(widget.id)}
-                onOpenWidgetTitleDialog={() => handleOpenWidgetTitleDialog(widget.id)}
-                onDeleteWidget={handleDeleteWidget}
-                isCollapsed={widget.isCollapsed}
-                onToggleCollapse={handleToggleWidgetCollapse}
-              />
-            );
-          }
-          return null; 
-        })}
-      </div>
 
       {isLinkDialogOpen && currentLinkCollectionWidgetId && (
         <LinkDialog
@@ -547,4 +562,3 @@ export default function HomePage() {
     </div>
   );
 }
-
