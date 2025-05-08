@@ -256,7 +256,7 @@
     @apply p-4; /* More padding for note body */
   }
   .note-widget__content {
-    @apply prose prose-sm max-w-none dark:prose-invert 
+    @apply prose prose-sm max-w-none 
            prose-headings:text-[hsl(var(--note-card-foreground))] 
            prose-p:text-[hsl(var(--note-card-foreground))]
            prose-strong:text-[hsl(var(--note-card-foreground))]
@@ -271,6 +271,7 @@
            prose-pre:bg-[hsl(var(--card))]
            prose-pre:text-[hsl(var(--card-foreground))]
            prose-hr:border-[hsl(var(--note-card-foreground))/0.3]
+           dark:prose-invert
            dark:prose-headings:text-[hsl(var(--note-card-foreground))]
            dark:prose-p:text-[hsl(var(--note-card-foreground))]
            dark:prose-strong:text-[hsl(var(--note-card-foreground))]
@@ -354,6 +355,9 @@
   .calendar-widget .widget__body {
     @apply p-0 md:p-1; /* Less padding for calendar, responsive */
   }
+  .calendar-widget__toolbar {
+    @apply flex justify-between items-center p-2 border-b;
+  }
   .calendar-widget .rdp { /* Targeting react-day-picker root */
     @apply w-full;
   }
@@ -382,7 +386,14 @@
     @apply text-sm font-semibold mb-2 text-foreground;
   }
   .calendar-widget__event-item {
-    @apply text-xs p-1.5 mb-1 rounded bg-accent/10 text-foreground flex justify-between items-center;
+    @apply text-xs p-1.5 mb-1 rounded bg-accent/10 text-accent-foreground flex justify-between items-center;
+    /* Ensure text color is from accent-foreground for visibility */
+  }
+  .calendar-widget__event-item strong, .calendar-widget__event-item span {
+    @apply text-accent-foreground; /* Explicitly set text color for children */
+  }
+  .dark .calendar-widget__event-item strong, .dark .calendar-widget__event-item span {
+     @apply text-accent-foreground; /* Ensure dark mode also uses accent-foreground */
   }
   .calendar-widget__no-events {
     @apply text-xs text-muted-foreground;
@@ -396,4 +407,5 @@
 
 
     
+
 

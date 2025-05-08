@@ -3,7 +3,7 @@
 
 import type { CalendarIcsAppWidget, CalendarEvent } from '@/types';
 import { Button } from '@/components/ui/button';
-import { Calendar as CalendarIcon, Edit3, MoreVertical, Trash2, ChevronDown, ChevronUp, AlertTriangle, Link2, FilePenLine } from 'lucide-react';
+import { Calendar as CalendarIcon, Edit3, MoreVertical, Trash2, ChevronDown, ChevronUp, AlertTriangle, Link2, FilePenLine, RotateCcw } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,10 +22,10 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Calendar } from "@/components/ui/calendar";
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import ICAL from 'ical.js';
-import { format, isSameDay } from 'date-fns';
-import { EventDetailDialog } from './EventDetailDialog'; // Import the new dialog
+import { format, isSameDay, startOfDay } from 'date-fns';
+import { EventDetailDialog } from './EventDetailDialog'; 
 
 interface CalendarIcsWidgetProps {
   widget: CalendarIcsAppWidget;
@@ -35,6 +35,23 @@ interface CalendarIcsWidgetProps {
   isCollapsed?: boolean;
   onToggleCollapse: (widgetId: string) => void;
 }
+
+// Helper to safely parse date from ICAL.Time
+const parseIcalTime = (icalTime: ICAL.Time, event: ICAL.Event): Date => {
+  try {
+    if (icalTime.isDate) { // For all-day events, startDate might not have time components
+      return startOfDay(icalTime.toJSDate());
+    }
+    return icalTime.toJSDate();
+  } catch (e) {
+    console.warn("Failed to parse date directly, attempting fallback for event:", event.summary, icalTime.toString(), e);
+    // Fallback for potentially problematic dates, e.g. only date without time but not marked as .isDate
+    // This is a common issue with some ICS generators.
+    const dateString = icalTime.toString().split('T')[0]; // Get YYYY-MM-DD part
+    return startOfDay(new Date(dateString)); // Assume start of day UTC, will be localized by browser later
+  }
+};
+
 
 export function CalendarIcsWidget({
   widget,
@@ -53,59 +70,101 @@ export function CalendarIcsWidget({
   const [isEventDetailDialogOpen, setIsEventDetailDialogOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | undefined>(undefined);
 
-  useEffect(() => {
-    if (widget.data.icsUrl && !isCollapsed) {
-      setIsLoading(true);
-      setError(null);
-      fetch(`/api/ics-proxy?url=${encodeURIComponent(widget.data.icsUrl)}`)
-        .then(response => {
-          if (!response.ok) {
-            throw new Error(`Failed to fetch ICS data (status: ${response.status})`);
-          }
-          return response.text();
-        })
-        .then(icsData => {
-          try {
-            const jcalData = ICAL.parse(icsData);
-            const component = new ICAL.Component(jcalData);
-            const vevents = component.getAllSubcomponents('vevent');
-            const parsedEvents: CalendarEvent[] = vevents.map((veventComponent: any) => {
-              const event = new ICAL.Event(veventComponent);
-              return {
-                id: event.uid || crypto.randomUUID(),
-                summary: event.summary || 'No Title',
-                startDate: event.startDate.toJSDate(),
-                endDate: event.endDate.toJSDate(),
-                isAllDay: event.startDate.isDate,
-                description: event.description || undefined,
-              };
-            });
-            setEvents(parsedEvents);
-          } catch (parseErr) {
-            console.error("Error parsing ICS data:", parseErr);
-            setError("Failed to parse calendar data. Ensure the ICS format is correct.");
-            setEvents([]);
-          }
-        })
-        .catch(err => {
-          console.error("Error fetching or parsing ICS:", err);
-          setError(err.message || "Failed to load calendar data. Check the URL and network.");
-          setEvents([]);
-        })
-        .finally(() => setIsLoading(false));
-    } else if (!widget.data.icsUrl) {
+  const fetchAndParseIcs = useCallback(() => {
+    if (!widget.data.icsUrl) {
       setEvents([]);
       setError(null);
       setIsLoading(false);
+      return;
     }
-  }, [widget.data.icsUrl, isCollapsed]);
+
+    setIsLoading(true);
+    setError(null);
+    fetch(`/api/ics-proxy?url=${encodeURIComponent(widget.data.icsUrl)}`)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Failed to fetch ICS data (status: ${response.status})`);
+        }
+        return response.text();
+      })
+      .then(icsData => {
+        try {
+          const jcalData = ICAL.parse(icsData);
+          const component = new ICAL.Component(jcalData);
+          const vevents = component.getAllSubcomponents('vevent');
+          const parsedEvents: CalendarEvent[] = vevents.map((veventComponent: any) => {
+            const event = new ICAL.Event(veventComponent);
+            const startDate = parseIcalTime(event.startDate, event);
+            const endDate = parseIcalTime(event.endDate, event);
+            
+            return {
+              id: event.uid || crypto.randomUUID(),
+              summary: event.summary || 'No Title',
+              startDate: startDate,
+              endDate: endDate,
+              isAllDay: event.startDate.isDate, // Rely on ICAL.Time's isDate property
+              description: event.description || undefined,
+            };
+          });
+          setEvents(parsedEvents);
+        } catch (parseErr) {
+          console.error("Error parsing ICS data:", parseErr);
+          setError("Failed to parse calendar data. Ensure the ICS format is correct.");
+          setEvents([]);
+        }
+      })
+      .catch(err => {
+        console.error("Error fetching or parsing ICS:", err);
+        setError(err.message || "Failed to load calendar data. Check the URL and network.");
+        setEvents([]);
+      })
+      .finally(() => setIsLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [widget.data.icsUrl]); 
+  
+  useEffect(() => {
+    if (!isCollapsed) {
+      fetchAndParseIcs();
+    }
+  }, [widget.data.icsUrl, isCollapsed, fetchAndParseIcs]);
 
   const eventDays = useMemo(() => events.map(event => event.startDate), [events]);
 
   const eventsForSelectedDay = useMemo(() => {
     if (!selectedDate) return [];
-    return events.filter(event => isSameDay(event.startDate, selectedDate) || (event.startDate < selectedDate && event.endDate > selectedDate))
-                 .sort((a,b) => a.startDate.getTime() - b.startDate.getTime());
+    return events.filter(event => {
+      const selectedDayStart = startOfDay(selectedDate);
+      const eventStartDay = startOfDay(event.startDate);
+      const eventEndDay = startOfDay(event.endDate);
+
+      if (event.isAllDay) {
+        // For all-day events, check if selectedDate is within event's date range (inclusive start, exclusive end for typical ICAL)
+        // However, for display, if it spans multiple days, we consider it active on its end day too IF it's not just a time on that day.
+        // Simplified: if start day is on or before selected, and end day is on or after selected.
+        // For an all-day event ending on date D, it's usually exclusive of D for time, but inclusive for the date itself.
+        // Example: All day event from May 8 to May 8 means it's active on May 8.
+        // All day event from May 8 to May 9 means it's active on May 8, not May 9 typically.
+        // Let's adjust for display: if end date is also considered.
+        // If event.endDate is the very start of the next day for an all-day event, then it means it occurs on event.startDate
+        // A common pattern for all-day events is startDate=YYYY-MM-DD, endDate=YYYY-MM-D(D+1)
+        // Let's consider an event active if selectedDate is between event.startDate (inclusive) and event.endDate (exclusive for timed, inclusive for all-day)
+        if (isSameDay(eventStartDay, selectedDayStart)) return true; // Starts today
+        if (eventStartDay < selectedDayStart && eventEndDay >= selectedDayStart ) { // Spans across today
+             // If event.endDate is exactly at midnight, it means the event concluded before this day started.
+             // But for all-day events, if endDate is YYYY-MM-DD, it includes that day.
+             // If endDate is YYYY-MM-(DD+1)T00:00:00, it means it lasts through DD.
+            if(event.endDate.getHours() === 0 && event.endDate.getMinutes() === 0 && event.endDate.getSeconds() === 0 && !isSameDay(eventEndDay,selectedDayStart) ){
+                return false; // Ends exactly at midnight of selected day, so not "on" selected day.
+            }
+            return true;
+        }
+        return false;
+
+      } else { // For timed events
+        return isSameDay(eventStartDay, selectedDayStart);
+      }
+    })
+    .sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
   }, [events, selectedDate]);
 
   const handleBodyClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -138,10 +197,11 @@ export function CalendarIcsWidget({
 
   const handleCloseEventDetailDialog = () => {
     setIsEventDetailDialogOpen(false);
-    setEditingEvent(undefined); // Clear editing event
+    setEditingEvent(undefined); 
   };
 
   const handleSubmitEventDetail = (updatedEventData: Partial<CalendarEvent> & { id: string }) => {
+    // For now, event editing is local and doesn't persist to an ICS file.
     setEvents(prevEvents =>
       prevEvents.map(event =>
         event.id === updatedEventData.id ? { ...event, ...updatedEventData } : event
@@ -151,7 +211,14 @@ export function CalendarIcsWidget({
   };
 
   const handleDeleteEvent = (eventId: string) => {
+    // Local deletion
     setEvents(prevEvents => prevEvents.filter(event => event.id !== eventId));
+  };
+  
+  const goToToday = () => {
+    const today = new Date();
+    setSelectedDate(today);
+    setCurrentMonth(today);
   };
 
 
@@ -174,6 +241,12 @@ export function CalendarIcsWidget({
               {isCollapsed ? <ChevronDown className="widget-header__chevron" /> : <ChevronUp className="widget-header__chevron" />}
             </div>
             <div className="widget-header__controls">
+              {!isCollapsed && widget.data.icsUrl && (
+                <Button variant="ghost" size="icon" className="widget-header__control h-7 w-7" onClick={(e) => {e.stopPropagation(); fetchAndParseIcs();}} title="Refresh Calendar Data">
+                    <RotateCcw className="widget-header__feather-icon h-4 w-4" />
+                    <span className="sr-only">Refresh Calendar</span>
+                </Button>
+              )}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="widget-header__control h-7 w-7" onClick={(e) => e.stopPropagation()}>
@@ -244,6 +317,9 @@ export function CalendarIcsWidget({
                 }
                 {!isLoading && !error && widget.data.icsUrl && (
                   <>
+                    <div className="calendar-widget__toolbar">
+                      <Button onClick={goToToday} variant="outline" size="sm">Today</Button>
+                    </div>
                     <Calendar
                       mode="single"
                       selected={selectedDate}
@@ -252,7 +328,7 @@ export function CalendarIcsWidget({
                       onMonthChange={setCurrentMonth}
                       className="rounded-md calendar-widget" 
                       modifiers={{ eventDay: eventDays }}
-                      modifiersClassNames={{ eventDay: 'bg-primary/20 rounded-full !text-primary-foreground' }} // Ensure text is visible on event days
+                      modifiersClassNames={{ eventDay: 'bg-primary/20 rounded-full !text-primary-foreground' }} 
                     />
                     {selectedDate && eventsForSelectedDay.length > 0 && (
                       <div className="calendar-widget__event-list">
@@ -267,6 +343,7 @@ export function CalendarIcsWidget({
                                     ({format(event.startDate, 'p')} - {format(event.endDate, 'p')})
                                   </span>
                                 )}
+                                {event.isAllDay && <span className="ml-2 text-xs italic">(All day)</span>}
                               </div>
                               <div className="calendar-widget__event-actions">
                                 <Button variant="ghost" size="icon" className="h-7 w-7 p-1" onClick={(e) => {e.stopPropagation(); handleOpenEventDetailDialog(event);}}>
@@ -334,7 +411,7 @@ export function CalendarIcsWidget({
           onClose={handleCloseEventDetailDialog}
           event={editingEvent}
           onSubmit={handleSubmitEventDetail}
-          widgetId={widget.id} // Pass widgetId if needed by dialog logic, though not strictly for local event state
+          widgetId={widget.id} 
         />
       )}
     </div>
