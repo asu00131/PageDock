@@ -3,7 +3,7 @@
 
 import type { CalendarIcsAppWidget, CalendarEvent } from '@/types';
 import { Button } from '@/components/ui/button';
-import { Calendar as CalendarIcon, Edit3, MoreVertical, Trash2, ChevronDown, ChevronUp, AlertTriangle, Link2, FilePenLine, RotateCcw } from 'lucide-react';
+import { Calendar as CalendarIcon, Edit3, MoreVertical, Trash2, ChevronDown, ChevronUp, AlertTriangle, Link2, FilePenLine, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,7 +24,7 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import ICAL from 'ical.js';
-import { format, isSameDay, startOfDay } from 'date-fns';
+import { format, isSameDay, startOfDay, addDays, subDays, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isWithinInterval, compareAsc } from 'date-fns';
 import { EventDetailDialog } from './EventDetailDialog'; 
 
 interface CalendarIcsWidgetProps {
@@ -36,6 +36,8 @@ interface CalendarIcsWidgetProps {
   onToggleCollapse: (widgetId: string) => void;
 }
 
+type CalendarViewMode = 'month' | 'week' | 'day' | 'list';
+
 // Helper to safely parse date from ICAL.Time
 const parseIcalTime = (icalTime: ICAL.Time, event: ICAL.Event): Date => {
   try {
@@ -45,10 +47,8 @@ const parseIcalTime = (icalTime: ICAL.Time, event: ICAL.Event): Date => {
     return icalTime.toJSDate();
   } catch (e) {
     console.warn("Failed to parse date directly, attempting fallback for event:", event.summary, icalTime.toString(), e);
-    // Fallback for potentially problematic dates, e.g. only date without time but not marked as .isDate
-    // This is a common issue with some ICS generators.
-    const dateString = icalTime.toString().split('T')[0]; // Get YYYY-MM-DD part
-    return startOfDay(new Date(dateString)); // Assume start of day UTC, will be localized by browser later
+    const dateString = icalTime.toString().split('T')[0]; 
+    return startOfDay(new Date(dateString)); 
   }
 };
 
@@ -61,11 +61,14 @@ export function CalendarIcsWidget({
   isCollapsed,
   onToggleCollapse,
 }: CalendarIcsWidgetProps) {
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(startOfDay(new Date()));
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [currentMonth, setCurrentMonth] = useState(startOfDay(new Date())); // For month view navigation
+
+  const [currentView, setCurrentView] = useState<CalendarViewMode>('month');
+  const [displayDate, setDisplayDate] = useState<Date>(startOfDay(new Date())); // Anchor for week/day view navigation
 
   const [isEventDetailDialogOpen, setIsEventDetailDialogOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | undefined>(undefined);
@@ -80,6 +83,7 @@ export function CalendarIcsWidget({
 
     setIsLoading(true);
     setError(null);
+    // Use a proxy to fetch ICS data to avoid CORS issues
     fetch(`/api/ics-proxy?url=${encodeURIComponent(widget.data.icsUrl)}`)
       .then(response => {
         if (!response.ok) {
@@ -102,10 +106,10 @@ export function CalendarIcsWidget({
               summary: event.summary || 'No Title',
               startDate: startDate,
               endDate: endDate,
-              isAllDay: event.startDate.isDate, // Rely on ICAL.Time's isDate property
+              isAllDay: event.startDate.isDate, 
               description: event.description || undefined,
             };
-          });
+          }).sort((a,b) => compareAsc(a.startDate, b.startDate)); // Sort events by start date
           setEvents(parsedEvents);
         } catch (parseErr) {
           console.error("Error parsing ICS data:", parseErr);
@@ -119,7 +123,6 @@ export function CalendarIcsWidget({
         setEvents([]);
       })
       .finally(() => setIsLoading(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [widget.data.icsUrl]); 
   
   useEffect(() => {
@@ -129,46 +132,59 @@ export function CalendarIcsWidget({
   }, [widget.data.icsUrl, isCollapsed, fetchAndParseIcs]);
 
   const eventDays = useMemo(() => events.map(event => event.startDate), [events]);
+  
+  const getEventsForDay = useCallback((day: Date | undefined): CalendarEvent[] => {
+    if (!day) return [];
+    return events.filter(event => {
+        const targetDayStart = startOfDay(day);
+        const eventStartDay = startOfDay(event.startDate);
+
+        if (event.isAllDay) {
+            // For all-day events, check if 'day' is within the event's date range.
+            // ICAL all-day events usually have endDate as the start of the next day.
+            // So, event is on 'day' if event.startDate <= day < event.endDate
+            return compareAsc(eventStartDay, targetDayStart) <= 0 && compareAsc(targetDayStart, event.endDate) < 0;
+        } else {
+            // For timed events, it's simpler: just check if it starts on that day.
+            return isSameDay(eventStartDay, targetDayStart);
+        }
+    }).sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+  }, [events]);
+
 
   const eventsForSelectedDay = useMemo(() => {
-    if (!selectedDate) return [];
+    return getEventsForDay(selectedDate);
+  }, [selectedDate, getEventsForDay]);
+
+  const weekRange = useMemo(() => {
+    const start = startOfWeek(displayDate, { weekStartsOn: 1 }); // Monday as start of week
+    const end = endOfWeek(displayDate, { weekStartsOn: 1 });
+    return { start, end };
+  }, [displayDate]);
+
+  const eventsForCurrentWeek = useMemo(() => {
     return events.filter(event => {
-      const selectedDayStart = startOfDay(selectedDate);
-      const eventStartDay = startOfDay(event.startDate);
-      const eventEndDay = startOfDay(event.endDate);
+      const eventStart = event.startDate;
+      // Check if event occurs at any point within the weekRange
+      return isWithinInterval(eventStart, weekRange) || 
+             (event.endDate && isWithinInterval(event.endDate, weekRange)) ||
+             (eventStart < weekRange.start && event.endDate > weekRange.end); // Event spans the whole week
+    }).sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+  }, [events, weekRange]);
 
-      if (event.isAllDay) {
-        // For all-day events, check if selectedDate is within event's date range (inclusive start, exclusive end for typical ICAL)
-        // However, for display, if it spans multiple days, we consider it active on its end day too IF it's not just a time on that day.
-        // Simplified: if start day is on or before selected, and end day is on or after selected.
-        // For an all-day event ending on date D, it's usually exclusive of D for time, but inclusive for the date itself.
-        // Example: All day event from May 8 to May 8 means it's active on May 8.
-        // All day event from May 8 to May 9 means it's active on May 8, not May 9 typically.
-        // Let's adjust for display: if end date is also considered.
-        // If event.endDate is the very start of the next day for an all-day event, then it means it occurs on event.startDate
-        // A common pattern for all-day events is startDate=YYYY-MM-DD, endDate=YYYY-MM-D(D+1)
-        // Let's consider an event active if selectedDate is between event.startDate (inclusive) and event.endDate (exclusive for timed, inclusive for all-day)
-        if (isSameDay(eventStartDay, selectedDayStart)) return true; // Starts today
-        if (eventStartDay < selectedDayStart && eventEndDay >= selectedDayStart ) { // Spans across today
-             // If event.endDate is exactly at midnight, it means the event concluded before this day started.
-             // But for all-day events, if endDate is YYYY-MM-DD, it includes that day.
-             // If endDate is YYYY-MM-(DD+1)T00:00:00, it means it lasts through DD.
-            if(event.endDate.getHours() === 0 && event.endDate.getMinutes() === 0 && event.endDate.getSeconds() === 0 && !isSameDay(eventEndDay,selectedDayStart) ){
-                return false; // Ends exactly at midnight of selected day, so not "on" selected day.
-            }
-            return true;
-        }
-        return false;
+  const eventsForListView = useMemo(() => {
+    const today = startOfDay(new Date());
+    const thirtyDaysLater = endOfWeek(addDays(today, 30)); // Show events for roughly the next month
+    return events.filter(event => 
+      isWithinInterval(event.startDate, { start: today, end: thirtyDaysLater }) ||
+      (event.endDate && isWithinInterval(event.endDate, { start: today, end: thirtyDaysLater })) ||
+      (event.startDate < today && event.endDate > thirtyDaysLater)
+    ).sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+  }, [events]);
 
-      } else { // For timed events
-        return isSameDay(eventStartDay, selectedDayStart);
-      }
-    })
-    .sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
-  }, [events, selectedDate]);
 
   const handleBodyClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target instanceof HTMLElement && (e.target.closest('button, a') || e.target.closest('.rdp-nav_button'))) {
+    if (e.target instanceof HTMLElement && (e.target.closest('button, a') || e.target.closest('.rdp-nav_button') || e.target.closest('.view-switcher'))) {
       return; 
     }
     e.stopPropagation();
@@ -179,7 +195,7 @@ export function CalendarIcsWidget({
   
   const handleBodyKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'Enter' || e.key === ' ') {
-       if (e.target instanceof HTMLElement && (e.target.closest('button, a') || e.target.closest('.rdp-nav_button'))) {
+       if (e.target instanceof HTMLElement && (e.target.closest('button, a') || e.target.closest('.rdp-nav_button') || e.target.closest('.view-switcher'))) {
         return;
       }
       e.preventDefault();
@@ -201,7 +217,6 @@ export function CalendarIcsWidget({
   };
 
   const handleSubmitEventDetail = (updatedEventData: Partial<CalendarEvent> & { id: string }) => {
-    // For now, event editing is local and doesn't persist to an ICS file.
     setEvents(prevEvents =>
       prevEvents.map(event =>
         event.id === updatedEventData.id ? { ...event, ...updatedEventData } : event
@@ -211,15 +226,83 @@ export function CalendarIcsWidget({
   };
 
   const handleDeleteEvent = (eventId: string) => {
-    // Local deletion
     setEvents(prevEvents => prevEvents.filter(event => event.id !== eventId));
   };
   
   const goToToday = () => {
-    const today = new Date();
+    const today = startOfDay(new Date());
     setSelectedDate(today);
     setCurrentMonth(today);
+    setDisplayDate(today); // Also reset displayDate for week/day views
   };
+
+  const renderEventItem = (event: CalendarEvent, context?: 'week' | 'list') => (
+    <li key={event.id} className="calendar-widget__event-item group/event-item">
+      <div className="flex-grow overflow-hidden">
+        <strong className="truncate block" title={event.summary}>{event.summary}</strong>
+        {context === 'week' && (
+            <span className="text-xs block">
+                {format(event.startDate, 'EEE, MMM d')}
+                {!event.isAllDay && ` ${format(event.startDate, 'p')}`}
+            </span>
+        )}
+        {context === 'list' && (
+            <span className="text-xs block">
+                {format(event.startDate, 'PPP')}
+                {!event.isAllDay && ` ${format(event.startDate, 'p')} - ${format(event.endDate, 'p')}`}
+            </span>
+        )}
+        {context !== 'week' && context !== 'list' && !event.isAllDay && (
+          <span className="ml-1 text-xs">
+            ({format(event.startDate, 'p')} - {format(event.endDate, 'p')})
+          </span>
+        )}
+        {context !== 'week' && context !== 'list' && event.isAllDay && <span className="ml-1 text-xs italic">(All day)</span>}
+      </div>
+      <div className="calendar-widget__event-actions">
+        <Button variant="ghost" size="icon" className="h-7 w-7 p-1" onClick={(e) => {e.stopPropagation(); handleOpenEventDetailDialog(event);}}>
+          <FilePenLine className="h-4 w-4" />
+          <span className="sr-only">View/Edit Event</span>
+        </Button>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-7 w-7 p-1 hover:bg-destructive/10 hover:text-destructive" onClick={(e) => e.stopPropagation()}>
+              <Trash2 className="h-4 w-4" />
+              <span className="sr-only">Delete Event</span>
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete the event "{event.summary}"? This action is local and cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => handleDeleteEvent(event.id)}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    </li>
+  );
+
+  const renderEventsList = (eventsToRender: CalendarEvent[], title?: string, noEventsMessage?: string, context?: 'week' | 'list') => (
+    <div className="calendar-widget__event-list">
+      {title && <h3 className="calendar-widget__event-list-title">{title}</h3>}
+      {eventsToRender.length > 0 ? (
+        <ul>{eventsToRender.map(event => renderEventItem(event, context))}</ul>
+      ) : (
+        <p className="calendar-widget__no-events">{noEventsMessage || "No events."}</p>
+      )}
+    </div>
+  );
 
 
   return (
@@ -254,12 +337,12 @@ export function CalendarIcsWidget({
                     <span className="sr-only">More options for {widget.title}</span>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onOpenWidgetTitleDialog(widget.id); }}>
+                <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                  <DropdownMenuItem onClick={() => onOpenWidgetTitleDialog(widget.id)}>
                     <Edit3 className="mr-2 h-4 w-4" />
                     <span>Edit Title</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onOpenEditDialog(widget.id); }}>
+                  <DropdownMenuItem onClick={() => onOpenEditDialog(widget.id)}>
                     <Link2 className="mr-2 h-4 w-4" />
                     <span>Edit Calendar URL</span>
                   </DropdownMenuItem>
@@ -267,7 +350,6 @@ export function CalendarIcsWidget({
                     <AlertDialogTrigger asChild>
                       <DropdownMenuItem
                         onSelect={(e) => e.preventDefault()}
-                        onClick={(e) => e.stopPropagation()}
                         className="text-destructive focus:text-destructive-foreground hover:!text-destructive-foreground hover:!bg-destructive/90 focus:!bg-destructive/90"
                       >
                         <Trash2 className="mr-2 h-4 w-4" />
@@ -317,75 +399,77 @@ export function CalendarIcsWidget({
                 }
                 {!isLoading && !error && widget.data.icsUrl && (
                   <>
-                    <div className="calendar-widget__toolbar">
-                      <Button onClick={goToToday} variant="outline" size="sm">Today</Button>
-                    </div>
-                    <Calendar
-                      mode="single"
-                      selected={selectedDate}
-                      onSelect={setSelectedDate}
-                      month={currentMonth}
-                      onMonthChange={setCurrentMonth}
-                      className="rounded-md calendar-widget" 
-                      modifiers={{ eventDay: eventDays }}
-                      modifiersClassNames={{ eventDay: 'bg-primary/20 rounded-full !text-primary-foreground' }} 
-                    />
-                    {selectedDate && eventsForSelectedDay.length > 0 && (
-                      <div className="calendar-widget__event-list">
-                        <h3 className="calendar-widget__event-list-title">Events for {format(selectedDate, 'PPP')}:</h3>
-                        <ul>
-                          {eventsForSelectedDay.map(event => (
-                            <li key={event.id} className="calendar-widget__event-item group/event-item">
-                              <div className="flex-grow">
-                                <strong>{event.summary}</strong>
-                                {!event.isAllDay && (
-                                  <span className="ml-2 text-xs">
-                                    ({format(event.startDate, 'p')} - {format(event.endDate, 'p')})
-                                  </span>
-                                )}
-                                {event.isAllDay && <span className="ml-2 text-xs italic">(All day)</span>}
-                              </div>
-                              <div className="calendar-widget__event-actions">
-                                <Button variant="ghost" size="icon" className="h-7 w-7 p-1" onClick={(e) => {e.stopPropagation(); handleOpenEventDetailDialog(event);}}>
-                                  <FilePenLine className="h-4 w-4" />
-                                  <span className="sr-only">View/Edit Event</span>
+                    <div className="calendar-widget__toolbar view-switcher">
+                        <div className="flex space-x-1">
+                            {(['month', 'week', 'day', 'list'] as CalendarViewMode[]).map(view => (
+                                <Button
+                                key={view}
+                                variant={currentView === view ? 'default' : 'outline'}
+                                size="sm"
+                                onClick={(e) => { e.stopPropagation(); setCurrentView(view); }}
+                                >
+                                {view.charAt(0).toUpperCase() + view.slice(1)}
                                 </Button>
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-7 w-7 p-1 hover:bg-destructive/10 hover:text-destructive" onClick={(e) => e.stopPropagation()}>
-                                      <Trash2 className="h-4 w-4" />
-                                      <span className="sr-only">Delete Event</span>
-                                    </Button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent onClick={(e) => e.stopPropagation()}>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        Are you sure you want to delete the event "{event.summary}"? This action is local and cannot be undone.
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                      <AlertDialogAction
-                                        onClick={() => handleDeleteEvent(event.id)}
-                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                      >
-                                        Delete
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
-                              </div>
-                            </li>
-                          ))}
-                        </ul>
+                            ))}
+                        </div>
+                        <Button onClick={(e)=>{e.stopPropagation(); goToToday()}} variant="outline" size="sm">Today</Button>
+                    </div>
+
+                    {currentView === 'month' && (
+                      <>
+                        <Calendar
+                          mode="single"
+                          selected={selectedDate}
+                          onSelect={(day) => { setSelectedDate(day); if (day) setDisplayDate(day);}}
+                          month={currentMonth}
+                          onMonthChange={setCurrentMonth}
+                          className="rounded-md calendar-widget" 
+                          modifiers={{ eventDay: eventDays }}
+                          modifiersClassNames={{ eventDay: 'bg-primary/20 rounded-full !text-primary-foreground' }} 
+                        />
+                        {selectedDate && renderEventsList(eventsForSelectedDay, `Events for ${format(selectedDate, 'PPP')}`, `No events for ${format(selectedDate, 'PPP')}.`)}
+                      </>
+                    )}
+
+                    {currentView === 'week' && (
+                      <div className="p-2">
+                        <div className="flex justify-between items-center mb-2">
+                          <Button variant="ghost" size="icon" onClick={(e)=>{e.stopPropagation(); setDisplayDate(subWeeks(displayDate, 1))}}><ChevronLeft className="h-5 w-5" /></Button>
+                          <h3 className="text-base font-semibold">{format(weekRange.start, 'MMM d')} - {format(weekRange.end, 'MMM d, yyyy')}</h3>
+                          <Button variant="ghost" size="icon" onClick={(e)=>{e.stopPropagation(); setDisplayDate(addWeeks(displayDate, 1))}}><ChevronRight className="h-5 w-5" /></Button>
+                        </div>
+                        {renderEventsList(eventsForCurrentWeek, undefined, "No events this week.", 'week')}
                       </div>
                     )}
-                     {selectedDate && eventsForSelectedDay.length === 0 && (
-                       <div className="calendar-widget__event-list">
-                         <p className="calendar-widget__no-events">No events for {format(selectedDate, 'PPP')}.</p>
-                       </div>
-                     )}
+
+                    {currentView === 'day' && (
+                       <div className="p-2">
+                        <div className="flex justify-between items-center mb-2">
+                          <Button variant="ghost" size="icon" onClick={(e)=>{e.stopPropagation(); const newDay = subDays(displayDate,1); setDisplayDate(newDay); setSelectedDate(newDay);}}><ChevronLeft className="h-5 w-5" /></Button>
+                          <Button variant="outline" size="sm" onClick={() => {const newMonth = startOfDay(displayDate); setCurrentMonth(newMonth)}}>
+                            {format(displayDate, 'PPP')}
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={(e)=>{e.stopPropagation(); const newDay = addDays(displayDate,1); setDisplayDate(newDay); setSelectedDate(newDay);}}><ChevronRight className="h-5 w-5" /></Button>
+                        </div>
+                         <Calendar
+                            mode="single"
+                            selected={displayDate}
+                            onSelect={(day) => { if(day) {setDisplayDate(day); setSelectedDate(day); setCurrentMonth(startOfDay(day))}}}
+                            month={currentMonth} // Use currentMonth which can be controlled for day view too
+                            onMonthChange={setCurrentMonth} // Allow month navigation within day view's calendar
+                            className="rounded-md calendar-widget my-2"
+                            modifiers={{ eventDay: eventDays }}
+                            modifiersClassNames={{ eventDay: 'bg-primary/20 rounded-full !text-primary-foreground' }}
+                        />
+                        {renderEventsList(getEventsForDay(displayDate), undefined, `No events for ${format(displayDate, 'PPP')}.`)}
+                      </div>
+                    )}
+                    
+                    {currentView === 'list' && (
+                        <div className="p-2">
+                         {renderEventsList(eventsForListView, "Upcoming Events (Next 30 days)", "No upcoming events in the next 30 days.", 'list')}
+                        </div>
+                    )}
                   </>
                 )}
                 {!widget.data.icsUrl && !isLoading && !error && (
@@ -417,3 +501,4 @@ export function CalendarIcsWidget({
     </div>
   );
 }
+

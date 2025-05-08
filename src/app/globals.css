@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -389,11 +388,14 @@
     @apply text-xs p-1.5 mb-1 rounded bg-accent/10 text-accent-foreground flex justify-between items-center;
     /* Ensure text color is from accent-foreground for visibility */
   }
-  .calendar-widget__event-item strong, .calendar-widget__event-item span {
-    @apply text-accent-foreground; /* Explicitly set text color for children */
+   /* Ensure children of event item also use accent-foreground for better contrast */
+  .calendar-widget__event-item strong, 
+  .calendar-widget__event-item span {
+    @apply text-[hsl(var(--accent-foreground))]; 
   }
-  .dark .calendar-widget__event-item strong, .dark .calendar-widget__event-item span {
-     @apply text-accent-foreground; /* Ensure dark mode also uses accent-foreground */
+  .dark .calendar-widget__event-item strong, 
+  .dark .calendar-widget__event-item span {
+     @apply text-[hsl(var(--accent-foreground))]; /* Ensure dark mode also uses accent-foreground */
   }
   .calendar-widget__no-events {
     @apply text-xs text-muted-foreground;
@@ -403,9 +405,3 @@
   }
 
 }
-
-
-
-    
-
-
