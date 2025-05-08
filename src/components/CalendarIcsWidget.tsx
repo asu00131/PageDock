@@ -41,14 +41,30 @@ type CalendarViewMode = 'month' | 'week' | 'day' | 'list';
 
 const parseIcalTime = (icalTime: ICAL.Time, event: ICAL.Event): Date => {
   try {
+    // For all-day events, ICAL.Time.isDate is true.
+    // The JS date conversion for these should be at the start of the day.
     if (icalTime.isDate) { 
-      return startOfDay(icalTime.toJSDate());
+      // Ensure the date is interpreted in local timezone at midnight
+      const jsDate = icalTime.toJSDate();
+      return startOfDay(jsDate); // Use date-fns startOfDay for consistency
     }
+    // For timed events, convert directly.
     return icalTime.toJSDate();
   } catch (e) {
     console.warn("Failed to parse date directly, attempting fallback for event:", event.summary, icalTime.toString(), e);
-    const dateString = icalTime.toString().split('T')[0]; 
-    return startOfDay(new Date(dateString)); 
+    // Fallback for potentially problematic date strings: parse only the date part
+    const dateString = icalTime.toString().split('T')[0]; // Get YYYYMMDD or YYYY-MM-DD
+    // Attempt to construct a new Date from this string, then take startOfDay
+    // This handles cases like '20231026' which new Date() might not parse correctly alone.
+    // A more robust parser might be needed if various non-standard formats are common.
+    const year = parseInt(dateString.substring(0, 4), 10);
+    const month = parseInt(dateString.substring(4, 6), 10) -1; // JS months are 0-indexed
+    const day = parseInt(dateString.substring(6, 8), 10);
+    if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
+        return startOfDay(new Date(year, month, day));
+    }
+    // If all else fails, return current date's start as a last resort to prevent crashes
+    return startOfDay(new Date()); 
   }
 };
 
@@ -141,14 +157,15 @@ export function CalendarIcsWidget({
 
         if (event.isAllDay) {
             // For all-day events, check if the target day is within the event's range (inclusive start, exclusive end)
-            return compareAsc(eventStartDay, targetDayStart) <= 0 && compareAsc(targetDayStart, startOfDay(event.endDate)) < 0;
+            const eventEndDayForCompare = event.endDate.getTime() === eventStartDay.getTime() ? addDays(event.endDate, 1) : event.endDate;
+            return compareAsc(targetDayStart, eventStartDay) >= 0 && compareAsc(targetDayStart, startOfDay(eventEndDayForCompare)) < 0;
         } else {
             // For timed events, check if the event spans across any part of the target day
-            const eventEndDay = event.endDate; // Use full end date for comparison
-            return isWithinInterval(targetDayStart, { start: eventStartDay, end: eventEndDay }) || 
-                   isWithinInterval(addDays(targetDayStart,1), { start: eventStartDay, end: eventEndDay }) || // if event ends on next day but after midnight
-                   (isSameDay(targetDayStart, eventStartDay)) || // event starts on target day
-                   (isSameDay(targetDayStart, eventEndDay) && !isSameDay(eventStartDay, eventEndDay)); // event ends on target day (but didn't start on it)
+             const eventEndDay = event.endDate; 
+            // Check if targetDayStart is between event.startDate and event.endDate (inclusive of start, exclusive of end for full day span)
+            // or if the event specifically starts on the targetDay
+            return (compareAsc(targetDayStart, eventStartDay) >= 0 && compareAsc(targetDayStart, eventEndDay) < 0) || 
+                   isSameDay(targetDayStart, eventStartDay);
         }
     }).sort((a, b) => {
       if (a.isAllDay && !b.isAllDay) return -1;
@@ -170,12 +187,16 @@ export function CalendarIcsWidget({
 
   const eventsForListView = useMemo(() => {
     const today = startOfDay(new Date());
+    // Show events from today up to 30 days in the future, or events that are ongoing from the past.
     const thirtyDaysLater = endOfWeek(addDays(today, 30)); 
-    return events.filter(event => 
-      isWithinInterval(event.startDate, { start: today, end: thirtyDaysLater }) ||
-      (event.endDate && isWithinInterval(event.endDate, { start: today, end: thirtyDaysLater })) ||
-      (event.startDate < today && event.endDate && event.endDate > thirtyDaysLater) 
-    ).sort((a, b) => compareAsc(a.startDate, b.startDate));
+    return events.filter(event => {
+      const eventStartsTodayOrLater = compareAsc(event.startDate, today) >= 0;
+      const eventEndsTodayOrLater = event.endDate && compareAsc(event.endDate, today) >=0;
+      const eventIsWithinFutureRange = isWithinInterval(event.startDate, { start: today, end: thirtyDaysLater });
+      const eventSpansAcrossToday = compareAsc(event.startDate, today) < 0 && event.endDate && compareAsc(event.endDate, today) > 0;
+
+      return eventIsWithinFutureRange || (eventStartsTodayOrLater && eventEndsTodayOrLater) || eventSpansAcrossToday;
+    }).sort((a, b) => compareAsc(a.startDate, b.startDate));
   }, [events]);
 
 
@@ -202,8 +223,8 @@ export function CalendarIcsWidget({
     }
   };
 
-  const handleOpenEventDetailDialog = (event: CalendarEvent) => {
-    setEditingEvent(event);
+  const handleOpenEventDetailDialog = (event: CalendarEvent | Omit<CalendarEvent, 'id'>) => {
+    setEditingEvent(event as CalendarEvent); // Assume it will have an ID or one will be generated
     setIsEventDetailDialogOpen(true);
   };
 
@@ -212,12 +233,18 @@ export function CalendarIcsWidget({
     setEditingEvent(undefined); 
   };
 
-  const handleSubmitEventDetail = (updatedEventData: Partial<CalendarEvent> & { id: string }) => {
-    setEvents(prevEvents =>
-      prevEvents.map(event =>
-        event.id === updatedEventData.id ? { ...event, ...updatedEventData } : event
-      )
-    );
+  const handleSubmitEventDetail = (updatedEventData: CalendarEvent) => {
+     setEvents(prevEvents => {
+        const eventExists = prevEvents.some(e => e.id === updatedEventData.id);
+        if (eventExists) {
+            return prevEvents.map(event =>
+                event.id === updatedEventData.id ? { ...event, ...updatedEventData } : event
+            ).sort((a,b) => compareAsc(a.startDate, b.startDate));
+        } else {
+            // This is a new event
+            return [...prevEvents, updatedEventData].sort((a,b) => compareAsc(a.startDate, b.startDate));
+        }
+    });
     handleCloseEventDetailDialog();
   };
 
@@ -455,11 +482,10 @@ export function CalendarIcsWidget({
                     <span>Edit Calendar URL</span>
                   </DropdownMenuItem>
                    <DropdownMenuItem onClick={() => {
-                     const newEvent: CalendarEvent = {
-                       id: crypto.randomUUID(),
+                     const newEvent: Omit<CalendarEvent, 'id'> = { // Omit id for new event template
                        summary: "New Event",
-                       startDate: selectedDate || new Date(),
-                       endDate: addDays(selectedDate || new Date(), 1),
+                       startDate: selectedDate || startOfDay(new Date()),
+                       endDate: addDays(selectedDate || startOfDay(new Date()), 1), // Default to 1 day duration
                        isAllDay: false,
                        description: ""
                      };
@@ -522,7 +548,8 @@ export function CalendarIcsWidget({
                 {!isLoading && !error && widget.data.icsUrl && (
                   <>
                     <div className="calendar-widget__toolbar view-switcher">
-                        <div className="flex space-x-1">
+                        <div className="flex items-center space-x-1">
+                             <Button onClick={(e)=>{e.stopPropagation(); goToToday()}} variant="outline" size="sm">Today</Button>
                             {(['month', 'week', 'day', 'list'] as CalendarViewMode[]).map(view => (
                                 <Button
                                 key={view}
@@ -534,7 +561,24 @@ export function CalendarIcsWidget({
                                 </Button>
                             ))}
                         </div>
-                        <Button onClick={(e)=>{e.stopPropagation(); goToToday()}} variant="outline" size="sm">Today</Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                const newEvent: Omit<CalendarEvent, 'id'> = {
+                                    summary: "New Event",
+                                    startDate: selectedDate || startOfDay(new Date()),
+                                    endDate: addDays(selectedDate || startOfDay(new Date()), 1),
+                                    isAllDay: false,
+                                    description: "",
+                                };
+                                handleOpenEventDetailDialog(newEvent);
+                            }}
+                        >
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            新增时间安排
+                        </Button>
                     </div>
 
                     {currentView === 'month' && (
@@ -551,7 +595,7 @@ export function CalendarIcsWidget({
                           month={currentMonth}
                           onMonthChange={setCurrentMonth}
                           className="rounded-md calendar-widget" 
-                          modifiers={{ eventDay: eventDays }}
+                          modifiers={{ eventDay: eventDays.map(d => startOfDay(d)) }}
                           modifiersClassNames={{ eventDay: 'bg-primary/20 rounded-full !text-primary-foreground' }} 
                         />
                         {selectedDate && renderEventsList(eventsForSelectedDay, `Events for ${format(selectedDate, 'PPP')}`, `No events for ${format(selectedDate, 'PPP')}.`, 'day-detail')}
@@ -607,7 +651,7 @@ export function CalendarIcsWidget({
                     
                     {currentView === 'list' && (
                         <div className="p-2">
-                         {renderEventsList(eventsForListView, "Upcoming Events (Next 30 days)", "No upcoming events in the next 30 days.", 'list')}
+                         {renderEventsList(eventsForListView, "Upcoming Events", "No upcoming events.", 'list')}
                         </div>
                     )}
                   </>
