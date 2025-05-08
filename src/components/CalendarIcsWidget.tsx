@@ -1,4 +1,3 @@
-
 "use client";
 
 import type { CalendarIcsAppWidget, CalendarEvent } from '@/types';
@@ -47,8 +46,10 @@ const parseIcalTime = (icalTime: ICAL.Time, event: ICAL.Event): Date => {
     return icalTime.toJSDate();
   } catch (e) {
     console.warn("Failed to parse date directly, attempting fallback for event:", event.summary, icalTime.toString(), e);
-    const dateString = icalTime.toString().split('T')[0]; 
-    return startOfDay(new Date(dateString)); 
+    // Attempt to parse from string representation if toJSDate fails (e.g. invalid date format for JS Date constructor from ical.js)
+    // This is a basic fallback and might not cover all edge cases.
+    const dateString = icalTime.toString().split('T')[0]; // Try to get at least the date part
+    return startOfDay(new Date(dateString)); // This might also fail if dateString is not a valid ISO part
   }
 };
 
@@ -172,7 +173,7 @@ export function CalendarIcsWidget({
     return events.filter(event => 
       isWithinInterval(event.startDate, { start: today, end: thirtyDaysLater }) ||
       (event.endDate && isWithinInterval(event.endDate, { start: today, end: thirtyDaysLater })) ||
-      (event.startDate < today && event.endDate > thirtyDaysLater)
+      (event.startDate < today && event.endDate > thirtyDaysLater) // Events that span the whole period
     ).sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
   }, [events]);
 
@@ -234,20 +235,23 @@ export function CalendarIcsWidget({
     let baseItemClasses = "calendar-widget__event-item group/event-item";
     let titleClasses = "truncate block";
     let timeClasses = "text-xs block";
-    let actionButtonSizeClasses = "h-7 w-7 p-1";
-    let actionIconSizeClasses = "h-4 w-4";
+    let actionButtonSizeClasses = "h-7 w-7 p-1"; // Standard size for actions
+    let actionIconSizeClasses = "h-4 w-4"; // Standard icon size
 
     if (context === 'week-column') {
-        baseItemClasses = "calendar-widget__event-item group/event-item !p-1 !mb-0.5";
-        titleClasses = "truncate block text-xs font-semibold";
-        timeClasses = "text-xs block";
-        actionButtonSizeClasses = "h-6 w-6 p-0.5";
-        actionIconSizeClasses = "h-3 w-3";
+        baseItemClasses = "calendar-widget__event-item group/event-item !p-1 !mb-0.5 text-xs"; // Smaller text overall for week column
+        titleClasses = "truncate block font-semibold"; // title still semi-bold
+        timeClasses = "text-xs block"; // time explicitly text-xs
+        actionButtonSizeClasses = "h-6 w-6 p-0.5"; // smaller buttons for compact view
+        actionIconSizeClasses = "h-3 w-3"; // smaller icons
+    } else if (context === 'day-detail' || context === 'list') {
+        // Default classes are generally good for list and day-detail
+        // No specific override needed here unless further differentiation is required
     }
     
     return (
     <li key={event.id} className={baseItemClasses}>
-      <div className="flex-grow overflow-hidden">
+      <div className="flex-grow overflow-hidden mr-2"> {/* Added mr-2 for spacing before actions */}
         <strong className={titleClasses} title={event.summary}>{event.summary}</strong>
         
         {context === 'list' && (
@@ -306,7 +310,7 @@ export function CalendarIcsWidget({
     <div className="calendar-widget__event-list">
       {title && <h3 className="calendar-widget__event-list-title">{title}</h3>}
       {eventsToRender.length > 0 ? (
-        <ul>{eventsToRender.map(event => renderEventItem(event, context))}</ul>
+        <ul className="space-y-1">{eventsToRender.map(event => renderEventItem(event, context))}</ul>
       ) : (
         <p className="calendar-widget__no-events">{noEventsMessage || "No events."}</p>
       )}
@@ -429,7 +433,7 @@ export function CalendarIcsWidget({
                         <Calendar
                           mode="single"
                           selected={selectedDate}
-                          onSelect={(day) => { setSelectedDate(day); if (day) setDisplayDate(day);}}
+                          onSelect={(day) => { setSelectedDate(day); if (day) setDisplayDate(startOfDay(day));}}
                           month={currentMonth}
                           onMonthChange={setCurrentMonth}
                           className="rounded-md calendar-widget" 
@@ -450,12 +454,12 @@ export function CalendarIcsWidget({
                             <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-7 gap-px bg-border border-t border-l">
                             {eachDayOfInterval(weekRange).map(day => {
                                 const dailyEvents = getEventsForDay(day);
-                                const isCurrentDisplayDay = isSameDay(day, displayDate); // Or selectedDate depending on interaction model
+                                const isCurrentDisplayDay = isSameDay(day, displayDate); 
                                 const isTodayDate = isSameDay(day, new Date());
                                 return (
                                 <div key={day.toISOString()} 
                                      className={`calendar-widget__day-column bg-card p-1 min-h-[100px] border-b border-r ${isCurrentDisplayDay ? 'bg-accent/10': ''}`}
-                                     onClick={() => { setSelectedDate(day); setDisplayDate(day); setCurrentView('day');}} // Optionally switch to day view
+                                     onClick={() => { setSelectedDate(day); setDisplayDate(day); setCurrentView('day');}}
                                      role="button"
                                      tabIndex={0}
                                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedDate(day); setDisplayDate(day); setCurrentView('day');}}}
@@ -481,22 +485,57 @@ export function CalendarIcsWidget({
                        <div className="p-2">
                         <div className="flex justify-between items-center mb-2">
                           <Button variant="ghost" size="icon" onClick={(e)=>{e.stopPropagation(); const newDay = subDays(displayDate,1); setDisplayDate(newDay); setSelectedDate(newDay);}}><ChevronLeft className="h-5 w-5" /></Button>
-                          <Button variant="outline" size="sm" onClick={() => {const newMonth = startOfDay(displayDate); setCurrentMonth(newMonth); setCurrentView('month'); setSelectedDate(displayDate);}}>
-                            {format(displayDate, 'PPP')}
-                          </Button>
+                          <h3 
+                            className="text-lg font-semibold text-center cursor-pointer hover:text-primary"
+                            onClick={() => {const newMonth = startOfDay(displayDate); setCurrentMonth(newMonth); setCurrentView('month'); setSelectedDate(displayDate);}}
+                          >
+                            {format(displayDate, 'EEEE, MMM d, yyyy')}
+                          </h3>
                           <Button variant="ghost" size="icon" onClick={(e)=>{e.stopPropagation(); const newDay = addDays(displayDate,1); setDisplayDate(newDay); setSelectedDate(newDay);}}><ChevronRight className="h-5 w-5" /></Button>
                         </div>
                          <Calendar
                             mode="single"
                             selected={displayDate}
-                            onSelect={(day) => { if(day) {setDisplayDate(day); setSelectedDate(day); setCurrentMonth(startOfDay(day))}}}
+                            onSelect={(day) => { if(day) {setDisplayDate(startOfDay(day)); setSelectedDate(startOfDay(day)); setCurrentMonth(startOfDay(day))}}}
                             month={currentMonth} 
                             onMonthChange={setCurrentMonth} 
                             className="rounded-md calendar-widget my-2"
                             modifiers={{ eventDay: eventDays }}
                             modifiersClassNames={{ eventDay: 'bg-primary/20 rounded-full !text-primary-foreground' }}
                         />
-                        {renderEventsList(getEventsForDay(displayDate), `Events for ${format(displayDate, 'PPP')}`, `No events for ${format(displayDate, 'PPP')}.`, 'day-detail')}
+                        <div className="mt-4">
+                          {(() => {
+                            const allEventsOnDay = getEventsForDay(displayDate);
+                            const allDayEventsList = allEventsOnDay.filter(event => event.isAllDay);
+                            const timedEventsList = allEventsOnDay.filter(event => !event.isAllDay);
+
+                            return (
+                              <>
+                                {allDayEventsList.length > 0 && (
+                                  <div className="mb-4">
+                                    <h4 className="text-md font-semibold mb-2 text-foreground">All-day Events</h4>
+                                    <ul className="space-y-1">
+                                      {allDayEventsList.map(event => renderEventItem(event, 'day-detail'))}
+                                    </ul>
+                                  </div>
+                                )}
+
+                                {timedEventsList.length > 0 && (
+                                  <div>
+                                    <h4 className="text-md font-semibold mb-2 text-foreground">Timed Events</h4>
+                                    <ul className="space-y-1">
+                                      {timedEventsList.map(event => renderEventItem(event, 'day-detail'))}
+                                    </ul>
+                                  </div>
+                                )}
+                                
+                                {allEventsOnDay.length === 0 && (
+                                  <p className="text-muted-foreground">No events for {format(displayDate, 'PPP')}.</p>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </div>
                       </div>
                     )}
                     
