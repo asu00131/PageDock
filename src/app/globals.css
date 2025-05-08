@@ -385,8 +385,7 @@
     @apply text-sm font-semibold mb-2 text-foreground;
   }
   .calendar-widget__event-item {
-    @apply text-xs p-1.5 mb-1 rounded bg-accent/10 text-accent-foreground flex justify-between items-center;
-    /* Ensure text color is from accent-foreground for visibility */
+    @apply text-xs p-1.5 mb-1 rounded bg-accent/10 text-accent-foreground flex justify-between items-center cursor-pointer;
   }
    /* Ensure children of event item also use accent-foreground for better contrast */
   .calendar-widget__event-item strong, 
@@ -403,5 +402,29 @@
   .calendar-widget__event-actions {
     @apply flex items-center space-x-1 opacity-0 group-hover/event-item:opacity-100 transition-opacity;
   }
+  .calendar-widget__day-column {
+    @apply bg-card p-1 min-h-[120px] border-b border-r hover:bg-accent/5 cursor-pointer;
+  }
+  /* Day view timeline styles */
+  .calendar-widget__day-timeline-container {
+    @apply relative; /* Container for timeline slots and events */
+  }
+  .calendar-widget__time-axis {
+     @apply w-14 pr-2 text-right text-xs text-muted-foreground shrink-0 pt-1;
+  }
+  .calendar-widget__event-column {
+    @apply relative ml-14 h-full; /* Offset by time axis width */
+  }
+  .calendar-widget__time-slot {
+    @apply flex border-b border-border/50; /* Adjust height in component style */
+  }
+  .calendar-widget__event-item.day-timeline {
+    @apply absolute w-[calc(100%-0.5rem)] left-1 right-1 z-10;
+    /* background, border, etc. are already on calendar-widget__event-item */
+  }
 
 }
+
+    
+
+    
