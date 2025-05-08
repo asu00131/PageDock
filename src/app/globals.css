@@ -206,11 +206,11 @@
     @apply relative transition-all duration-200 ease-in-out;
   }
   .bookmark-item_mode_cloud {
+    @apply bg-[hsl(var(--link-card-background))] text-[hsl(var(--link-card-foreground))] flex items-center; 
     max-width: 100%;
     margin: 0.15em;
     border: 1px solid hsl(var(--link-card-foreground) / 0.2); /* Fainter border for links */
     border-radius: 2px; /* Much smaller radius */
-    @apply bg-[hsl(var(--link-card-background))] text-[hsl(var(--link-card-foreground))] flex items-center; 
     padding: 1px .5em; /* Explicitly set padding */
   }
   .bookmark-item_mode_cloud:hover {
@@ -256,43 +256,36 @@
     @apply p-4; /* More padding for note body */
   }
   .note-widget__content {
-    @apply prose prose-sm max-w-none dark:prose-invert;
-    
-    --tw-prose-body: hsl(var(--note-card-foreground));
-    --tw-prose-headings: hsl(var(--note-card-foreground));
-    --tw-prose-lead: hsl(var(--note-card-foreground));
-    --tw-prose-links: hsl(var(--primary)); 
-    --tw-prose-bold: hsl(var(--note-card-foreground));
-    --tw-prose-counters: hsl(var(--note-card-foreground) / 0.7); 
-    --tw-prose-bullets: hsl(var(--note-card-foreground) / 0.7); 
-    --tw-prose-hr: hsl(var(--note-card-foreground) / 0.3); 
-    --tw-prose-quotes: hsl(var(--note-card-foreground));
-    --tw-prose-quote-borders: hsl(var(--primary)); 
-    --tw-prose-captions: hsl(var(--note-card-foreground) / 0.8); 
-    --tw-prose-code: hsl(var(--note-card-foreground)); 
-    --tw-prose-pre-code: hsl(var(--card-foreground)); 
-    --tw-prose-pre-bg: hsl(var(--card)); 
-    --tw-prose-th-borders: hsl(var(--note-card-foreground) / 0.4); 
-    --tw-prose-td-borders: hsl(var(--note-card-foreground) / 0.3); 
-
-    --tw-prose-invert-body: hsl(var(--note-card-foreground));
-    --tw-prose-invert-headings: hsl(var(--note-card-foreground));
-    --tw-prose-invert-lead: hsl(var(--note-card-foreground));
-    --tw-prose-invert-links: hsl(var(--primary));
-    --tw-prose-invert-bold: hsl(var(--note-card-foreground));
-    --tw-prose-invert-counters: hsl(var(--note-card-foreground) / 0.7);
-    --tw-prose-invert-bullets: hsl(var(--note-card-foreground) / 0.7);
-    --tw-prose-invert-hr: hsl(var(--note-card-foreground) / 0.3);
-    --tw-prose-invert-quotes: hsl(var(--note-card-foreground));
-    --tw-prose-invert-quote-borders: hsl(var(--primary));
-    --tw-prose-invert-captions: hsl(var(--note-card-foreground) / 0.8);
-    --tw-prose-invert-code: hsl(var(--note-card-foreground));
-    --tw-prose-invert-pre-code: hsl(var(--card-foreground));
-    --tw-prose-invert-pre-bg: hsl(var(--card));
-    --tw-prose-invert-th-borders: hsl(var(--note-card-foreground) / 0.4);
-    --tw-prose-invert-td-borders: hsl(var(--note-card-foreground) / 0.3);
-
-    min-height: 50px; 
+    @apply prose prose-sm max-w-none dark:prose-invert 
+           prose-headings:text-[hsl(var(--note-card-foreground))] 
+           prose-p:text-[hsl(var(--note-card-foreground))]
+           prose-strong:text-[hsl(var(--note-card-foreground))]
+           prose-em:text-[hsl(var(--note-card-foreground))]
+           prose-ol:text-[hsl(var(--note-card-foreground))]
+           prose-ul:text-[hsl(var(--note-card-foreground))]
+           prose-li:text-[hsl(var(--note-card-foreground))]
+           prose-a:text-[hsl(var(--primary))]
+           prose-blockquote:text-[hsl(var(--note-card-foreground))]
+           prose-blockquote:border-[hsl(var(--primary))]
+           prose-code:text-[hsl(var(--note-card-foreground))]
+           prose-pre:bg-[hsl(var(--card))]
+           prose-pre:text-[hsl(var(--card-foreground))]
+           prose-hr:border-[hsl(var(--note-card-foreground))/0.3]
+           dark:prose-headings:text-[hsl(var(--note-card-foreground))]
+           dark:prose-p:text-[hsl(var(--note-card-foreground))]
+           dark:prose-strong:text-[hsl(var(--note-card-foreground))]
+           dark:prose-em:text-[hsl(var(--note-card-foreground))]
+           dark:prose-ol:text-[hsl(var(--note-card-foreground))]
+           dark:prose-ul:text-[hsl(var(--note-card-foreground))]
+           dark:prose-li:text-[hsl(var(--note-card-foreground))]
+           dark:prose-a:text-[hsl(var(--primary))]
+           dark:prose-blockquote:text-[hsl(var(--note-card-foreground))]
+           dark:prose-blockquote:border-[hsl(var(--primary))]
+           dark:prose-code:text-[hsl(var(--note-card-foreground))]
+           dark:prose-pre:bg-[hsl(var(--card))]
+           dark:prose-pre:text-[hsl(var(--card-foreground))]
+           dark:prose-hr:border-[hsl(var(--note-card-foreground))/0.3]
+           min-h-[50px];
   }
    .note-widget__empty-prompt {
     @apply text-center text-muted-foreground hover:text-foreground cursor-pointer py-4;
@@ -321,7 +314,7 @@
     @apply space-y-1.5;
   }
   .todo-item {
-    @apply flex items-center; 
+    @apply flex items-center p-1 rounded-md hover:bg-accent/10; 
   }
   .todo-item__drag-handle {
     @apply cursor-grab text-muted-foreground hover:text-foreground mr-2 opacity-50 group-hover/todo-item:opacity-100;
@@ -380,7 +373,19 @@
      @apply bg-primary text-primary-foreground hover:bg-primary/90 focus:bg-primary/90;
   }
    .calendar-widget__empty-prompt {
-    @apply text-center text-muted-foreground hover:text-foreground cursor-pointer py-4 min-h-[150px] flex flex-col justify-center items-center;
+    @apply text-center text-muted-foreground py-4 min-h-[200px] flex flex-col justify-center items-center; /* Adjusted min-height */
+  }
+  .calendar-widget__event-list {
+    @apply mt-4 p-3 border-t;
+  }
+  .calendar-widget__event-list-title {
+    @apply text-sm font-semibold mb-2 text-foreground;
+  }
+  .calendar-widget__event-item {
+    @apply text-xs p-1.5 mb-1 rounded bg-accent/10 text-accent-foreground;
+  }
+  .calendar-widget__no-events {
+    @apply text-xs text-muted-foreground;
   }
 
 }

@@ -3,7 +3,7 @@
 
 import type { CalendarIcsAppWidget } from '@/types';
 import { Button } from '@/components/ui/button';
-import { Calendar as CalendarIcon, Edit3, MoreVertical, Trash2, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
+import { Calendar as CalendarIcon, Edit3, MoreVertical, Trash2, ChevronDown, ChevronUp, AlertTriangle, Link2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,11 +21,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Calendar } from "@/components/ui/calendar"; // Using ShadCN Calendar
-import { useEffect, useState } from 'react';
-// We would need a library to parse ICS data. For simplicity, this is a placeholder.
-// In a real app, you'd use something like 'ical.js' or 'node-ical'.
-// For now, we'll just show the calendar component without actual events.
+import { Calendar } from "@/components/ui/calendar";
+import { useEffect, useState, useMemo } from 'react';
+import ICAL from 'ical.js';
+import { format, isSameDay, parseISO } from 'date-fns';
+
 
 interface CalendarIcsWidgetProps {
   widget: CalendarIcsAppWidget;
@@ -34,6 +34,14 @@ interface CalendarIcsWidgetProps {
   onDeleteWidget: (widgetId: string) => void;
   isCollapsed?: boolean;
   onToggleCollapse: (widgetId: string) => void;
+}
+
+interface CalendarEvent {
+  id: string;
+  summary: string;
+  startDate: Date;
+  endDate: Date;
+  isAllDay: boolean;
 }
 
 export function CalendarIcsWidget({
@@ -45,41 +53,67 @@ export function CalendarIcsWidget({
   onToggleCollapse,
 }: CalendarIcsWidgetProps) {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  // Placeholder for events - in a real app, this would be populated from the ICS URL
-  const [events, setEvents] = useState<any[]>([]); 
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
 
   useEffect(() => {
     if (widget.data.icsUrl && !isCollapsed) {
-      // Placeholder: Fetch and parse ICS data
-      // This is where you would integrate an ICS parsing library
-      // For example:
-      // setIsLoading(true);
-      // fetch(widget.data.icsUrl)
-      //   .then(response => response.text())
-      //   .then(icsData => {
-      //     const jcalData = ICAL.parse(icsData);
-      //     const comp = new ICAL.Component(jcalData);
-      //     const vevents = comp.getAllSubcomponents('vevent');
-      //     // Process vevents into a usable format
-      //     setEvents(processedEvents);
-      //     setError(null);
-      //   })
-      //   .catch(err => {
-      //     console.error("Error fetching or parsing ICS:", err);
-      //     setError("Failed to load calendar data.");
-      //     setEvents([]);
-      //   })
-      //   .finally(() => setIsLoading(false));
-      console.log(`Would fetch and parse ICS from: ${widget.data.icsUrl}`);
+      setIsLoading(true);
+      setError(null);
+      fetch(`/api/ics-proxy?url=${encodeURIComponent(widget.data.icsUrl)}`)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`Failed to fetch ICS data (status: ${response.status})`);
+          }
+          return response.text();
+        })
+        .then(icsData => {
+          try {
+            const jcalData = ICAL.parse(icsData);
+            const component = new ICAL.Component(jcalData);
+            const vevents = component.getAllSubcomponents('vevent');
+            const parsedEvents: CalendarEvent[] = vevents.map((vevent: any) => {
+              const event = new ICAL.Event(vevent);
+              return {
+                id: event.uid || crypto.randomUUID(),
+                summary: event.summary || 'No Title',
+                startDate: event.startDate.toJSDate(),
+                endDate: event.endDate.toJSDate(),
+                isAllDay: event.startDate.isDate,
+              };
+            });
+            setEvents(parsedEvents);
+          } catch (parseErr) {
+            console.error("Error parsing ICS data:", parseErr);
+            setError("Failed to parse calendar data. Ensure the ICS format is correct.");
+            setEvents([]);
+          }
+        })
+        .catch(err => {
+          console.error("Error fetching or parsing ICS:", err);
+          setError(err.message || "Failed to load calendar data. Check the URL and network.");
+          setEvents([]);
+        })
+        .finally(() => setIsLoading(false));
+    } else if (!widget.data.icsUrl) {
+      setEvents([]);
+      setError(null);
+      setIsLoading(false);
     }
   }, [widget.data.icsUrl, isCollapsed]);
 
+  const eventDays = useMemo(() => events.map(event => event.startDate), [events]);
+
+  const eventsForSelectedDay = useMemo(() => {
+    if (!selectedDate) return [];
+    return events.filter(event => isSameDay(event.startDate, selectedDate) || (event.startDate < selectedDate && event.endDate > selectedDate));
+  }, [events, selectedDate]);
 
   const handleBodyClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target instanceof HTMLElement && e.target.closest('button, a')) {
-      return; // Allow interactions within the calendar
+    if (e.target instanceof HTMLElement && (e.target.closest('button, a') || e.target.closest('.rdp-nav_button'))) {
+      return; 
     }
     e.stopPropagation();
     if (!widget.data.icsUrl) {
@@ -89,7 +123,7 @@ export function CalendarIcsWidget({
   
   const handleBodyKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'Enter' || e.key === ' ') {
-       if (e.target instanceof HTMLElement && e.target.closest('button, a') && e.key === 'Enter') {
+       if (e.target instanceof HTMLElement && (e.target.closest('button, a') || e.target.closest('.rdp-nav_button'))) {
         return;
       }
       e.preventDefault();
@@ -103,11 +137,11 @@ export function CalendarIcsWidget({
 
   return (
     <div className="page-section__widget">
-      <article className="widget"> {/* Using default widget styling */}
+      <article className="widget calendar-widget">
         <div className="widget__container">
           <header className="widget__header widget-header_hovered">
             <div
-              className="flex items-center flex-grow cursor-pointer mr-2"
+              className="widget-header__title-clickable-area"
               onClick={() => onToggleCollapse(widget.id)}
               role="button"
               tabIndex={0}
@@ -117,7 +151,7 @@ export function CalendarIcsWidget({
             >
               <CalendarIcon className="widget-header__feather-icon h-5 w-5 mr-2" />
               <span className="widget-header__text text-lg font-semibold">{widget.title}</span>
-              {isCollapsed ? <ChevronDown className="h-4 w-4 text-muted-foreground ml-2" /> : <ChevronUp className="h-4 w-4 text-muted-foreground ml-2" />}
+              {isCollapsed ? <ChevronDown className="widget-header__chevron" /> : <ChevronUp className="widget-header__chevron" />}
             </div>
             <div className="widget-header__controls">
               <DropdownMenu>
@@ -133,7 +167,7 @@ export function CalendarIcsWidget({
                     <span>Edit Title</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onOpenEditDialog(widget.id); }}>
-                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    <Link2 className="mr-2 h-4 w-4" />
                     <span>Edit Calendar URL</span>
                   </DropdownMenuItem>
                   <AlertDialog>
@@ -141,7 +175,7 @@ export function CalendarIcsWidget({
                       <DropdownMenuItem
                         onSelect={(e) => e.preventDefault()}
                         onClick={(e) => e.stopPropagation()}
-                        className="text-destructive hover:!bg-destructive/10 focus:!bg-destructive/10"
+                        className="text-destructive focus:text-destructive-foreground hover:!text-destructive-foreground hover:!bg-destructive/90 focus:!bg-destructive/90"
                       >
                         <Trash2 className="mr-2 h-4 w-4" />
                         <span>Delete Calendar</span>
@@ -172,13 +206,13 @@ export function CalendarIcsWidget({
           {!isCollapsed && (
             <div className="widget__box" id={`widget-body-${widget.id}`}>
               <div 
-                className="widget__body p-0 md:p-1" // Less padding for calendar
+                className="widget__body"
                 onClick={handleBodyClick}
                 onKeyDown={handleBodyKeyDown}
                 role={!widget.data.icsUrl ? "button" : undefined}
                 tabIndex={!widget.data.icsUrl ? 0 : undefined}
               >
-                {isLoading && <p className="p-4 text-center">Loading calendar...</p>}
+                {isLoading && <p className="p-4 text-center text-muted-foreground">Loading calendar...</p>}
                 {error && 
                   <div className="p-4 text-center text-destructive flex flex-col items-center">
                     <AlertTriangle className="w-8 h-8 mb-2"/>
@@ -189,24 +223,51 @@ export function CalendarIcsWidget({
                   </div>
                 }
                 {!isLoading && !error && widget.data.icsUrl && (
-                  <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={setSelectedDate}
-                    className="rounded-md" // Adjust styling as needed
-                    // Modifiers can be used to highlight days with events
-                    // modifiers={{ events: events.map(event => event.date) }}
-                    // modifiersClassNames={{ events: 'bg-primary/20 rounded-full' }}
-                  />
-                  // Potentially list events for the selected day here
+                  <>
+                    <Calendar
+                      mode="single"
+                      selected={selectedDate}
+                      onSelect={setSelectedDate}
+                      month={currentMonth}
+                      onMonthChange={setCurrentMonth}
+                      className="rounded-md calendar-widget" 
+                      modifiers={{ eventDay: eventDays }}
+                      modifiersClassNames={{ eventDay: 'bg-primary/20 rounded-full' }}
+                    />
+                    {selectedDate && eventsForSelectedDay.length > 0 && (
+                      <div className="calendar-widget__event-list">
+                        <h3 className="calendar-widget__event-list-title">Events for {format(selectedDate, 'PPP')}:</h3>
+                        <ul>
+                          {eventsForSelectedDay.map(event => (
+                            <li key={event.id} className="calendar-widget__event-item">
+                              <strong>{event.summary}</strong>
+                              {!event.isAllDay && (
+                                <span className="ml-2 text-xs">
+                                  ({format(event.startDate, 'p')} - {format(event.endDate, 'p')})
+                                </span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                     {selectedDate && eventsForSelectedDay.length === 0 && (
+                       <div className="calendar-widget__event-list">
+                         <p className="calendar-widget__no-events">No events for {format(selectedDate, 'PPP')}.</p>
+                       </div>
+                     )}
+                  </>
                 )}
                 {!widget.data.icsUrl && !isLoading && !error && (
                    <div 
-                    className="note-widget__empty-prompt min-h-[150px] flex flex-col justify-center items-center" // Reuse note styles
-                    onClick={(e) => { e.stopPropagation(); onOpenEditDialog(widget.id); }}
+                    className="calendar-widget__empty-prompt"
                   >
-                    <CalendarIcon className="w-10 h-10 text-muted-foreground mb-2"/>
-                    <p>设置ICS日历链接</p>
+                    <CalendarIcon className="w-10 h-10 text-muted-foreground mb-3"/>
+                    <p className="text-lg font-medium text-foreground mb-2">Calendar is Empty</p>
+                    <p className="text-sm text-muted-foreground mb-4">To display events, please link an ICS Calendar URL.</p>
+                    <Button onClick={(e) => { e.stopPropagation(); onOpenEditDialog(widget.id); }}>
+                      <Link2 className="mr-2 h-4 w-4" /> Set ICS Calendar Link
+                    </Button>
                   </div>
                 )}
               </div>
@@ -217,3 +278,8 @@ export function CalendarIcsWidget({
     </div>
   );
 }
+
+// Note: Manual event addition is a new feature and not implemented here.
+// This widget currently focuses on displaying events from an ICS URL.
+// Time scale adjustments similar to Google Calendar (day/week views) are also significant enhancements
+// and would likely require a different calendar component or heavy customization.
