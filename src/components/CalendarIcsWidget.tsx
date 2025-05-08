@@ -129,7 +129,8 @@ export function CalendarIcsWidget({
     if (!isCollapsed) {
       fetchAndParseIcs();
     }
-  }, [widget.data.icsUrl, isCollapsed, fetchAndParseIcs]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [widget.data.icsUrl, isCollapsed]); // Removed fetchAndParseIcs from deps to avoid loop with useCallback if not careful. State it depends on is already there.
 
   const eventDays = useMemo(() => events.map(event => event.startDate), [events]);
   
@@ -146,7 +147,10 @@ export function CalendarIcsWidget({
             return compareAsc(eventStartDay, targetDayStart) <= 0 && compareAsc(targetDayStart, event.endDate) < 0;
         } else {
             // For timed events, it's simpler: just check if it starts on that day.
-            return isSameDay(eventStartDay, targetDayStart);
+             // Or if it spans across the day
+            const eventEndDay = event.endDate ? startOfDay(event.endDate) : eventStartDay;
+            return (isSameDay(eventStartDay, targetDayStart) || 
+                   (compareAsc(eventStartDay, targetDayStart) < 0 && compareAsc(eventEndDay, targetDayStart) > 0));
         }
     }).sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
   }, [events]);
@@ -161,16 +165,6 @@ export function CalendarIcsWidget({
     const end = endOfWeek(displayDate, { weekStartsOn: 1 });
     return { start, end };
   }, [displayDate]);
-
-  const eventsForCurrentWeek = useMemo(() => {
-    return events.filter(event => {
-      const eventStart = event.startDate;
-      // Check if event occurs at any point within the weekRange
-      return isWithinInterval(eventStart, weekRange) || 
-             (event.endDate && isWithinInterval(event.endDate, weekRange)) ||
-             (eventStart < weekRange.start && event.endDate > weekRange.end); // Event spans the whole week
-    }).sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
-  }, [events, weekRange]);
 
   const eventsForListView = useMemo(() => {
     const today = startOfDay(new Date());
@@ -230,44 +224,59 @@ export function CalendarIcsWidget({
   };
   
   const goToToday = () => {
-    const today = startOfDay(new Date());
-    setSelectedDate(today);
-    setCurrentMonth(today);
-    setDisplayDate(today); // Also reset displayDate for week/day views
+    const todayAnchor = startOfDay(new Date());
+    setSelectedDate(todayAnchor);
+    setCurrentMonth(todayAnchor);
+    setDisplayDate(todayAnchor); 
   };
 
-  const renderEventItem = (event: CalendarEvent, context?: 'week' | 'list') => (
-    <li key={event.id} className="calendar-widget__event-item group/event-item">
+  const renderEventItem = (event: CalendarEvent, context?: 'week-column' | 'list' | 'day-detail') => {
+    let baseItemClasses = "calendar-widget__event-item group/event-item";
+    let titleClasses = "truncate block";
+    let timeClasses = "text-xs block";
+    let actionButtonSizeClasses = "h-7 w-7 p-1";
+    let actionIconSizeClasses = "h-4 w-4";
+
+    if (context === 'week-column') {
+        baseItemClasses = "calendar-widget__event-item group/event-item !p-1 !mb-0.5";
+        titleClasses = "truncate block text-xs font-semibold";
+        timeClasses = "text-xs block";
+        actionButtonSizeClasses = "h-6 w-6 p-0.5";
+        actionIconSizeClasses = "h-3 w-3";
+    }
+    
+    return (
+    <li key={event.id} className={baseItemClasses}>
       <div className="flex-grow overflow-hidden">
-        <strong className="truncate block" title={event.summary}>{event.summary}</strong>
-        {context === 'week' && (
-            <span className="text-xs block">
-                {format(event.startDate, 'EEE, MMM d')}
-                {!event.isAllDay && ` ${format(event.startDate, 'p')}`}
-            </span>
-        )}
+        <strong className={titleClasses} title={event.summary}>{event.summary}</strong>
+        
         {context === 'list' && (
-            <span className="text-xs block">
+            <span className={timeClasses}>
                 {format(event.startDate, 'PPP')}
                 {!event.isAllDay && ` ${format(event.startDate, 'p')} - ${format(event.endDate, 'p')}`}
+                {event.isAllDay && ` (All day)`}
             </span>
         )}
-        {context !== 'week' && context !== 'list' && !event.isAllDay && (
-          <span className="ml-1 text-xs">
-            ({format(event.startDate, 'p')} - {format(event.endDate, 'p')})
+        {context === 'day-detail' && (
+          <span className={timeClasses}>
+            {!event.isAllDay ? `${format(event.startDate, 'p')} - ${format(event.endDate, 'p')}` : "(All day)"}
           </span>
         )}
-        {context !== 'week' && context !== 'list' && event.isAllDay && <span className="ml-1 text-xs italic">(All day)</span>}
+         {context === 'week-column' && (
+          <span className={timeClasses}>
+            {!event.isAllDay ? `${format(event.startDate, 'p')}` : "(All day)"}
+          </span>
+        )}
       </div>
       <div className="calendar-widget__event-actions">
-        <Button variant="ghost" size="icon" className="h-7 w-7 p-1" onClick={(e) => {e.stopPropagation(); handleOpenEventDetailDialog(event);}}>
-          <FilePenLine className="h-4 w-4" />
+        <Button variant="ghost" size="icon" className={actionButtonSizeClasses} onClick={(e) => {e.stopPropagation(); handleOpenEventDetailDialog(event);}}>
+          <FilePenLine className={actionIconSizeClasses} />
           <span className="sr-only">View/Edit Event</span>
         </Button>
         <AlertDialog>
           <AlertDialogTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-7 w-7 p-1 hover:bg-destructive/10 hover:text-destructive" onClick={(e) => e.stopPropagation()}>
-              <Trash2 className="h-4 w-4" />
+            <Button variant="ghost" size="icon" className={`${actionButtonSizeClasses} hover:bg-destructive/10 hover:text-destructive`} onClick={(e) => e.stopPropagation()}>
+              <Trash2 className={actionIconSizeClasses}/>
               <span className="sr-only">Delete Event</span>
             </Button>
           </AlertDialogTrigger>
@@ -291,9 +300,9 @@ export function CalendarIcsWidget({
         </AlertDialog>
       </div>
     </li>
-  );
+  )};
 
-  const renderEventsList = (eventsToRender: CalendarEvent[], title?: string, noEventsMessage?: string, context?: 'week' | 'list') => (
+  const renderEventsList = (eventsToRender: CalendarEvent[], title?: string, noEventsMessage?: string, context?: 'list' | 'day-detail') => (
     <div className="calendar-widget__event-list">
       {title && <h3 className="calendar-widget__event-list-title">{title}</h3>}
       {eventsToRender.length > 0 ? (
@@ -427,26 +436,52 @@ export function CalendarIcsWidget({
                           modifiers={{ eventDay: eventDays }}
                           modifiersClassNames={{ eventDay: 'bg-primary/20 rounded-full !text-primary-foreground' }} 
                         />
-                        {selectedDate && renderEventsList(eventsForSelectedDay, `Events for ${format(selectedDate, 'PPP')}`, `No events for ${format(selectedDate, 'PPP')}.`)}
+                        {selectedDate && renderEventsList(eventsForSelectedDay, `Events for ${format(selectedDate, 'PPP')}`, `No events for ${format(selectedDate, 'PPP')}.`, 'day-detail')}
                       </>
                     )}
 
                     {currentView === 'week' && (
-                      <div className="p-2">
-                        <div className="flex justify-between items-center mb-2">
-                          <Button variant="ghost" size="icon" onClick={(e)=>{e.stopPropagation(); setDisplayDate(subWeeks(displayDate, 1))}}><ChevronLeft className="h-5 w-5" /></Button>
-                          <h3 className="text-base font-semibold">{format(weekRange.start, 'MMM d')} - {format(weekRange.end, 'MMM d, yyyy')}</h3>
-                          <Button variant="ghost" size="icon" onClick={(e)=>{e.stopPropagation(); setDisplayDate(addWeeks(displayDate, 1))}}><ChevronRight className="h-5 w-5" /></Button>
+                        <div className="p-2">
+                            <div className="flex justify-between items-center mb-2">
+                            <Button variant="ghost" size="icon" onClick={(e)=>{e.stopPropagation(); setDisplayDate(subWeeks(displayDate, 1))}}><ChevronLeft className="h-5 w-5" /></Button>
+                            <h3 className="text-base font-semibold">{format(weekRange.start, 'MMM d')} - {format(weekRange.end, 'MMM d, yyyy')}</h3>
+                            <Button variant="ghost" size="icon" onClick={(e)=>{e.stopPropagation(); setDisplayDate(addWeeks(displayDate, 1))}}><ChevronRight className="h-5 w-5" /></Button>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-7 gap-px bg-border border-t border-l">
+                            {eachDayOfInterval(weekRange).map(day => {
+                                const dailyEvents = getEventsForDay(day);
+                                const isCurrentDisplayDay = isSameDay(day, displayDate); // Or selectedDate depending on interaction model
+                                const isTodayDate = isSameDay(day, new Date());
+                                return (
+                                <div key={day.toISOString()} 
+                                     className={`calendar-widget__day-column bg-card p-1 min-h-[100px] border-b border-r ${isCurrentDisplayDay ? 'bg-accent/10': ''}`}
+                                     onClick={() => { setSelectedDate(day); setDisplayDate(day); setCurrentView('day');}} // Optionally switch to day view
+                                     role="button"
+                                     tabIndex={0}
+                                     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedDate(day); setDisplayDate(day); setCurrentView('day');}}}
+                                >
+                                    <h4 className={`text-xs font-semibold mb-1 ${isTodayDate ? 'text-primary' : 'text-foreground'}`}>
+                                    {format(day, 'EEE d')}
+                                    </h4>
+                                    {dailyEvents.length > 0 ? (
+                                    <ul className="space-y-0.5">
+                                        {dailyEvents.map(event => renderEventItem(event, 'week-column'))}
+                                    </ul>
+                                    ) : (
+                                    <p className="text-xs text-muted-foreground italic h-full flex items-center justify-center">No events</p>
+                                    )}
+                                </div>
+                                );
+                            })}
+                            </div>
                         </div>
-                        {renderEventsList(eventsForCurrentWeek, undefined, "No events this week.", 'week')}
-                      </div>
                     )}
 
                     {currentView === 'day' && (
                        <div className="p-2">
                         <div className="flex justify-between items-center mb-2">
                           <Button variant="ghost" size="icon" onClick={(e)=>{e.stopPropagation(); const newDay = subDays(displayDate,1); setDisplayDate(newDay); setSelectedDate(newDay);}}><ChevronLeft className="h-5 w-5" /></Button>
-                          <Button variant="outline" size="sm" onClick={() => {const newMonth = startOfDay(displayDate); setCurrentMonth(newMonth)}}>
+                          <Button variant="outline" size="sm" onClick={() => {const newMonth = startOfDay(displayDate); setCurrentMonth(newMonth); setCurrentView('month'); setSelectedDate(displayDate);}}>
                             {format(displayDate, 'PPP')}
                           </Button>
                           <Button variant="ghost" size="icon" onClick={(e)=>{e.stopPropagation(); const newDay = addDays(displayDate,1); setDisplayDate(newDay); setSelectedDate(newDay);}}><ChevronRight className="h-5 w-5" /></Button>
@@ -455,13 +490,13 @@ export function CalendarIcsWidget({
                             mode="single"
                             selected={displayDate}
                             onSelect={(day) => { if(day) {setDisplayDate(day); setSelectedDate(day); setCurrentMonth(startOfDay(day))}}}
-                            month={currentMonth} // Use currentMonth which can be controlled for day view too
-                            onMonthChange={setCurrentMonth} // Allow month navigation within day view's calendar
+                            month={currentMonth} 
+                            onMonthChange={setCurrentMonth} 
                             className="rounded-md calendar-widget my-2"
                             modifiers={{ eventDay: eventDays }}
                             modifiersClassNames={{ eventDay: 'bg-primary/20 rounded-full !text-primary-foreground' }}
                         />
-                        {renderEventsList(getEventsForDay(displayDate), undefined, `No events for ${format(displayDate, 'PPP')}.`)}
+                        {renderEventsList(getEventsForDay(displayDate), `Events for ${format(displayDate, 'PPP')}`, `No events for ${format(displayDate, 'PPP')}.`, 'day-detail')}
                       </div>
                     )}
                     
@@ -501,4 +536,3 @@ export function CalendarIcsWidget({
     </div>
   );
 }
-
