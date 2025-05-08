@@ -1,9 +1,9 @@
 
 "use client";
 
-import type { CalendarIcsAppWidget } from '@/types';
+import type { CalendarIcsAppWidget, CalendarEvent } from '@/types';
 import { Button } from '@/components/ui/button';
-import { Calendar as CalendarIcon, Edit3, MoreVertical, Trash2, ChevronDown, ChevronUp, AlertTriangle, Link2 } from 'lucide-react';
+import { Calendar as CalendarIcon, Edit3, MoreVertical, Trash2, ChevronDown, ChevronUp, AlertTriangle, Link2, FilePenLine } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,24 +24,16 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { useEffect, useState, useMemo } from 'react';
 import ICAL from 'ical.js';
-import { format, isSameDay, parseISO } from 'date-fns';
-
+import { format, isSameDay } from 'date-fns';
+import { EventDetailDialog } from './EventDetailDialog'; // Import the new dialog
 
 interface CalendarIcsWidgetProps {
   widget: CalendarIcsAppWidget;
-  onOpenEditDialog: (widgetId: string) => void;
+  onOpenEditDialog: (widgetId: string) => void; // For editing ICS URL
   onOpenWidgetTitleDialog: (widgetId: string) => void;
   onDeleteWidget: (widgetId: string) => void;
   isCollapsed?: boolean;
   onToggleCollapse: (widgetId: string) => void;
-}
-
-interface CalendarEvent {
-  id: string;
-  summary: string;
-  startDate: Date;
-  endDate: Date;
-  isAllDay: boolean;
 }
 
 export function CalendarIcsWidget({
@@ -57,6 +49,9 @@ export function CalendarIcsWidget({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
+
+  const [isEventDetailDialogOpen, setIsEventDetailDialogOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<CalendarEvent | undefined>(undefined);
 
   useEffect(() => {
     if (widget.data.icsUrl && !isCollapsed) {
@@ -74,14 +69,15 @@ export function CalendarIcsWidget({
             const jcalData = ICAL.parse(icsData);
             const component = new ICAL.Component(jcalData);
             const vevents = component.getAllSubcomponents('vevent');
-            const parsedEvents: CalendarEvent[] = vevents.map((vevent: any) => {
-              const event = new ICAL.Event(vevent);
+            const parsedEvents: CalendarEvent[] = vevents.map((veventComponent: any) => {
+              const event = new ICAL.Event(veventComponent);
               return {
                 id: event.uid || crypto.randomUUID(),
                 summary: event.summary || 'No Title',
                 startDate: event.startDate.toJSDate(),
                 endDate: event.endDate.toJSDate(),
                 isAllDay: event.startDate.isDate,
+                description: event.description || undefined,
               };
             });
             setEvents(parsedEvents);
@@ -108,7 +104,8 @@ export function CalendarIcsWidget({
 
   const eventsForSelectedDay = useMemo(() => {
     if (!selectedDate) return [];
-    return events.filter(event => isSameDay(event.startDate, selectedDate) || (event.startDate < selectedDate && event.endDate > selectedDate));
+    return events.filter(event => isSameDay(event.startDate, selectedDate) || (event.startDate < selectedDate && event.endDate > selectedDate))
+                 .sort((a,b) => a.startDate.getTime() - b.startDate.getTime());
   }, [events, selectedDate]);
 
   const handleBodyClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -132,6 +129,29 @@ export function CalendarIcsWidget({
         onOpenEditDialog(widget.id);
       }
     }
+  };
+
+  const handleOpenEventDetailDialog = (event: CalendarEvent) => {
+    setEditingEvent(event);
+    setIsEventDetailDialogOpen(true);
+  };
+
+  const handleCloseEventDetailDialog = () => {
+    setIsEventDetailDialogOpen(false);
+    setEditingEvent(undefined); // Clear editing event
+  };
+
+  const handleSubmitEventDetail = (updatedEventData: Partial<CalendarEvent> & { id: string }) => {
+    setEvents(prevEvents =>
+      prevEvents.map(event =>
+        event.id === updatedEventData.id ? { ...event, ...updatedEventData } : event
+      )
+    );
+    handleCloseEventDetailDialog();
+  };
+
+  const handleDeleteEvent = (eventId: string) => {
+    setEvents(prevEvents => prevEvents.filter(event => event.id !== eventId));
   };
 
 
@@ -232,20 +252,53 @@ export function CalendarIcsWidget({
                       onMonthChange={setCurrentMonth}
                       className="rounded-md calendar-widget" 
                       modifiers={{ eventDay: eventDays }}
-                      modifiersClassNames={{ eventDay: 'bg-primary/20 rounded-full' }}
+                      modifiersClassNames={{ eventDay: 'bg-primary/20 rounded-full !text-primary-foreground' }} // Ensure text is visible on event days
                     />
                     {selectedDate && eventsForSelectedDay.length > 0 && (
                       <div className="calendar-widget__event-list">
                         <h3 className="calendar-widget__event-list-title">Events for {format(selectedDate, 'PPP')}:</h3>
                         <ul>
                           {eventsForSelectedDay.map(event => (
-                            <li key={event.id} className="calendar-widget__event-item">
-                              <strong>{event.summary}</strong>
-                              {!event.isAllDay && (
-                                <span className="ml-2 text-xs">
-                                  ({format(event.startDate, 'p')} - {format(event.endDate, 'p')})
-                                </span>
-                              )}
+                            <li key={event.id} className="calendar-widget__event-item group/event-item">
+                              <div className="flex-grow">
+                                <strong>{event.summary}</strong>
+                                {!event.isAllDay && (
+                                  <span className="ml-2 text-xs">
+                                    ({format(event.startDate, 'p')} - {format(event.endDate, 'p')})
+                                  </span>
+                                )}
+                              </div>
+                              <div className="calendar-widget__event-actions">
+                                <Button variant="ghost" size="icon" className="h-7 w-7 p-1" onClick={(e) => {e.stopPropagation(); handleOpenEventDetailDialog(event);}}>
+                                  <FilePenLine className="h-4 w-4" />
+                                  <span className="sr-only">View/Edit Event</span>
+                                </Button>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 p-1 hover:bg-destructive/10 hover:text-destructive" onClick={(e) => e.stopPropagation()}>
+                                      <Trash2 className="h-4 w-4" />
+                                      <span className="sr-only">Delete Event</span>
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Are you sure you want to delete the event "{event.summary}"? This action is local and cannot be undone.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => handleDeleteEvent(event.id)}
+                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                      >
+                                        Delete
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </div>
                             </li>
                           ))}
                         </ul>
@@ -275,11 +328,15 @@ export function CalendarIcsWidget({
           )}
         </div>
       </article>
+      {editingEvent && (
+        <EventDetailDialog
+          isOpen={isEventDetailDialogOpen}
+          onClose={handleCloseEventDetailDialog}
+          event={editingEvent}
+          onSubmit={handleSubmitEventDetail}
+          widgetId={widget.id} // Pass widgetId if needed by dialog logic, though not strictly for local event state
+        />
+      )}
     </div>
   );
 }
-
-// Note: Manual event addition is a new feature and not implemented here.
-// This widget currently focuses on displaying events from an ICS URL.
-// Time scale adjustments similar to Google Calendar (day/week views) are also significant enhancements
-// and would likely require a different calendar component or heavy customization.

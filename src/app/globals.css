@@ -361,13 +361,13 @@
     @apply justify-center;
   }
   .calendar-widget .rdp-caption_label {
-    @apply text-base font-medium; /* Adjusted for visibility */
+    @apply text-base font-medium text-foreground; 
   }
   .calendar-widget .rdp-nav_button {
     @apply h-8 w-8; /* Larger touch targets */
   }
   .calendar-widget .rdp-day {
-    @apply h-10 w-10; /* Larger day cells */
+    @apply h-10 w-10 text-foreground;
   }
   .calendar-widget .rdp-day_selected {
      @apply bg-primary text-primary-foreground hover:bg-primary/90 focus:bg-primary/90;
@@ -382,10 +382,13 @@
     @apply text-sm font-semibold mb-2 text-foreground;
   }
   .calendar-widget__event-item {
-    @apply text-xs p-1.5 mb-1 rounded bg-accent/10 text-foreground; /* Changed text-accent-foreground to text-foreground */
+    @apply text-xs p-1.5 mb-1 rounded bg-accent/10 text-foreground flex justify-between items-center;
   }
   .calendar-widget__no-events {
     @apply text-xs text-muted-foreground;
+  }
+  .calendar-widget__event-actions {
+    @apply flex items-center space-x-1 opacity-0 group-hover/event-item:opacity-100 transition-opacity;
   }
 
 }
@@ -393,3 +396,4 @@
 
 
     
+
