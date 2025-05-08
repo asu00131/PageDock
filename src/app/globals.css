@@ -264,7 +264,7 @@
            prose-ol:text-[hsl(var(--note-card-foreground))]
            prose-ul:text-[hsl(var(--note-card-foreground))]
            prose-li:text-[hsl(var(--note-card-foreground))]
-           prose-a:text-[hsl(var(--primary))]
+           prose-a:text-[hsl(var(--primary))] hover:prose-a:text-[hsl(var(--primary)/0.8)]
            prose-blockquote:text-[hsl(var(--note-card-foreground))]
            prose-blockquote:border-[hsl(var(--primary))]
            prose-code:text-[hsl(var(--note-card-foreground))]
@@ -278,7 +278,7 @@
            dark:prose-ol:text-[hsl(var(--note-card-foreground))]
            dark:prose-ul:text-[hsl(var(--note-card-foreground))]
            dark:prose-li:text-[hsl(var(--note-card-foreground))]
-           dark:prose-a:text-[hsl(var(--primary))]
+           dark:prose-a:text-[hsl(var(--primary))] dark:hover:prose-a:text-[hsl(var(--primary)/0.8)]
            dark:prose-blockquote:text-[hsl(var(--note-card-foreground))]
            dark:prose-blockquote:border-[hsl(var(--primary))]
            dark:prose-code:text-[hsl(var(--note-card-foreground))]
@@ -382,7 +382,7 @@
     @apply text-sm font-semibold mb-2 text-foreground;
   }
   .calendar-widget__event-item {
-    @apply text-xs p-1.5 mb-1 rounded bg-accent/10 text-accent-foreground;
+    @apply text-xs p-1.5 mb-1 rounded bg-accent/10 text-foreground; /* Changed text-accent-foreground to text-foreground */
   }
   .calendar-widget__no-events {
     @apply text-xs text-muted-foreground;
@@ -390,3 +390,6 @@
 
 }
 
+
+
+    
