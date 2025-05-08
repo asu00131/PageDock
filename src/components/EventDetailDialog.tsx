@@ -1,4 +1,3 @@
-
 "use client";
 
 import type { CalendarEvent } from '@/types';
@@ -33,7 +32,7 @@ import { CalendarIcon, Trash2 } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import {
-  AlertDialog,
+  AlertDialog, // Keep AlertDialog for wrapping if needed for context, though not directly used here for root
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent as EventAlertDialogContent, // Renamed to avoid conflict
@@ -41,7 +40,7 @@ import {
   AlertDialogFooter as EventAlertDialogFooter,
   AlertDialogHeader as EventAlertDialogHeader,
   AlertDialogTitle as EventAlertDialogTitle,
-  AlertDialogTrigger as EventAlertDialogTrigger,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
 
@@ -102,7 +101,6 @@ export function EventDetailDialog({ isOpen, onClose, onSubmit, event, widgetId, 
     },
   });
   
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -124,7 +122,7 @@ export function EventDetailDialog({ isOpen, onClose, onSubmit, event, widgetId, 
 
     const finalEventData: CalendarEvent = {
       ...event, // Spread original event to keep its ID if it exists
-      id: 'id' in event ? event.id : crypto.randomUUID(), // Generate new ID if it's a new event
+      id: 'id' in event && event.id ? event.id : crypto.randomUUID(), // Generate new ID if it's a new event
       summary: data.summary,
       description: data.description,
       startDate: combinedStartDate,
@@ -138,7 +136,6 @@ export function EventDetailDialog({ isOpen, onClose, onSubmit, event, widgetId, 
     if ('id' in event && event.id) {
       onDeleteEvent(event.id);
     }
-    setShowDeleteConfirm(false); // Close confirmation
     onClose(); // Close main dialog
   };
 
@@ -316,11 +313,11 @@ export function EventDetailDialog({ isOpen, onClose, onSubmit, event, widgetId, 
             <DialogFooter className="sm:justify-between">
               <div>
               {!isNewEvent && 'id' in event && event.id && (
-                <EventAlertDialogTrigger asChild>
+                <AlertDialogTrigger asChild>
                   <Button type="button" variant="destructive" className="mr-auto" onClick={(e) => e.stopPropagation()}>
                     <Trash2 className="mr-2 h-4 w-4" /> Delete
                   </Button>
-                </EventAlertDialogTrigger>
+                </AlertDialogTrigger>
               )}
               </div>
               <div className="flex space-x-2">
@@ -342,16 +339,15 @@ export function EventDetailDialog({ isOpen, onClose, onSubmit, event, widgetId, 
                     </EventAlertDialogDescription>
                 </EventAlertDialogHeader>
                 <EventAlertDialogFooter>
-                    <EventAlertDialogCancel asChild>
+                    <AlertDialogCancel asChild>
                         <Button type="button" variant="outline">Cancel</Button>
-                    </EventAlertDialogCancel>
-                    <EventAlertDialogAction asChild>
+                    </AlertDialogCancel>
+                    <AlertDialogAction asChild>
                          <Button type="button" variant="destructive" onClick={handleDelete}>Delete</Button>
-                    </EventAlertDialogAction>
+                    </AlertDialogAction>
                 </EventAlertDialogFooter>
             </EventAlertDialogContent>
         )}
     </Dialog>
   );
 }
-
