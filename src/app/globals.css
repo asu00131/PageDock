@@ -99,7 +99,7 @@
     --muted-foreground: 0 0% 63.9%;
 
     --accent: 174 70% 50%; 
-    --accent-foreground: 0 0% 98%;
+    --accent-foreground: 0 0% 98%; /* This is still light text, on a darker accent bg */
 
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
@@ -385,16 +385,11 @@
     @apply text-sm font-semibold mb-2 text-foreground;
   }
   .calendar-widget__event-item {
-    @apply text-xs p-1.5 mb-1 rounded bg-accent/10 text-accent-foreground flex justify-between items-center cursor-pointer;
+    @apply text-xs p-1.5 mb-1 rounded bg-accent/10 flex justify-between items-center cursor-pointer;
   }
-   /* Ensure children of event item also use accent-foreground for better contrast */
   .calendar-widget__event-item strong, 
   .calendar-widget__event-item span {
-    @apply text-[hsl(var(--accent-foreground))]; 
-  }
-  .dark .calendar-widget__event-item strong, 
-  .dark .calendar-widget__event-item span {
-     @apply text-[hsl(var(--accent-foreground))]; /* Ensure dark mode also uses accent-foreground */
+    @apply text-[hsl(var(--accent))]; /* Use main accent color for text on light accent bg */
   }
   .calendar-widget__no-events {
     @apply text-xs text-muted-foreground;
@@ -413,15 +408,12 @@
      @apply w-14 pr-2 text-right text-xs text-muted-foreground shrink-0 pt-1;
   }
   .calendar-widget__event-column {
-    @apply relative ml-14 h-full; /* Offset by time axis width */
+    @apply absolute inset-y-0 left-14 right-0; /* Position next to time axis, full height */
   }
   .calendar-widget__time-slot {
     @apply flex border-b border-border/50; /* Adjust height in component style */
   }
-  .calendar-widget__event-item.day-timeline {
-    @apply absolute w-[calc(100%-0.5rem)] left-1 right-1 z-10;
-    /* background, border, etc. are already on calendar-widget__event-item */
-  }
+  /* .calendar-widget__event-item.day-timeline is handled by inline styles for top/height */
 
 }
 
