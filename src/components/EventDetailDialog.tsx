@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { CalendarEvent } from '@/types';
@@ -12,7 +13,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogClose,
 } from '@/components/ui/dialog';
 import {
   Form,
@@ -25,17 +25,17 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { format, parse } from 'date-fns';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CalendarIcon, Trash2 } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import {
-  AlertDialog, // Keep AlertDialog for wrapping if needed for context, though not directly used here for root
+  AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
-  AlertDialogContent as EventAlertDialogContent, // Renamed to avoid conflict
+  AlertDialogContent as EventAlertDialogContent,
   AlertDialogDescription as EventAlertDialogDescription,
   AlertDialogFooter as EventAlertDialogFooter,
   AlertDialogHeader as EventAlertDialogHeader,
@@ -59,7 +59,7 @@ const eventDetailSchema = z.object({
   return true;
 }, {
   message: "Start and end times are required for non-all-day events.",
-  path: ["startTime"], // Or path: ["endTime"] or a general path
+  path: ["startTime"], 
 }).refine(data => {
     if (data.endDate < data.startDate) {
         return false;
@@ -80,13 +80,13 @@ interface EventDetailDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (updatedEventData: CalendarEvent) => void;
-  event: CalendarEvent | Omit<CalendarEvent, 'id'>; // Allow passing new event data without id
+  event: CalendarEvent | Omit<CalendarEvent, 'id'>; 
   widgetId: string;
   onDeleteEvent: (eventId: string) => void;
 }
 
 export function EventDetailDialog({ isOpen, onClose, onSubmit, event, widgetId, onDeleteEvent }: EventDetailDialogProps) {
-  const isNewEvent = !('id' in event) || !event.id; // Check if it's a new event
+  const isNewEvent = !('id' in event) || !event.id; 
 
   const form = useForm<EventDetailFormData>({
     resolver: zodResolver(eventDetailSchema),
@@ -116,13 +116,13 @@ export function EventDetailDialog({ isOpen, onClose, onSubmit, event, widgetId, 
     }
   }, [event, form, isOpen]);
 
-  const handleSubmit = (data: EventDetailFormData) => {
+  const handleSubmitData = (data: EventDetailFormData) => {
     const combinedStartDate = data.isAllDay ? data.startDate : parse(`${format(data.startDate, 'yyyy-MM-dd')} ${data.startTime}`, 'yyyy-MM-dd HH:mm', new Date());
     const combinedEndDate = data.isAllDay ? data.endDate : parse(`${format(data.endDate, 'yyyy-MM-dd')} ${data.endTime}`, 'yyyy-MM-dd HH:mm', new Date());
 
     const finalEventData: CalendarEvent = {
-      ...event, // Spread original event to keep its ID if it exists
-      id: 'id' in event && event.id ? event.id : crypto.randomUUID(), // Generate new ID if it's a new event
+      ...event, 
+      id: 'id' in event && event.id ? event.id : crypto.randomUUID(), 
       summary: data.summary,
       description: data.description,
       startDate: combinedStartDate,
@@ -136,7 +136,7 @@ export function EventDetailDialog({ isOpen, onClose, onSubmit, event, widgetId, 
     if ('id' in event && event.id) {
       onDeleteEvent(event.id);
     }
-    onClose(); // Close main dialog
+    // onClose(); // AlertDialog should close itself, then main dialog can be closed if needed via onClose from parent
   };
 
 
@@ -152,7 +152,7 @@ export function EventDetailDialog({ isOpen, onClose, onSubmit, event, widgetId, 
           }
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 py-4">
+          <form onSubmit={form.handleSubmit(handleSubmitData)} className="space-y-4 py-4">
             <FormField
               control={form.control}
               name="summary"
@@ -312,13 +312,31 @@ export function EventDetailDialog({ isOpen, onClose, onSubmit, event, widgetId, 
             />
             <DialogFooter className="sm:justify-between">
               <div>
-              {!isNewEvent && 'id' in event && event.id && (
-                <AlertDialogTrigger asChild>
-                  <Button type="button" variant="destructive" className="mr-auto" onClick={(e) => e.stopPropagation()}>
-                    <Trash2 className="mr-2 h-4 w-4" /> Delete
-                  </Button>
-                </AlertDialogTrigger>
-              )}
+                {!isNewEvent && 'id' in event && event.id && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button type="button" variant="destructive" className="mr-auto" onClick={(e) => e.stopPropagation()}>
+                        <Trash2 className="mr-2 h-4 w-4" /> Delete
+                      </Button>
+                    </AlertDialogTrigger>
+                    <EventAlertDialogContent onClick={(e) => e.stopPropagation()}>
+                      <EventAlertDialogHeader>
+                        <EventAlertDialogTitle>Confirm Deletion</EventAlertDialogTitle>
+                        <EventAlertDialogDescription>
+                          Are you sure you want to delete the event "{event.summary}"? This action cannot be undone.
+                        </EventAlertDialogDescription>
+                      </EventAlertDialogHeader>
+                      <EventAlertDialogFooter>
+                        <AlertDialogCancel asChild>
+                          <Button type="button" variant="outline" onClick={(e) => e.stopPropagation()}>Cancel</Button>
+                        </AlertDialogCancel>
+                        <AlertDialogAction asChild>
+                          <Button type="button" variant="destructive" onClick={(e) => { e.stopPropagation(); handleDelete(); }}>Delete</Button>
+                        </AlertDialogAction>
+                      </EventAlertDialogFooter>
+                    </EventAlertDialogContent>
+                  </AlertDialog>
+                )}
               </div>
               <div className="flex space-x-2">
                 <Button type="button" variant="outline" onClick={onClose}>
@@ -330,24 +348,8 @@ export function EventDetailDialog({ isOpen, onClose, onSubmit, event, widgetId, 
           </form>
         </Form>
       </DialogContent>
-        {!isNewEvent && 'id' in event && event.id && (
-            <EventAlertDialogContent onClick={(e) => e.stopPropagation()}>
-                <EventAlertDialogHeader>
-                    <EventAlertDialogTitle>Confirm Deletion</EventAlertDialogTitle>
-                    <EventAlertDialogDescription>
-                        Are you sure you want to delete the event "{event.summary}"? This action cannot be undone.
-                    </EventAlertDialogDescription>
-                </EventAlertDialogHeader>
-                <EventAlertDialogFooter>
-                    <AlertDialogCancel asChild>
-                        <Button type="button" variant="outline">Cancel</Button>
-                    </AlertDialogCancel>
-                    <AlertDialogAction asChild>
-                         <Button type="button" variant="destructive" onClick={handleDelete}>Delete</Button>
-                    </AlertDialogAction>
-                </EventAlertDialogFooter>
-            </EventAlertDialogContent>
-        )}
     </Dialog>
   );
 }
+
+    
