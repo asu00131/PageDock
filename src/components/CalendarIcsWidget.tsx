@@ -43,19 +43,9 @@ const parseIcalTime = (icalTime: ICAL.Time, event: ICAL.Event): Date => {
   try {
     let jsDate = icalTime.toJSDate();
     if (icalTime.isDate) {
-      // For all-day events, ICAL.js might return a date at UTC midnight.
-      // We want it to be at local midnight for consistent startOfDay comparisons.
-      // Create a new Date object using the year, month, and day from jsDate,
-      // but in the local timezone.
       jsDate = new Date(jsDate.getUTCFullYear(), jsDate.getUTCMonth(), jsDate.getUTCDate());
       return startOfDay(jsDate);
     }
-    // For timed events, ensure it's correctly interpreted in local time if it was UTC.
-    // Most ICS files with time explicitly state timezone or assume UTC.
-    // If it's already local (e.g. "TZID=America/New_York:20231026T100000"), toJSDate() handles it.
-    // If it's UTC (e.g. "20231026T100000Z"), toJSDate() converts to local.
-    // If it's floating (e.g. "20231026T100000"), it's more ambiguous.
-    // We'll assume toJSDate() gives a reasonable local interpretation.
     return jsDate;
   } catch (e) {
     console.warn("Failed to parse date directly, attempting fallback for event:", event.summary, icalTime.toString(), e);
@@ -117,22 +107,11 @@ export function CalendarIcsWidget({
             const event = new ICAL.Event(veventComponent);
             const startDate = parseIcalTime(event.startDate, event);
             
-            // For all-day events, endDate might be the start of the next day or same day if single all-day event.
-            // ICAL.Event.endDate is exclusive for all-day events.
-            // If it's an all-day event and start date equals end date from source,
-            // it means it's a single all-day event. We should represent endDate as end of that day.
-            // However, parseIcalTime already gives startOfDay.
-            // So, for an all-day event "DTSTART;VALUE=DATE:20231026", "DTEND;VALUE=DATE:20231027",
-            // it lasts the whole of 2023-10-26.
-            // startDate will be 2023-10-26 00:00:00.
-            // endDate from parseIcalTime(event.endDate) will be 2023-10-27 00:00:00.
             let endDate = parseIcalTime(event.endDate, event);
 
-            if (event.startDate.isDate) { // All-day event
-                 // If duration is 0 or negative (e.g. DTEND is same as DTSTART for an all-day event),
-                 // make it last for the full day.
+            if (event.startDate.isDate) { 
                  if (compareAsc(endDate, startDate) <= 0) {
-                    endDate = startOfDay(addDays(startDate,1)); // Make it end at start of next day
+                    endDate = startOfDay(addDays(startDate,1));
                  }
             }
             
@@ -172,20 +151,15 @@ export function CalendarIcsWidget({
   const getEventsForDay = useCallback((day: Date | undefined): CalendarEvent[] => {
     if (!day) return [];
     const targetDayStart = startOfDay(day);
-    const targetDayEnd = addDays(targetDayStart, 1); // Exclusive end for range check
+    const targetDayEnd = addDays(targetDayStart, 1); 
 
     return events.filter(event => {
       const eventStart = event.startDate;
-      const eventEnd = event.endDate; // This is exclusive end for all-day events
+      const eventEnd = event.endDate; 
 
       if (event.isAllDay) {
-        // All-day event "starts" on eventStart (e.g., YYYY-MM-DD 00:00:00)
-        // and "ends" at eventEnd (e.g., YYYY-MM-DD+1 00:00:00 for a single day event)
-        // So, it occurs on targetDayStart if targetDayStart is >= eventStart and < eventEnd
         return compareAsc(targetDayStart, eventStart) >= 0 && compareAsc(targetDayStart, eventEnd) < 0;
       } else {
-        // Timed event, check if it overlaps with the target day.
-        // An event overlaps if its start is before day's end AND its end is after day's start.
         return compareAsc(eventStart, targetDayEnd) < 0 && compareAsc(eventEnd, targetDayStart) > 0;
       }
     }).sort((a, b) => {
@@ -201,7 +175,7 @@ export function CalendarIcsWidget({
   }, [selectedDate, getEventsForDay]);
 
   const weekRange = useMemo(() => {
-    const start = startOfWeek(displayDate, { weekStartsOn: 1 }); // Assuming week starts on Monday
+    const start = startOfWeek(displayDate, { weekStartsOn: 1 }); 
     const end = endOfWeek(displayDate, { weekStartsOn: 1 });
     return { start, end };
   }, [displayDate]);
@@ -279,29 +253,33 @@ export function CalendarIcsWidget({
     setSelectedDate(todayAnchor);
     setCurrentMonth(todayAnchor);
     setDisplayDate(todayAnchor);
-    setCurrentView('day'); // Switch to day view to list today's events
+    setCurrentView('day'); 
   };
 
   const renderEventItem = (event: CalendarEvent, context?: 'week-column' | 'list' | 'day-detail' | 'day-timeline') => {
     let baseItemClasses = "calendar-widget__event-item group/event-item";
-    let titleClasses = "truncate block";
-    let timeClasses = "text-xs block";
+    let titleClasses = "truncate block text-accent";
+    let timeClasses = "text-xs block text-accent";
     let actionButtonSizeClasses = "h-7 w-7 p-1";
     let actionIconSizeClasses = "h-4 w-4";
 
     if (context === 'week-column') {
         baseItemClasses = "calendar-widget__event-item group/event-item !p-1 !mb-0.5 text-xs";
-        titleClasses = "truncate block font-semibold";
-        timeClasses = "text-xs block";
+        titleClasses = "truncate block font-semibold text-accent";
+        timeClasses = "text-xs block text-accent";
         actionButtonSizeClasses = "h-6 w-6 p-0.5";
         actionIconSizeClasses = "h-3 w-3";
     } else if (context === 'day-timeline') {
         baseItemClasses = "calendar-widget__event-item group/event-item !p-1.5 text-xs"; 
-        titleClasses = "truncate block font-semibold";
-        timeClasses = "text-xs block";
+        titleClasses = "truncate block font-semibold text-accent";
+        timeClasses = "text-xs block text-accent";
         actionButtonSizeClasses = "h-5 w-5 p-0.5";
         actionIconSizeClasses = "h-3 w-3";
+    } else { // Default for list and day-detail
+        titleClasses = "truncate block text-accent group-hover/event-item:text-accent-foreground";
+        timeClasses = "text-xs block text-accent group-hover/event-item:text-accent-foreground";
     }
+
 
     return (
     <li key={event.id} className={baseItemClasses}
@@ -377,15 +355,15 @@ export function CalendarIcsWidget({
     </div>
   );
 
-  const hourSlotHeight = 60; // pixels per hour for timeline
+  const hourSlotHeight = 60; 
   const getTimelineEventStyle = (event: CalendarEvent): React.CSSProperties => {
-    if (event.isAllDay) return { position: 'relative' }; // All-day events handled separately or given basic style
+    if (event.isAllDay) return { position: 'relative' }; 
 
     const startHour = getHours(event.startDate);
     const startMinute = getMinutes(event.startDate);
 
     let durationMinutes = differenceInMinutes(event.endDate, event.startDate);
-    if (durationMinutes <=0) durationMinutes = 30; // Minimum 30 min height for very short events
+    if (durationMinutes <=0) durationMinutes = 30; 
 
     const top = (startHour + startMinute / 60) * hourSlotHeight;
     const height = (durationMinutes / 60) * hourSlotHeight;
@@ -393,9 +371,9 @@ export function CalendarIcsWidget({
     return {
       position: 'absolute',
       top: `${top}px`,
-      height: `${Math.max(height, 20)}px`, // Ensure a minimum visible height
-      left: '0.25rem', // Small offset from time axis
-      right: '0.25rem', // Small offset from edge
+      height: `${Math.max(height, 20)}px`, 
+      left: '0.25rem', 
+      right: '0.25rem', 
       zIndex: 10,
     };
   };
@@ -404,14 +382,14 @@ export function CalendarIcsWidget({
     const dayEvents = getEventsForDay(displayDate);
     const allDayEvents = dayEvents.filter(e => e.isAllDay);
     const timedEvents = dayEvents.filter(e => !e.isAllDay);
-    const hours = Array.from({ length: 24 }, (_, i) => i); // 0 to 23
+    const hours = Array.from({ length: 24 }, (_, i) => i); 
 
     return (
       <div className="p-2">
         <div className="flex justify-between items-center mb-2">
           <Button variant="ghost" size="icon" onClick={(e)=>{e.stopPropagation(); const newDay = subDays(displayDate,1); setDisplayDate(newDay); setSelectedDate(newDay);}}><ChevronLeft className="h-5 w-5" /></Button>
           <h3
-            className="text-lg font-semibold text-center cursor-pointer hover:text-primary"
+            className="text-lg font-semibold text-center cursor-pointer text-foreground hover:text-primary"
             onClick={() => {const newMonth = startOfDay(displayDate); setCurrentMonth(newMonth); setCurrentView('month'); setSelectedDate(displayDate);}}
             title={`Switch to month view for ${format(displayDate, 'MMMM yyyy')}`}
           >
@@ -430,21 +408,19 @@ export function CalendarIcsWidget({
         )}
 
         <ScrollArea className="h-[500px] w-full">
-          <div className="calendar-widget__day-timeline-container"> {/* Relative container for timeline slots and events */}
-            {/* Time Axis and Slots Background */}
-            <div className="relative"> {/* This will contain both time axis and event column effectively */}
+          <div className="calendar-widget__day-timeline-container"> 
+            <div className="relative"> 
               {hours.map(hour => (
                 <div key={`timeslot-${hour}`} className="calendar-widget__time-slot" style={{ height: `${hourSlotHeight}px` }}>
                   <div className="calendar-widget__time-axis">
-                    {format(setHours(new Date(), hour), 'HH:mm')}
+                    {format(setHours(setMinutes(new Date(),0), hour), 'HH:mm')}
                   </div>
-                  <div className="flex-grow"> {/* This part is the "slot" for events */}
+                  <div className="flex-grow"> 
                   </div>
                 </div>
               ))}
-               {/* Events Overlay positioned absolutely within this relative container */}
               <div className="calendar-widget__event-column">
-                <ul className="relative h-full"> {/* Ensure this ul can contain positioned items */}
+                <ul className="relative h-full"> 
                   {timedEvents.map(event => renderEventItem(event, 'day-timeline'))}
                 </ul>
               </div>
@@ -456,6 +432,54 @@ export function CalendarIcsWidget({
         {allDayEvents.length === 0 && timedEvents.length === 0 && (
             <p className="text-muted-foreground text-center py-10">No events for {format(displayDate, 'PPP')}.</p>
         )}
+      </div>
+    );
+  };
+
+  const renderWeekView = () => {
+    const daysOfWeek = eachDayOfInterval(weekRange);
+    return (
+      <div className="p-2">
+        <div className="flex justify-between items-center mb-2">
+          <Button variant="ghost" size="icon" onClick={(e)=>{e.stopPropagation(); setDisplayDate(subWeeks(displayDate, 1))}}><ChevronLeft className="h-5 w-5" /></Button>
+          <h3
+            className="text-base font-semibold cursor-pointer text-foreground hover:text-primary"
+            onClick={() => {setCurrentView('month'); if(selectedDate) setCurrentMonth(startOfDay(selectedDate))}}
+            title="Switch to Month View"
+          >
+            {format(weekRange.start, 'MMM d')} - {format(weekRange.end, 'MMM d, yyyy')}
+          </h3>
+          <Button variant="ghost" size="icon" onClick={(e)=>{e.stopPropagation(); setDisplayDate(addWeeks(displayDate, 1))}}><ChevronRight className="h-5 w-5" /></Button>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-7 gap-px bg-border border-t border-l">
+          {daysOfWeek.map(day => {
+            const dailyEvents = getEventsForDay(day);
+            const isCurrentDisplayDay = isSameDay(day, displayDate); // Use displayDate for week's active day logic
+            const isTodayDate = isSameDay(day, startOfDay(new Date()));
+            return (
+              <div key={day.toISOString()}
+                   className={`calendar-widget__day-column ${isCurrentDisplayDay ? 'bg-accent/10': ''} ${isTodayDate ? 'border-primary border-2' : ''}`}
+                   onClick={() => { setSelectedDate(day); setDisplayDate(day); setCurrentView('day');}} // Click a day in week view takes you to that day in Day view
+                   role="button"
+                   tabIndex={0}
+                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedDate(day); setDisplayDate(day); setCurrentView('day');}}}
+              >
+                <h4 className={`text-xs font-semibold mb-1 text-center ${isTodayDate ? 'text-primary font-bold' : 'text-foreground'}`}>
+                  {format(day, 'EEE d')}
+                </h4>
+                {dailyEvents.length > 0 ? (
+                  <ScrollArea className="h-[80px]">
+                    <ul className="space-y-0.5 pr-1">
+                        {dailyEvents.map(event => renderEventItem(event, 'week-column'))}
+                    </ul>
+                  </ScrollArea>
+                ) : (
+                  <p className="text-xs text-muted-foreground italic h-full flex items-center justify-center opacity-50">No events</p>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
     );
   };
@@ -506,8 +530,8 @@ export function CalendarIcsWidget({
                      const newEventStart = selectedDate || startOfDay(new Date());
                      const newEvent: Omit<CalendarEvent, 'id'> = {
                        summary: "New Event",
-                       startDate: setMinutes(setHours(newEventStart, 9),0), // Default to 9:00 AM
-                       endDate: setMinutes(setHours(newEventStart, 10),0), // Default to 10:00 AM
+                       startDate: setMinutes(setHours(newEventStart, 9),0), 
+                       endDate: setMinutes(setHours(newEventStart, 10),0), 
                        isAllDay: false,
                        description: ""
                      };
@@ -571,8 +595,7 @@ export function CalendarIcsWidget({
                   <>
                     <div className="calendar-widget__toolbar view-switcher">
                         <div className="flex items-center space-x-1">
-                             <Button onClick={(e)=>{e.stopPropagation(); goToToday()}} variant="outline" size="sm">Today</Button>
-                            {(['month', 'week', 'day', 'list'] as CalendarViewMode[]).map(view => (
+                            {(['day', 'week', 'month', 'list'] as CalendarViewMode[]).map(view => (
                                 <Button
                                 key={view}
                                 variant={currentView === view ? 'default' : 'outline'}
@@ -580,9 +603,20 @@ export function CalendarIcsWidget({
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     setCurrentView(view);
-                                    // If switching to day or week, ensure displayDate is sensible (e.g., selectedDate or today)
-                                    if ((view === 'day' || view === 'week')) {
-                                      setDisplayDate(selectedDate || startOfDay(new Date()));
+                                    if (view === 'day') {
+                                        // If switching to Day view, ensure displayDate is the selectedDate or today.
+                                        // If selectedDate is undefined, it defaults to today.
+                                        // This also makes "Day" button effectively "go to selected day or today"
+                                        const targetDay = selectedDate || startOfDay(new Date());
+                                        setDisplayDate(targetDay);
+                                        // If selectedDate was undefined, set it to today as well for consistency
+                                        if(!selectedDate) setSelectedDate(targetDay);
+                                    } else if (view === 'week') {
+                                        // For week view, displayDate should also follow selectedDate or today
+                                        setDisplayDate(selectedDate || startOfDay(new Date()));
+                                    } else if (view === 'month') {
+                                        // For month view, ensure currentMonth reflects selectedDate or today
+                                        setCurrentMonth(selectedDate || startOfDay(new Date()));
                                     }
                                  }}
                                 >
@@ -619,69 +653,34 @@ export function CalendarIcsWidget({
                           onSelect={(day) => {
                             setSelectedDate(day);
                             if (day) {
-                                setDisplayDate(startOfDay(day)); // Keep displayDate in sync for potential view switch
+                                setDisplayDate(startOfDay(day)); 
+                                setCurrentMonth(startOfDay(day)); // Ensure month view also navigates
                             }
                           }}
                           month={currentMonth}
-                          onMonthChange={setCurrentMonth}
+                          onMonthChange={(month) => {
+                            setCurrentMonth(month);
+                            // Optionally, update selectedDate to the first of the new month if desired
+                            // setSelectedDate(startOfMonth(month));
+                            // setDisplayDate(startOfMonth(month));
+                          }}
                           className="rounded-md calendar-widget"
-                          modifiers={{ eventDay: eventDays.map(d => startOfDay(d)) }} // Ensure unique days
+                          modifiers={{ eventDay: eventDays.map(d => startOfDay(d)) }} 
                           modifiersClassNames={{ eventDay: 'bg-primary/20 rounded-full !text-primary-foreground' }}
+                          footer={selectedDate && eventsForSelectedDay.length > 0 ? 
+                            renderEventsList(eventsForSelectedDay, `Events for ${format(selectedDate, 'PPP')}`, `No events for ${format(selectedDate, 'PPP')}.`, 'day-detail') 
+                            : selectedDate ? <p className="calendar-widget__no-events p-3 border-t">{`No events for ${format(selectedDate, 'PPP')}.`}</p> : null
+                          }
                         />
-                        {selectedDate && renderEventsList(eventsForSelectedDay, `Events for ${format(selectedDate, 'PPP')}`, `No events for ${format(selectedDate, 'PPP')}.`, 'day-detail')}
                       </>
                     )}
 
-                    {currentView === 'week' && (
-                        <div className="p-2">
-                            <div className="flex justify-between items-center mb-2">
-                            <Button variant="ghost" size="icon" onClick={(e)=>{e.stopPropagation(); setDisplayDate(subWeeks(displayDate, 1))}}><ChevronLeft className="h-5 w-5" /></Button>
-                            <h3
-                                className="text-base font-semibold cursor-pointer hover:text-primary"
-                                onClick={() => {setCurrentView('month'); if(selectedDate) setCurrentMonth(startOfDay(selectedDate))}}
-                                title="Switch to Month View"
-                            >
-                                {format(weekRange.start, 'MMM d')} - {format(weekRange.end, 'MMM d, yyyy')}
-                            </h3>
-                            <Button variant="ghost" size="icon" onClick={(e)=>{e.stopPropagation(); setDisplayDate(addWeeks(displayDate, 1))}}><ChevronRight className="h-5 w-5" /></Button>
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-7 gap-px bg-border border-t border-l">
-                            {eachDayOfInterval(weekRange).map(day => {
-                                const dailyEvents = getEventsForDay(day);
-                                const isCurrentDisplayDay = isSameDay(day, displayDate);
-                                const isTodayDate = isSameDay(day, startOfDay(new Date()));
-                                return (
-                                <div key={day.toISOString()}
-                                     className={`calendar-widget__day-column ${isCurrentDisplayDay ? 'bg-accent/10': ''} ${isTodayDate ? 'border-primary border-2' : ''}`}
-                                     onClick={() => { setSelectedDate(day); setDisplayDate(day); setCurrentView('day');}}
-                                     role="button"
-                                     tabIndex={0}
-                                     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedDate(day); setDisplayDate(day); setCurrentView('day');}}}
-                                >
-                                    <h4 className={`text-xs font-semibold mb-1 text-center ${isTodayDate ? 'text-primary font-bold' : 'text-foreground'}`}>
-                                    {format(day, 'EEE d')}
-                                    </h4>
-                                    {dailyEvents.length > 0 ? (
-                                      <ScrollArea className="h-[80px]">
-                                        <ul className="space-y-0.5 pr-1">
-                                            {dailyEvents.map(event => renderEventItem(event, 'week-column'))}
-                                        </ul>
-                                      </ScrollArea>
-                                    ) : (
-                                    <p className="text-xs text-muted-foreground italic h-full flex items-center justify-center opacity-50">No events</p>
-                                    )}
-                                </div>
-                                );
-                            })}
-                            </div>
-                        </div>
-                    )}
-
+                    {currentView === 'week' && renderWeekView()}
                     {currentView === 'day' && renderDayTimelineView()}
 
                     {currentView === 'list' && (
                         <div className="p-2">
-                         {renderEventsList(eventsForListView, "Upcoming Events", "No upcoming events.", 'list')}
+                         {renderEventsList(eventsForListView, "Upcoming Events (next 30 days)", "No upcoming events.", 'list')}
                         </div>
                     )}
                   </>
@@ -716,4 +715,3 @@ export function CalendarIcsWidget({
     </div>
   );
 }
-
