@@ -54,13 +54,13 @@ export function LinkCard({
       onDragEnd={onDragEndHandler}
       className={cn(
         "bookmark-item bookmark-item_mode_cloud group/bookmark-item",
-        "py-px px-[0.5em]", // Apply requested padding via Tailwind
+        "py-px px-[0.5em]", 
         className,
         isDragging && "opacity-50 cursor-grabbing",
         isDragOver && "ring-2 ring-primary ring-offset-1"
       )}
     >
-      <GripVertical className="h-4 w-4 text-muted-foreground mr-2 cursor-grab flex-shrink-0" aria-label="Drag to reorder" />
+      <GripVertical className="h-4 w-4 text-muted-foreground mr-2 cursor-grab flex-shrink-0" aria-label="拖动以重新排序" />
       <a
         href={link.url}
         target="_blank"
@@ -70,7 +70,7 @@ export function LinkCard({
         onClick={(e) => {
           if (e.ctrlKey || e.metaKey || e.button === 1) return;
         }}
-        draggable="false" // Prevents browser's default drag for the link itself
+        draggable="false" 
       >
         <div className="bookmark-item__icon-wrapper">
           <LinkIcon className="bookmark-item__icon" />
@@ -86,7 +86,7 @@ export function LinkCard({
           variant="ghost"
           size="icon"
           onClick={(e) => { e.stopPropagation(); e.preventDefault(); onEdit(link.id); }}
-          aria-label={`Edit ${link.title}`}
+          aria-label={`编辑 ${link.title}`}
           className="h-6 w-6 p-1"
         >
           <Pencil className="h-3 w-3" />
@@ -97,7 +97,7 @@ export function LinkCard({
               variant="ghost"
               size="icon"
               onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}
-              aria-label={`Delete ${link.title}`}
+              aria-label={`删除 ${link.title}`}
               className="h-6 w-6 p-1 hover:bg-destructive/10 hover:text-destructive"
             >
               <Trash2 className="h-3 w-3" />
@@ -105,18 +105,18 @@ export function LinkCard({
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogTitle>您确定吗？</AlertDialogTitle>
               <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete the link "{link.title}".
+                此操作无法撤销。这将永久删除链接 “{link.title}”。
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}>Cancel</AlertDialogCancel>
+              <AlertDialogCancel onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}>取消</AlertDialogCancel>
               <AlertDialogAction
                 onClick={(e) => { e.stopPropagation(); e.preventDefault(); onDelete(link.id); }}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
-                Delete
+                删除
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -125,3 +125,4 @@ export function LinkCard({
     </div>
   );
 }
+

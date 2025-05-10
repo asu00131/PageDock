@@ -26,7 +26,7 @@ import { Input } from '@/components/ui/input';
 import { useEffect } from 'react';
 
 const widgetTitleSchema = z.object({
-  title: z.string().min(1, { message: 'Widget title is required.' }).max(50, { message: 'Title must be 50 characters or less.' }),
+  title: z.string().min(1, { message: '小部件标题是必填项。' }).max(50, { message: '标题长度不能超过50个字符。' }),
 });
 
 type WidgetTitleFormData = z.infer<typeof widgetTitleSchema>;
@@ -35,7 +35,7 @@ interface WidgetTitleDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (title: string, widgetId: string) => void;
-  defaultValues?: Pick<AppWidget, 'id' | 'title'>; // Only need id and title
+  defaultValues?: Pick<AppWidget, 'id' | 'title'>; 
 }
 
 export function WidgetTitleDialog({ isOpen, onClose, onSubmit, defaultValues }: WidgetTitleDialogProps) {
@@ -51,7 +51,7 @@ export function WidgetTitleDialog({ isOpen, onClose, onSubmit, defaultValues }: 
         if (defaultValues) {
             form.reset({ title: defaultValues.title });
         } else {
-            form.reset({ title: '' }); // Should not happen if always editing
+            form.reset({ title: '' }); 
         }
     }
   }, [defaultValues, form, isOpen]);
@@ -67,9 +67,9 @@ export function WidgetTitleDialog({ isOpen, onClose, onSubmit, defaultValues }: 
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="sm:max-w-[425px] bg-background">
         <DialogHeader>
-          <DialogTitle>{defaultValues ? 'Edit Widget Title' : 'Set Widget Title'}</DialogTitle>
+          <DialogTitle>{defaultValues ? '编辑小部件标题' : '设置小部件标题'}</DialogTitle>
           <DialogDescription>
-            {defaultValues ? "Update the title for this widget." : "Enter the title for this widget."}
+            {defaultValues ? "更新此小部件的标题。" : "输入此小部件的标题。"}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -79,9 +79,9 @@ export function WidgetTitleDialog({ isOpen, onClose, onSubmit, defaultValues }: 
               name="title"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Widget Title</FormLabel>
+                  <FormLabel>小部件标题</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g. Work Tools, Quick Notes" {...field} />
+                    <Input placeholder="例如：工作工具，快速笔记" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -89,9 +89,9 @@ export function WidgetTitleDialog({ isOpen, onClose, onSubmit, defaultValues }: 
             />
             <DialogFooter>
               <Button type="button" variant="outline" onClick={onClose}>
-                Cancel
+                取消
               </Button>
-              <Button type="submit">{defaultValues ? 'Save Changes' : 'Set Title'}</Button>
+              <Button type="submit">{defaultValues ? '保存更改' : '设置标题'}</Button>
             </DialogFooter>
           </form>
         </Form>
@@ -99,3 +99,4 @@ export function WidgetTitleDialog({ isOpen, onClose, onSubmit, defaultValues }: 
     </Dialog>
   );
 }
+

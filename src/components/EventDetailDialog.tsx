@@ -35,22 +35,22 @@ import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
-  AlertDialogContent as EventAlertDialogContent,
-  AlertDialogDescription as EventAlertDialogDescription,
-  AlertDialogFooter as EventAlertDialogFooter,
-  AlertDialogHeader as EventAlertDialogHeader,
-  AlertDialogTitle as EventAlertDialogTitle,
+  AlertDialogContent as EventAlertDialogContent, // Renamed to avoid conflict
+  AlertDialogDescription as EventAlertDialogDescription, // Renamed
+  AlertDialogFooter as EventAlertDialogFooter, // Renamed
+  AlertDialogHeader as EventAlertDialogHeader, // Renamed
+  AlertDialogTitle as EventAlertDialogTitle, // Renamed
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
 
 const eventDetailSchema = z.object({
-  summary: z.string().min(1, { message: 'Summary is required.' }).max(200, { message: 'Summary must be 200 characters or less.' }),
+  summary: z.string().min(1, { message: '摘要是必填项。' }).max(200, { message: '摘要长度不能超过200个字符。' }),
   description: z.string().optional(),
-  startDate: z.date({ required_error: "Start date is required." }),
-  endDate: z.date({ required_error: "End date is required." }),
-  startTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, { message: "Invalid time format (HH:mm)"}).optional(),
-  endTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, { message: "Invalid time format (HH:mm)"}).optional(),
+  startDate: z.date({ required_error: "开始日期是必填项。" }),
+  endDate: z.date({ required_error: "结束日期是必填项。" }),
+  startTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, { message: "无效的时间格式 (HH:mm)"}).optional(),
+  endTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, { message: "无效的时间格式 (HH:mm)"}).optional(),
   isAllDay: z.boolean(),
 }).refine(data => {
   if (!data.isAllDay && (!data.startTime || !data.endTime)) {
@@ -58,7 +58,7 @@ const eventDetailSchema = z.object({
   }
   return true;
 }, {
-  message: "Start and end times are required for non-all-day events.",
+  message: "非全天事件需要开始和结束时间。",
   path: ["startTime"], 
 }).refine(data => {
     if (data.endDate < data.startDate) {
@@ -69,7 +69,7 @@ const eventDetailSchema = z.object({
     }
     return true;
 }, {
-    message: "End date/time must be after start date/time.",
+    message: "结束日期/时间必须在开始日期/时间之后。",
     path: ["endDate"],
 });
 
@@ -136,7 +136,7 @@ export function EventDetailDialog({ isOpen, onClose, onSubmit, event, widgetId, 
     if ('id' in event && event.id) {
       onDeleteEvent(event.id);
     }
-    // onClose(); // AlertDialog should close itself, then main dialog can be closed if needed via onClose from parent
+    // onClose(); 
   };
 
 
@@ -144,10 +144,10 @@ export function EventDetailDialog({ isOpen, onClose, onSubmit, event, widgetId, 
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="sm:max-w-lg bg-background">
         <DialogHeader>
-          <DialogTitle>{isNewEvent ? 'Add New Event' : 'Event Details'}</DialogTitle>
+          <DialogTitle>{isNewEvent ? '添加新事件' : '事件详情'}</DialogTitle>
           {!isNewEvent && 
             <DialogDescription>
-              View or edit the event details. Changes are local to this session.
+              查看或编辑事件详情。更改仅保存在当前会话中。
             </DialogDescription>
           }
         </DialogHeader>
@@ -158,9 +158,9 @@ export function EventDetailDialog({ isOpen, onClose, onSubmit, event, widgetId, 
               name="summary"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Summary</FormLabel>
+                  <FormLabel>摘要</FormLabel>
                   <FormControl>
-                    <Input placeholder="Event summary" {...field} />
+                    <Input placeholder="事件摘要" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -173,7 +173,7 @@ export function EventDetailDialog({ isOpen, onClose, onSubmit, event, widgetId, 
                     name="startDate"
                     render={({ field }) => (
                         <FormItem className="flex flex-col">
-                        <FormLabel>Start Date</FormLabel>
+                        <FormLabel>开始日期</FormLabel>
                         <Popover>
                             <PopoverTrigger asChild>
                             <FormControl>
@@ -187,7 +187,7 @@ export function EventDetailDialog({ isOpen, onClose, onSubmit, event, widgetId, 
                                 {field.value ? (
                                     format(field.value, "PPP")
                                 ) : (
-                                    <span>Pick a date</span>
+                                    <span>选择日期</span>
                                 )}
                                 <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                                 </Button>
@@ -212,7 +212,7 @@ export function EventDetailDialog({ isOpen, onClose, onSubmit, event, widgetId, 
                     name="endDate"
                     render={({ field }) => (
                         <FormItem className="flex flex-col">
-                        <FormLabel>End Date</FormLabel>
+                        <FormLabel>结束日期</FormLabel>
                         <Popover>
                             <PopoverTrigger asChild>
                             <FormControl>
@@ -226,7 +226,7 @@ export function EventDetailDialog({ isOpen, onClose, onSubmit, event, widgetId, 
                                 {field.value ? (
                                     format(field.value, "PPP")
                                 ) : (
-                                    <span>Pick a date</span>
+                                    <span>选择日期</span>
                                 )}
                                 <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                                 </Button>
@@ -255,7 +255,7 @@ export function EventDetailDialog({ isOpen, onClose, onSubmit, event, widgetId, 
                         name="startTime"
                         render={({ field }) => (
                             <FormItem>
-                            <FormLabel>Start Time</FormLabel>
+                            <FormLabel>开始时间</FormLabel>
                             <FormControl>
                                 <Input type="time" {...field} />
                             </FormControl>
@@ -268,7 +268,7 @@ export function EventDetailDialog({ isOpen, onClose, onSubmit, event, widgetId, 
                         name="endTime"
                         render={({ field }) => (
                             <FormItem>
-                            <FormLabel>End Time</FormLabel>
+                            <FormLabel>结束时间</FormLabel>
                             <FormControl>
                                 <Input type="time" {...field} />
                             </FormControl>
@@ -291,7 +291,7 @@ export function EventDetailDialog({ isOpen, onClose, onSubmit, event, widgetId, 
                         />
                     </FormControl>
                     <FormLabel className="font-normal">
-                        All-day event
+                        全天事件
                     </FormLabel>
                     </FormItem>
                 )}
@@ -302,9 +302,9 @@ export function EventDetailDialog({ isOpen, onClose, onSubmit, event, widgetId, 
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Description</FormLabel>
+                  <FormLabel>描述</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Event description (optional)" {...field} rows={5} />
+                    <Textarea placeholder="事件描述 (可选)" {...field} rows={5} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -316,22 +316,22 @@ export function EventDetailDialog({ isOpen, onClose, onSubmit, event, widgetId, 
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button type="button" variant="destructive" className="mr-auto" onClick={(e) => e.stopPropagation()}>
-                        <Trash2 className="mr-2 h-4 w-4" /> Delete
+                        <Trash2 className="mr-2 h-4 w-4" /> 删除
                       </Button>
                     </AlertDialogTrigger>
                     <EventAlertDialogContent onClick={(e) => e.stopPropagation()}>
                       <EventAlertDialogHeader>
-                        <EventAlertDialogTitle>Confirm Deletion</EventAlertDialogTitle>
+                        <EventAlertDialogTitle>确认删除</EventAlertDialogTitle>
                         <EventAlertDialogDescription>
-                          Are you sure you want to delete the event "{event.summary}"? This action cannot be undone.
+                          您确定要删除事件 “{event.summary}” 吗？此操作无法撤销。
                         </EventAlertDialogDescription>
                       </EventAlertDialogHeader>
                       <EventAlertDialogFooter>
                         <AlertDialogCancel asChild>
-                          <Button type="button" variant="outline" onClick={(e) => e.stopPropagation()}>Cancel</Button>
+                          <Button type="button" variant="outline" onClick={(e) => e.stopPropagation()}>取消</Button>
                         </AlertDialogCancel>
                         <AlertDialogAction asChild>
-                          <Button type="button" variant="destructive" onClick={(e) => { e.stopPropagation(); handleDelete(); }}>Delete</Button>
+                          <Button type="button" variant="destructive" onClick={(e) => { e.stopPropagation(); handleDelete(); }}>删除</Button>
                         </AlertDialogAction>
                       </EventAlertDialogFooter>
                     </EventAlertDialogContent>
@@ -340,9 +340,9 @@ export function EventDetailDialog({ isOpen, onClose, onSubmit, event, widgetId, 
               </div>
               <div className="flex space-x-2">
                 <Button type="button" variant="outline" onClick={onClose}>
-                  Cancel
+                  取消
                 </Button>
-                <Button type="submit">{isNewEvent ? 'Add Event' : 'Save Changes'}</Button>
+                <Button type="submit">{isNewEvent ? '添加事件' : '保存更改'}</Button>
               </div>
             </DialogFooter>
           </form>

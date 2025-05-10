@@ -26,8 +26,8 @@ import { Input } from '@/components/ui/input';
 import { useEffect } from 'react';
 
 const linkSchema = z.object({
-  title: z.string().min(1, { message: 'Title is required.' }).max(100, { message: 'Title must be 100 characters or less.' }),
-  url: z.string().url({ message: 'Please enter a valid URL.' }),
+  title: z.string().min(1, { message: '标题是必填项。' }).max(100, { message: '标题长度不能超过100个字符。' }),
+  url: z.string().url({ message: '请输入有效的网址。' }),
 });
 
 type LinkFormData = z.infer<typeof linkSchema>;
@@ -35,9 +35,9 @@ type LinkFormData = z.infer<typeof linkSchema>;
 interface LinkDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: LinkFormData, id?: string) => void; // categoryId is handled by parent through currentCategoryId state
+  onSubmit: (data: LinkFormData, id?: string) => void; 
   defaultValues?: LinkItem;
-  categoryId: string; // To ensure context, though not directly used in form submission data
+  categoryId: string; 
 }
 
 export function LinkDialog({ isOpen, onClose, onSubmit, defaultValues, categoryId }: LinkDialogProps) {
@@ -50,7 +50,7 @@ export function LinkDialog({ isOpen, onClose, onSubmit, defaultValues, categoryI
   });
 
   useEffect(() => {
-    if (isOpen) { // Reset form only when dialog opens
+    if (isOpen) { 
       if (defaultValues) {
         form.reset({ title: defaultValues.title, url: defaultValues.url });
       } else {
@@ -60,16 +60,12 @@ export function LinkDialog({ isOpen, onClose, onSubmit, defaultValues, categoryI
   }, [defaultValues, form, isOpen]);
 
   const handleSubmit = (data: LinkFormData) => {
-    onSubmit(data, defaultValues?.id); // Pass linkId if editing
+    onSubmit(data, defaultValues?.id); 
     onClose();
   };
 
-  // Ensure categoryId is present, though not part of form data schema
   if (!categoryId && isOpen) {
     console.error("LinkDialog opened without a categoryId!");
-    // Optionally, close dialog or show error
-    // onClose(); 
-    // return null;
   }
 
 
@@ -77,9 +73,9 @@ export function LinkDialog({ isOpen, onClose, onSubmit, defaultValues, categoryI
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="sm:max-w-[425px] bg-background">
         <DialogHeader>
-          <DialogTitle>{defaultValues ? 'Edit Link' : 'Add New Link'}</DialogTitle>
+          <DialogTitle>{defaultValues ? '编辑链接' : '添加新链接'}</DialogTitle>
           <DialogDescription>
-            {defaultValues ? "Update the details for your link." : "Enter the details for your new link."}
+            {defaultValues ? "更新链接详情。" : "输入新链接的详情。"}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -89,9 +85,9 @@ export function LinkDialog({ isOpen, onClose, onSubmit, defaultValues, categoryI
               name="title"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Title</FormLabel>
+                  <FormLabel>标题</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g. My Favorite News" {...field} />
+                    <Input placeholder="例如：我最爱的新闻" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -102,7 +98,7 @@ export function LinkDialog({ isOpen, onClose, onSubmit, defaultValues, categoryI
               name="url"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>URL</FormLabel>
+                  <FormLabel>网址</FormLabel>
                   <FormControl>
                     <Input placeholder="https://example.com" {...field} />
                   </FormControl>
@@ -112,9 +108,9 @@ export function LinkDialog({ isOpen, onClose, onSubmit, defaultValues, categoryI
             />
             <DialogFooter>
               <Button type="button" variant="outline" onClick={onClose}>
-                Cancel
+                取消
               </Button>
-              <Button type="submit">{defaultValues ? 'Save Changes' : 'Add Link'}</Button>
+              <Button type="submit">{defaultValues ? '保存更改' : '添加链接'}</Button>
             </DialogFooter>
           </form>
         </Form>
@@ -122,3 +118,4 @@ export function LinkDialog({ isOpen, onClose, onSubmit, defaultValues, categoryI
     </Dialog>
   );
 }
+

@@ -1,7 +1,7 @@
 
 "use client";
 
-import type { LinkCollectionAppWidget, LinkItem, LinkCollectionWidgetData } from '@/types';
+import type { LinkCollectionAppWidget, LinkItem } from '@/types';
 import { LinkGrid } from './LinkGrid';
 import { Button } from '@/components/ui/button';
 import { Edit3, MoreVertical, PlusCircle, Trash2, Bookmark, ChevronDown, ChevronUp } from 'lucide-react'; 
@@ -65,7 +65,7 @@ export function LinkCollectionWidget({
         <div className="widget__container">
           <header className="widget__header widget-header_hovered">
             <div 
-              className="flex items-center flex-grow cursor-pointer mr-2"
+              className="widget-header__title-clickable-area"
               onClick={() => onToggleCollapse(widget.id)}
               role="button"
               tabIndex={0}
@@ -75,50 +75,50 @@ export function LinkCollectionWidget({
             >
               <Bookmark className="widget-header__feather-icon h-5 w-5 mr-2 text-[hsl(var(--link-card-foreground))]" />
               <span className="widget-header__text text-lg font-semibold text-[hsl(var(--link-card-foreground))]">{widget.title}</span>
-              {isCollapsed ? <ChevronDown className="h-4 w-4 text-muted-foreground ml-2" /> : <ChevronUp className="h-4 w-4 text-muted-foreground ml-2" />}
+              {isCollapsed ? <ChevronDown className="widget-header__chevron" /> : <ChevronUp className="widget-header__chevron" />}
             </div>
             <div className="widget-header__controls">
               <Button variant="ghost" size="icon" className="widget-header__control h-7 w-7" onClick={(e) => { e.stopPropagation(); onOpenLinkDialog(widget.id); }}>
                 <PlusCircle className="widget-header__feather-icon h-4 w-4" />
-                <span className="sr-only">Add link to {widget.title}</span>
+                <span className="sr-only">{`为 ${widget.title} 添加链接`}</span>
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="widget-header__control h-7 w-7" onClick={(e) => e.stopPropagation()}>
                     <MoreVertical className="widget-header__feather-icon h-4 w-4" />
-                    <span className="sr-only">More options for {widget.title}</span>
+                    <span className="sr-only">{`${widget.title} 的更多选项`}</span>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onOpenWidgetTitleDialog(widget.id); }}>
                     <Edit3 className="mr-2 h-4 w-4" />
-                    <span>Edit Collection Title</span>
+                    <span>编辑合集标题</span>
                   </DropdownMenuItem>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                        <DropdownMenuItem 
                          onSelect={(e) => e.preventDefault()} 
                          onClick={(e) => e.stopPropagation()} 
-                         className="text-destructive hover:!bg-destructive/10 focus:!bg-destructive/10"
+                         className="text-destructive hover:!bg-destructive/10 focus:!bg-destructive/10 focus:text-destructive-foreground"
                        >
                         <Trash2 className="mr-2 h-4 w-4" />
-                        <span>Delete Collection</span>
+                        <span>删除合集</span>
                       </DropdownMenuItem>
                     </AlertDialogTrigger>
                     <AlertDialogContent onClick={(e) => e.stopPropagation()}>
                       <AlertDialogHeader>
-                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogTitle>您确定吗？</AlertDialogTitle>
                         <AlertDialogDescription>
-                          This action cannot be undone. This will permanently delete the collection "{widget.title}" and all its links.
+                          {`此操作无法撤销。这将永久删除合集 “${widget.title}” 及其所有链接。`}
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel>取消</AlertDialogCancel>
                         <AlertDialogAction
                           onClick={() => onDeleteWidget(widget.id)}
                           className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
-                          Delete
+                          删除
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
@@ -144,3 +144,4 @@ export function LinkCollectionWidget({
     </div>
   );
 }
+

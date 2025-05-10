@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { AppWidget, LinkCollectionAppWidget, NoteAppWidget, TodoListAppWidget, CalendarIcsAppWidget, LinkItem, TodoItem, WidgetType } from '@/types';
 import { isLinkCollectionWidget, isNoteWidget, isTodoListWidget, isCalendarIcsWidget } from '@/types';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
@@ -13,12 +14,14 @@ import { NoteEditDialog } from '@/components/NoteEditDialog';
 import { WidgetTitleDialog } from '@/components/CategoryDialog'; 
 import { CalendarIcsDialog } from '@/components/CalendarIcsDialog';
 import { CalendarIcsWidget } from '@/components/CalendarIcsWidget';
-import { AppWindow, FolderPlus, PlusSquare, Bookmark, StickyNote, ListChecks, CalendarDays } from 'lucide-react';
+import { AppWindow, FolderPlus, PlusSquare, Bookmark, StickyNote, ListChecks, CalendarDays, UploadCloud, DownloadCloud } from 'lucide-react';
+import { useToast } from "@/hooks/use-toast";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 
 // For migrating old data structures
@@ -27,6 +30,36 @@ interface OldLinkCategory {
   title: string;
   links: LinkItem[];
 }
+
+// Helper function to validate imported widget structure (basic validation)
+function isValidAppWidget(obj: any): obj is AppWidget {
+  if (!obj || typeof obj !== 'object') return false;
+  if (typeof obj.id !== 'string' || typeof obj.type !== 'string' || typeof obj.title !== 'string') return false;
+  if (typeof obj.isCollapsed !== 'boolean' && typeof obj.isCollapsed !== 'undefined') return false;
+
+  switch (obj.type) {
+    case 'linkCollection':
+      return obj.data && Array.isArray(obj.data.links) && obj.data.links.every((link: any) => 
+        typeof link?.id === 'string' && typeof link?.url === 'string' && typeof link?.title === 'string'
+      );
+    case 'note':
+      return obj.data && typeof obj.data.content === 'string';
+    case 'todoList':
+      return obj.data && Array.isArray(obj.data.items) && typeof obj.data.showCompleted === 'boolean' &&
+        obj.data.items.every((item: any) => 
+          typeof item?.id === 'string' && typeof item?.text === 'string' && typeof item?.completed === 'boolean'
+        );
+    case 'calendarIcs':
+      return obj.data && typeof obj.data.icsUrl === 'string';
+    default:
+      return false;
+  }
+}
+
+function isValidWidgetArray(arr: any): arr is AppWidget[] {
+    return Array.isArray(arr) && arr.every(isValidAppWidget);
+}
+
 
 export default function HomePage() {
   const [widgets, setWidgets] = useLocalStorage<AppWidget[]>('pageDockWidgets', []);
@@ -41,6 +74,8 @@ export default function HomePage() {
   const [editingWidget, setEditingWidget] = useState<AppWidget | undefined>(undefined); 
   const [currentLinkCollectionWidgetId, setCurrentLinkCollectionWidgetId] = useState<string | undefined>(undefined);
   const [currentCalendarIcsWidgetId, setCurrentCalendarIcsWidgetId] = useState<string | undefined>(undefined);
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
 
   useEffect(() => {
@@ -97,7 +132,7 @@ export default function HomePage() {
       currentWidgetsSnapshot = [{
         id: crypto.randomUUID(),
         type: 'linkCollection',
-        title: 'My First Collection',
+        title: '我的第一个合集',
         data: { links: [] },
         isCollapsed: false,
       }];
@@ -238,7 +273,7 @@ export default function HomePage() {
         newWidget = {
           id: baseId,
           type: 'linkCollection',
-          title: 'New Link Collection',
+          title: '新链接合集',
           data: { links: [] },
           isCollapsed: false,
         } as LinkCollectionAppWidget;
@@ -247,7 +282,7 @@ export default function HomePage() {
         newWidget = {
           id: baseId,
           type: 'note',
-          title: 'New Note',
+          title: '新笔记',
           data: { content: '' },
           isCollapsed: false,
         } as NoteAppWidget;
@@ -258,7 +293,7 @@ export default function HomePage() {
         newWidget = {
             id: baseId,
             type: 'todoList',
-            title: 'New Todo List',
+            title: '新待办列表',
             data: { items: [], showCompleted: true },
             isCollapsed: false,
         } as TodoListAppWidget;
@@ -267,7 +302,7 @@ export default function HomePage() {
         newWidget = {
           id: baseId,
           type: 'calendarIcs',
-          title: 'New Calendar',
+          title: '新日历',
           data: { icsUrl: '' },
           isCollapsed: false,
         } as CalendarIcsAppWidget;
@@ -397,13 +432,110 @@ export default function HomePage() {
     }));
   };
 
+  const handleExportJson = () => {
+    if (!isClientHydratedAndSetup) return;
+    const jsonString = JSON.stringify(widgets, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'pagedock_config.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast({ title: "配置已导出", description: "JSON 文件已下载。" });
+  };
+
+  const handleImportJsonClick = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!isClientHydratedAndSetup) return;
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const content = e.target?.result as string;
+          const importedData = JSON.parse(content);
+          if (isValidWidgetArray(importedData)) {
+            setWidgets(importedData);
+            toast({ title: "配置已导入", description: "小部件已成功加载。" });
+          } else {
+            throw new Error("无效的文件格式或内容。");
+          }
+        } catch (error) {
+          console.error("Error importing JSON:", error);
+          toast({ variant: "destructive", title: "导入错误", description: error instanceof Error ? error.message : "无法解析 JSON 文件。" });
+        } finally {
+          // Reset file input to allow importing the same file again if needed
+          if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+          }
+        }
+      };
+      reader.onerror = () => {
+          toast({ variant: "destructive", title: "文件读取错误", description: "无法读取所选文件。" });
+          if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+          }
+      };
+      reader.readAsText(file);
+    }
+  };
+
+
   const renderEmptyState = () => (
     <div className="flex flex-col items-center justify-center text-center p-10 border-2 border-dashed border-muted rounded-lg min-h-[200px]">
       <FolderPlus className="h-12 w-12 text-muted-foreground mb-4" />
-      <h2 className="text-xl font-semibold text-foreground">No Tools Yet</h2>
-      <p className="text-muted-foreground mt-1">Use the "Add Tool" button to add your first widget.</p>
+      <h2 className="text-xl font-semibold text-foreground">暂无工具</h2>
+      <p className="text-muted-foreground mt-1">使用“添加工具”按钮添加您的第一个小部件。</p>
     </div>
   );
+
+  if (!isClientHydratedAndSetup) {
+    // Return a basic placeholder or null during server render / pre-hydration
+    // This helps prevent hydration mismatches if localStorage is used to initialize state
+    // which can only happen client-side.
+    return (
+       <div className="container mx-auto px-4 py-8 min-h-screen">
+          <header className="mb-8">
+            <div className="flex items-center gap-3 mb-2">
+              <AppWindow className="h-10 w-10 text-primary" />
+              <h1 className="text-4xl font-bold text-foreground">PageDock</h1>
+            </div>
+            <p className="text-muted-foreground">您的个性化仪表板，可快速访问您喜爱的网页和工具。</p>
+          </header>
+           <div className="mb-8 flex justify-end space-x-2">
+            <Button size="lg" variant="outline" onClick={handleImportJsonClick} disabled>
+              <UploadCloud className="mr-2 h-5 w-5" />
+              导入 JSON
+            </Button>
+            <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".json" style={{ display: 'none' }} />
+            <Button size="lg" variant="outline" onClick={handleExportJson} disabled>
+              <DownloadCloud className="mr-2 h-5 w-5" />
+              导出 JSON
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="lg" disabled>
+                  <PlusSquare className="mr-2 h-5 w-5" />
+                  添加工具
+                </Button>
+              </DropdownMenuTrigger>
+            </DropdownMenu>
+          </div>
+          {renderEmptyState()}
+           <footer className="mt-16 text-center text-muted-foreground text-sm">
+            <p>&copy; {new Date().getFullYear()} PageDock. 基于 Next.js 和 Tailwind CSS 构建。</p>
+          </footer>
+       </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-8 min-h-screen">
@@ -412,15 +544,24 @@ export default function HomePage() {
           <AppWindow className="h-10 w-10 text-primary" />
           <h1 className="text-4xl font-bold text-foreground">PageDock</h1>
         </div>
-        <p className="text-muted-foreground">Your personal dashboard for quick access to your favorite web pages and tools.</p>
+        <p className="text-muted-foreground">您的个性化仪表板，可快速访问您喜爱的网页和工具。</p>
       </header>
 
-      <div className="mb-8 text-right">
+      <div className="mb-8 flex justify-end space-x-2">
+         <Button size="lg" variant="outline" onClick={handleImportJsonClick}>
+            <UploadCloud className="mr-2 h-5 w-5" />
+            导入 JSON
+          </Button>
+          <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".json" style={{ display: 'none' }} />
+          <Button size="lg" variant="outline" onClick={handleExportJson} disabled={widgets.length === 0}>
+            <DownloadCloud className="mr-2 h-5 w-5" />
+            导出 JSON
+          </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button size="lg">
               <PlusSquare className="mr-2 h-5 w-5" />
-              Add Tool
+              添加工具
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
@@ -444,10 +585,7 @@ export default function HomePage() {
         </DropdownMenu>
       </div>
       
-      {!isClientHydratedAndSetup ? (
-        // Render placeholder matching server initial render if widgets would be empty
-        renderEmptyState()
-      ) : widgets.length === 0 ? (
+      {widgets.length === 0 ? (
         renderEmptyState()
       ) : (
         <div className="space-y-8">
@@ -557,8 +695,9 @@ export default function HomePage() {
       )}
       
       <footer className="mt-16 text-center text-muted-foreground text-sm">
-        <p>&copy; {new Date().getFullYear()} PageDock. Built with Next.js and Tailwind CSS.</p>
+        <p>&copy; {new Date().getFullYear()} PageDock. 基于 Next.js 和 Tailwind CSS 构建。</p>
       </footer>
     </div>
   );
 }
+

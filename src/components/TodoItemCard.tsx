@@ -60,7 +60,7 @@ export function TodoItemCard({
 
   const handleTextSubmit = () => {
     if (editText.trim() === '') {
-      onDelete(item.id); // Delete if text is empty
+      onDelete(item.id); 
     } else if (editText.trim() !== item.text) {
       onUpdateText(item.id, editText.trim());
     }
@@ -85,7 +85,7 @@ export function TodoItemCard({
       onDragLeave={onDragLeaveHandler}
       onDragEnd={onDragEndHandler}
       className={cn(
-        "todo-item group/todo-item p-2 rounded-md hover:bg-accent/50", // Added group/todo-item here
+        "todo-item group/todo-item", 
         isDragging && "opacity-50 cursor-grabbing",
         isDragOver && "ring-2 ring-primary ring-offset-1"
       )}
@@ -93,14 +93,14 @@ export function TodoItemCard({
       <div className="flex items-center">
         <GripVertical
           className="todo-item__drag-handle h-5 w-5"
-          aria-label="Drag to reorder"
+          aria-label="拖动以重新排序"
         />
         <div className="todo-item__checkbox">
            <Checkbox
             id={`todo-${item.id}`}
             checked={item.completed}
             onCheckedChange={() => onToggle(item.id)}
-            aria-label={item.completed ? `Mark ${item.text} as incomplete` : `Mark ${item.text} as complete`}
+            aria-label={item.completed ? `将 ${item.text} 标记为未完成` : `将 ${item.text} 标记为已完成`}
           />
         </div>
 
@@ -113,7 +113,7 @@ export function TodoItemCard({
             onBlur={handleTextSubmit}
             onKeyDown={handleKeyDown}
             className="todo-item__input h-8 text-sm"
-            aria-label={`Edit todo text for ${item.text}`}
+            aria-label={`编辑待办事项 ${item.text}`}
           />
         ) : (
           <div
@@ -122,11 +122,11 @@ export function TodoItemCard({
               item.completed && "todo-item__text-content_completed"
             )}
             onClick={() => setIsEditing(true)}
-            onDoubleClick={() => setIsEditing(true)} // For accessibility
+            onDoubleClick={() => setIsEditing(true)} 
             role="button"
             tabIndex={0}
             onKeyDown={(e) => {if(e.key === 'Enter' || e.key === ' ') setIsEditing(true)}}
-            aria-label={`Todo item: ${item.text}. Status: ${item.completed ? 'Completed' : 'Incomplete'}. Click to edit.`}
+            aria-label={`待办事项：${item.text}。状态：${item.completed ? '已完成' : '未完成'}。点击以编辑。`}
           >
             {item.text}
           </div>
@@ -139,7 +139,7 @@ export function TodoItemCard({
                 variant="ghost"
                 size="icon"
                 onClick={(e) => e.stopPropagation()}
-                aria-label={`Delete ${item.text}`}
+                aria-label={`删除 ${item.text}`}
                 className="h-7 w-7 p-1 hover:bg-destructive/10 hover:text-destructive"
               >
                 <Trash2 className="h-4 w-4" />
@@ -147,18 +147,18 @@ export function TodoItemCard({
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                <AlertDialogTitle>您确定吗？</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This action cannot be undone. This will permanently delete the task "{item.text}".
+                  {`此操作无法撤销。这将永久删除任务 “${item.text}”。`}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel onClick={(e) => e.stopPropagation()}>Cancel</AlertDialogCancel>
+                <AlertDialogCancel onClick={(e) => e.stopPropagation()}>取消</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={(e) => { e.stopPropagation(); onDelete(item.id);}}
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 >
-                  Delete
+                  删除
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>

@@ -26,11 +26,11 @@ import { useEffect, useState, useMemo, useCallback } from 'react';
 import ICAL from 'ical.js';
 import { format, isSameDay, startOfDay, addDays, subDays, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isWithinInterval, compareAsc, getHours, getMinutes, differenceInMinutes, setHours, setMinutes, setSeconds, setMilliseconds } from 'date-fns';
 import { EventDetailDialog } from './EventDetailDialog';
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'; // For scrollable timeline
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'; 
 
 interface CalendarIcsWidgetProps {
   widget: CalendarIcsAppWidget;
-  onOpenEditDialog: (widgetId: string) => void; // For editing ICS URL
+  onOpenEditDialog: (widgetId: string) => void; 
   onOpenWidgetTitleDialog: (widgetId: string) => void;
   onDeleteWidget: (widgetId: string) => void;
   isCollapsed?: boolean;
@@ -94,7 +94,7 @@ export function CalendarIcsWidget({
     fetch(`/api/ics-proxy?url=${encodeURIComponent(widget.data.icsUrl)}`)
       .then(response => {
         if (!response.ok) {
-          throw new Error(`Failed to fetch ICS data (status: ${response.status})`);
+          throw new Error(`获取 ICS 数据失败 (状态: ${response.status})`);
         }
         return response.text();
       })
@@ -117,7 +117,7 @@ export function CalendarIcsWidget({
             
             return {
               id: event.uid || crypto.randomUUID(),
-              summary: event.summary || 'No Title',
+              summary: event.summary || '无标题',
               startDate: startDate,
               endDate: endDate,
               isAllDay: event.startDate.isDate,
@@ -127,13 +127,13 @@ export function CalendarIcsWidget({
           setEvents(parsedEvents);
         } catch (parseErr) {
           console.error("Error parsing ICS data:", parseErr);
-          setError("Failed to parse calendar data. Ensure the ICS format is correct.");
+          setError("解析日历数据失败。请确保 ICS 格式正确。");
           setEvents([]);
         }
       })
       .catch(err => {
         console.error("Error fetching or parsing ICS:", err);
-        setError(err.message || "Failed to load calendar data. Check the URL and network.");
+        setError(err.message || "加载日历数据失败。请检查链接和网络。");
         setEvents([]);
       })
       .finally(() => setIsLoading(false));
@@ -250,34 +250,34 @@ export function CalendarIcsWidget({
 
   const goToToday = () => {
     const todayAnchor = startOfDay(new Date());
-    setSelectedDate(todayAnchor);
-    setCurrentMonth(todayAnchor);
-    setDisplayDate(todayAnchor);
-    setCurrentView('day'); 
+    setSelectedDate(todayAnchor); // Update selectedDate for Month view
+    setDisplayDate(todayAnchor);  // Update displayDate for Day/Week view
+    setCurrentMonth(todayAnchor); // Update currentMonth for Month view navigation
+    setCurrentView('day');        // Switch to Day view showing today
   };
 
   const renderEventItem = (event: CalendarEvent, context?: 'week-column' | 'list' | 'day-detail' | 'day-timeline') => {
     let baseItemClasses = "calendar-widget__event-item group/event-item";
-    let titleClasses = "truncate block text-accent";
-    let timeClasses = "text-xs block text-accent";
+    let titleClasses = "truncate block text-accent dark:text-[hsl(var(--accent-foreground))]";
+    let timeClasses = "text-xs block text-accent dark:text-[hsl(var(--accent-foreground))/90]";
     let actionButtonSizeClasses = "h-7 w-7 p-1";
     let actionIconSizeClasses = "h-4 w-4";
 
     if (context === 'week-column') {
         baseItemClasses = "calendar-widget__event-item group/event-item !p-1 !mb-0.5 text-xs";
-        titleClasses = "truncate block font-semibold text-accent";
-        timeClasses = "text-xs block text-accent";
+        titleClasses = "truncate block font-semibold text-accent dark:text-[hsl(var(--accent-foreground))]";
+        timeClasses = "text-xs block text-accent dark:text-[hsl(var(--accent-foreground))/90]";
         actionButtonSizeClasses = "h-6 w-6 p-0.5";
         actionIconSizeClasses = "h-3 w-3";
     } else if (context === 'day-timeline') {
         baseItemClasses = "calendar-widget__event-item group/event-item !p-1.5 text-xs"; 
-        titleClasses = "truncate block font-semibold text-accent";
-        timeClasses = "text-xs block text-accent";
+        titleClasses = "truncate block font-semibold text-accent dark:text-[hsl(var(--accent-foreground))]";
+        timeClasses = "text-xs block text-accent dark:text-[hsl(var(--accent-foreground))/90]";
         actionButtonSizeClasses = "h-5 w-5 p-0.5";
         actionIconSizeClasses = "h-3 w-3";
-    } else { // Default for list and day-detail
-        titleClasses = "truncate block text-accent group-hover/event-item:text-accent-foreground";
-        timeClasses = "text-xs block text-accent group-hover/event-item:text-accent-foreground";
+    } else { 
+        titleClasses = "truncate block text-accent dark:text-[hsl(var(--accent-foreground))] group-hover/event-item:text-accent-foreground dark:group-hover/event-item:text-accent";
+        timeClasses = "text-xs block text-accent dark:text-[hsl(var(--accent-foreground))/90] group-hover/event-item:text-accent-foreground dark:group-hover/event-item:text-accent";
     }
 
 
@@ -296,46 +296,46 @@ export function CalendarIcsWidget({
             <span className={timeClasses}>
                 {format(event.startDate, 'PPP')}
                 {!event.isAllDay && ` ${format(event.startDate, 'p')} - ${format(event.endDate, 'p')}`}
-                {event.isAllDay && ` (All day)`}
+                {event.isAllDay && ` (全天)`}
             </span>
         )}
         {(context === 'day-detail' || context === 'day-timeline') && (
           <span className={timeClasses}>
-            {!event.isAllDay ? `${format(event.startDate, 'HH:mm')} - ${format(event.endDate, 'HH:mm')}` : "(All day)"}
+            {!event.isAllDay ? `${format(event.startDate, 'HH:mm')} - ${format(event.endDate, 'HH:mm')}` : "(全天)"}
           </span>
         )}
          {context === 'week-column' && (
           <span className={timeClasses}>
-            {!event.isAllDay ? `${format(event.startDate, 'p')}` : "(All day)"}
+            {!event.isAllDay ? `${format(event.startDate, 'p')}` : "(全天)"}
           </span>
         )}
       </div>
       <div className="calendar-widget__event-actions">
         <Button variant="ghost" size="icon" className={actionButtonSizeClasses} onClick={(e) => {e.stopPropagation(); handleOpenEventDetailDialog(event);}}>
           <FilePenLine className={actionIconSizeClasses} />
-          <span className="sr-only">View/Edit Event</span>
+          <span className="sr-only">查看/编辑事件</span>
         </Button>
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <Button variant="ghost" size="icon" className={`${actionButtonSizeClasses} hover:bg-destructive/10 hover:text-destructive`} onClick={(e) => e.stopPropagation()}>
               <Trash2 className={actionIconSizeClasses}/>
-              <span className="sr-only">Delete Event</span>
+              <span className="sr-only">删除事件</span>
             </Button>
           </AlertDialogTrigger>
           <AlertDialogContent onClick={(e) => e.stopPropagation()}>
             <AlertDialogHeader>
-              <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
+              <AlertDialogTitle>确认删除</AlertDialogTitle>
               <AlertDialogDescription>
-                Are you sure you want to delete the event "{event.summary}"? This action is local and cannot be undone.
+                {`您确定要删除事件 “${event.summary}” 吗？此操作为本地操作，无法撤销。`}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogCancel>取消</AlertDialogCancel>
               <AlertDialogAction
                 onClick={() => handleDeleteEvent(event.id)}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
-                Delete
+                删除
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -350,7 +350,7 @@ export function CalendarIcsWidget({
       {eventsToRender.length > 0 ? (
         <ul className="space-y-1">{eventsToRender.map(event => renderEventItem(event, context))}</ul>
       ) : (
-        <p className="calendar-widget__no-events">{noEventsMessage || "No events."}</p>
+        <p className="calendar-widget__no-events">{noEventsMessage || "无事件。"}</p>
       )}
     </div>
   );
@@ -391,16 +391,16 @@ export function CalendarIcsWidget({
           <h3
             className="text-lg font-semibold text-center cursor-pointer text-foreground hover:text-primary"
             onClick={() => {const newMonth = startOfDay(displayDate); setCurrentMonth(newMonth); setCurrentView('month'); setSelectedDate(displayDate);}}
-            title={`Switch to month view for ${format(displayDate, 'MMMM yyyy')}`}
+            title={`切换到 ${format(displayDate, 'yyyy年MM月')} 的月视图`}
           >
-            {format(displayDate, 'EEEE, MMM d, yyyy')}
+            {format(displayDate, 'yyyy年M月d日, EEEE')}
           </h3>
           <Button variant="ghost" size="icon" onClick={(e)=>{e.stopPropagation(); const newDay = addDays(displayDate,1); setDisplayDate(newDay); setSelectedDate(newDay);}}><ChevronRight className="h-5 w-5" /></Button>
         </div>
 
         {allDayEvents.length > 0 && (
           <div className="mb-3 border-b pb-2">
-            <h4 className="text-sm font-semibold mb-1 text-foreground">All-day Events</h4>
+            <h4 className="text-sm font-semibold mb-1 text-foreground">全天事件</h4>
             <ul className="space-y-1">
               {allDayEvents.map(event => renderEventItem(event, 'day-detail'))}
             </ul>
@@ -430,7 +430,7 @@ export function CalendarIcsWidget({
         </ScrollArea>
 
         {allDayEvents.length === 0 && timedEvents.length === 0 && (
-            <p className="text-muted-foreground text-center py-10">No events for {format(displayDate, 'PPP')}.</p>
+            <p className="text-muted-foreground text-center py-10">{`${format(displayDate, 'PPP')} 无事件。`}</p>
         )}
       </div>
     );
@@ -445,21 +445,21 @@ export function CalendarIcsWidget({
           <h3
             className="text-base font-semibold cursor-pointer text-foreground hover:text-primary"
             onClick={() => {setCurrentView('month'); if(selectedDate) setCurrentMonth(startOfDay(selectedDate))}}
-            title="Switch to Month View"
+            title="切换到月视图"
           >
-            {format(weekRange.start, 'MMM d')} - {format(weekRange.end, 'MMM d, yyyy')}
+            {format(weekRange.start, 'M月d日')} - {format(weekRange.end, 'M月d日, yyyy年')}
           </h3>
           <Button variant="ghost" size="icon" onClick={(e)=>{e.stopPropagation(); setDisplayDate(addWeeks(displayDate, 1))}}><ChevronRight className="h-5 w-5" /></Button>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-7 gap-px bg-border border-t border-l">
           {daysOfWeek.map(day => {
             const dailyEvents = getEventsForDay(day);
-            const isCurrentDisplayDay = isSameDay(day, displayDate); // Use displayDate for week's active day logic
+            const isCurrentDisplayDay = isSameDay(day, displayDate); 
             const isTodayDate = isSameDay(day, startOfDay(new Date()));
             return (
               <div key={day.toISOString()}
                    className={`calendar-widget__day-column ${isCurrentDisplayDay ? 'bg-accent/10': ''} ${isTodayDate ? 'border-primary border-2' : ''}`}
-                   onClick={() => { setSelectedDate(day); setDisplayDate(day); setCurrentView('day');}} // Click a day in week view takes you to that day in Day view
+                   onClick={() => { setSelectedDate(day); setDisplayDate(day); setCurrentView('day');}} 
                    role="button"
                    tabIndex={0}
                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedDate(day); setDisplayDate(day); setCurrentView('day');}}}
@@ -474,7 +474,7 @@ export function CalendarIcsWidget({
                     </ul>
                   </ScrollArea>
                 ) : (
-                  <p className="text-xs text-muted-foreground italic h-full flex items-center justify-center opacity-50">No events</p>
+                  <p className="text-xs text-muted-foreground italic h-full flex items-center justify-center opacity-50">无事件</p>
                 )}
               </div>
             );
@@ -505,31 +505,31 @@ export function CalendarIcsWidget({
             </div>
             <div className="widget-header__controls">
               {!isCollapsed && widget.data.icsUrl && (
-                <Button variant="ghost" size="icon" className="widget-header__control h-7 w-7" onClick={(e) => {e.stopPropagation(); fetchAndParseIcs();}} title="Refresh Calendar Data">
+                <Button variant="ghost" size="icon" className="widget-header__control h-7 w-7" onClick={(e) => {e.stopPropagation(); fetchAndParseIcs();}} title="刷新日历数据">
                     <RotateCcw className="widget-header__feather-icon h-4 w-4" />
-                    <span className="sr-only">Refresh Calendar</span>
+                    <span className="sr-only">刷新日历</span>
                 </Button>
               )}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="widget-header__control h-7 w-7" onClick={(e) => e.stopPropagation()}>
                     <MoreVertical className="widget-header__feather-icon h-4 w-4" />
-                    <span className="sr-only">More options for {widget.title}</span>
+                    <span className="sr-only">{`${widget.title} 的更多选项`}</span>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                   <DropdownMenuItem onClick={() => onOpenWidgetTitleDialog(widget.id)}>
                     <Edit3 className="mr-2 h-4 w-4" />
-                    <span>Edit Title</span>
+                    <span>编辑标题</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => onOpenEditDialog(widget.id)}>
                     <Link2 className="mr-2 h-4 w-4" />
-                    <span>Edit Calendar URL</span>
+                    <span>编辑日历链接</span>
                   </DropdownMenuItem>
                    <DropdownMenuItem onClick={() => {
                      const newEventStart = selectedDate || startOfDay(new Date());
                      const newEvent: Omit<CalendarEvent, 'id'> = {
-                       summary: "New Event",
+                       summary: "新事件",
                        startDate: setMinutes(setHours(newEventStart, 9),0), 
                        endDate: setMinutes(setHours(newEventStart, 10),0), 
                        isAllDay: false,
@@ -538,7 +538,7 @@ export function CalendarIcsWidget({
                      handleOpenEventDetailDialog(newEvent);
                    }}>
                     <PlusCircle className="mr-2 h-4 w-4" />
-                    <span>Add Event Manually</span>
+                    <span>手动添加事件</span>
                   </DropdownMenuItem>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
@@ -547,23 +547,23 @@ export function CalendarIcsWidget({
                         className="text-destructive focus:text-destructive-foreground hover:!text-destructive-foreground hover:!bg-destructive/90 focus:!bg-destructive/90"
                       >
                         <Trash2 className="mr-2 h-4 w-4" />
-                        <span>Delete Calendar</span>
+                        <span>删除日历</span>
                       </DropdownMenuItem>
                     </AlertDialogTrigger>
                     <AlertDialogContent onClick={(e) => e.stopPropagation()}>
                       <AlertDialogHeader>
-                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogTitle>您确定吗？</AlertDialogTitle>
                         <AlertDialogDescription>
-                          This action cannot be undone. This will permanently delete the calendar "{widget.title}".
+                          {`此操作无法撤销。这将永久删除日历 “${widget.title}”。`}
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel>取消</AlertDialogCancel>
                         <AlertDialogAction
                           onClick={() => onDeleteWidget(widget.id)}
                           className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
-                          Delete
+                          删除
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
@@ -581,13 +581,13 @@ export function CalendarIcsWidget({
                 role={!widget.data.icsUrl ? "button" : undefined}
                 tabIndex={!widget.data.icsUrl ? 0 : undefined}
               >
-                {isLoading && <p className="p-4 text-center text-muted-foreground">Loading calendar...</p>}
+                {isLoading && <p className="p-4 text-center text-muted-foreground">正在加载日历...</p>}
                 {error &&
                   <div className="p-4 text-center text-destructive flex flex-col items-center">
                     <AlertTriangle className="w-8 h-8 mb-2"/>
                     <p>{error}</p>
                     <Button variant="link" onClick={(e) => { e.stopPropagation(); onOpenEditDialog(widget.id); }} className="mt-2">
-                      Edit Calendar URL
+                      编辑日历链接
                     </Button>
                   </div>
                 }
@@ -603,27 +603,33 @@ export function CalendarIcsWidget({
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     setCurrentView(view);
+                                    const targetDay = selectedDate || startOfDay(new Date());
                                     if (view === 'day') {
-                                        // If switching to Day view, ensure displayDate is the selectedDate or today.
-                                        // If selectedDate is undefined, it defaults to today.
-                                        // This also makes "Day" button effectively "go to selected day or today"
-                                        const targetDay = selectedDate || startOfDay(new Date());
                                         setDisplayDate(targetDay);
-                                        // If selectedDate was undefined, set it to today as well for consistency
                                         if(!selectedDate) setSelectedDate(targetDay);
                                     } else if (view === 'week') {
-                                        // For week view, displayDate should also follow selectedDate or today
-                                        setDisplayDate(selectedDate || startOfDay(new Date()));
+                                        setDisplayDate(targetDay);
                                     } else if (view === 'month') {
-                                        // For month view, ensure currentMonth reflects selectedDate or today
-                                        setCurrentMonth(selectedDate || startOfDay(new Date()));
+                                        setCurrentMonth(targetDay);
+                                        if(!selectedDate) setSelectedDate(targetDay);
                                     }
                                  }}
                                 >
-                                {view.charAt(0).toUpperCase() + view.slice(1)}
+                                {view === 'day' ? '日' : view === 'week' ? '周' : view === 'month' ? '月' : '列表'}
                                 </Button>
                             ))}
                         </div>
+                         <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                goToToday();
+                            }}
+                            title="跳转到今天"
+                        >
+                           今天
+                        </Button>
                         <Button
                             variant="outline"
                             size="sm"
@@ -631,7 +637,7 @@ export function CalendarIcsWidget({
                                 e.stopPropagation();
                                 const newEventStart = selectedDate || startOfDay(new Date());
                                 const newEvent: Omit<CalendarEvent, 'id'> = {
-                                    summary: "New Event",
+                                    summary: "新事件",
                                     startDate: setMinutes(setHours(newEventStart, 9),0),
                                     endDate: setMinutes(setHours(newEventStart, 10),0),
                                     isAllDay: false,
@@ -654,22 +660,19 @@ export function CalendarIcsWidget({
                             setSelectedDate(day);
                             if (day) {
                                 setDisplayDate(startOfDay(day)); 
-                                setCurrentMonth(startOfDay(day)); // Ensure month view also navigates
+                                setCurrentMonth(startOfDay(day)); 
                             }
                           }}
                           month={currentMonth}
                           onMonthChange={(month) => {
                             setCurrentMonth(month);
-                            // Optionally, update selectedDate to the first of the new month if desired
-                            // setSelectedDate(startOfMonth(month));
-                            // setDisplayDate(startOfMonth(month));
                           }}
                           className="rounded-md calendar-widget"
                           modifiers={{ eventDay: eventDays.map(d => startOfDay(d)) }} 
-                          modifiersClassNames={{ eventDay: 'bg-primary/20 rounded-full !text-primary-foreground' }}
+                          modifiersClassNames={{ eventDay: 'bg-primary/20 rounded-full !text-primary-foreground dark:!text-primary' }}
                           footer={selectedDate && eventsForSelectedDay.length > 0 ? 
-                            renderEventsList(eventsForSelectedDay, `Events for ${format(selectedDate, 'PPP')}`, `No events for ${format(selectedDate, 'PPP')}.`, 'day-detail') 
-                            : selectedDate ? <p className="calendar-widget__no-events p-3 border-t">{`No events for ${format(selectedDate, 'PPP')}.`}</p> : null
+                            renderEventsList(eventsForSelectedDay, `${format(selectedDate, 'PPP')} 的事件`, `${format(selectedDate, 'PPP')} 无事件。`, 'day-detail') 
+                            : selectedDate ? <p className="calendar-widget__no-events p-3 border-t">{`${format(selectedDate, 'PPP')} 无事件。`}</p> : null
                           }
                         />
                       </>
@@ -680,7 +683,7 @@ export function CalendarIcsWidget({
 
                     {currentView === 'list' && (
                         <div className="p-2">
-                         {renderEventsList(eventsForListView, "Upcoming Events (next 30 days)", "No upcoming events.", 'list')}
+                         {renderEventsList(eventsForListView, "未来30天事件", "暂无近期事件。", 'list')}
                         </div>
                     )}
                   </>
@@ -690,10 +693,10 @@ export function CalendarIcsWidget({
                     className="calendar-widget__empty-prompt"
                   >
                     <CalendarIcon className="w-10 h-10 text-muted-foreground mb-3"/>
-                    <p className="text-lg font-medium text-foreground mb-2">Calendar is Empty</p>
-                    <p className="text-sm text-muted-foreground mb-4">To display events, please link an ICS Calendar URL.</p>
+                    <p className="text-lg font-medium text-foreground mb-2">日历为空</p>
+                    <p className="text-sm text-muted-foreground mb-4">要显示事件，请链接一个 ICS 日历 URL。</p>
                     <Button onClick={(e) => { e.stopPropagation(); onOpenEditDialog(widget.id); }}>
-                      <Link2 className="mr-2 h-4 w-4" /> Set ICS Calendar Link
+                      <Link2 className="mr-2 h-4 w-4" /> 设置 ICS 日历链接
                     </Button>
                   </div>
                 )}

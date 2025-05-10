@@ -1,7 +1,7 @@
 
 "use client";
 
-import type { NoteAppWidget, NoteWidgetData } from '@/types';
+import type { NoteAppWidget } from '@/types';
 import { Button } from '@/components/ui/button';
 import { MoreVertical, Edit3, Trash2, StickyNote, ChevronDown, ChevronUp } from 'lucide-react';
 import {
@@ -41,18 +41,16 @@ export function NoteWidget({
 }: NoteWidgetProps) {
   
   const handleBodyClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    // Allow link clicks within markdown, but open edit dialog otherwise
-    if (e.target instanceof HTMLElement && e.target.closest('a')) {
+    if (e.target instanceof HTMLElement && (e.target.closest('a') || e.target.closest('button') || e.target.closest('[role="button"]'))) {
       return;
     }
-    e.stopPropagation(); // Prevent collapse toggle if header is clicked through
+    e.stopPropagation(); 
     onOpenEditDialog(widget.id);
   };
   
   const handleBodyKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'Enter' || e.key === ' ') {
-      if (e.target instanceof HTMLElement && e.target.closest('a') && e.key === 'Enter') {
-        // Allow default 'Enter' behavior for links (e.g. if they were buttons)
+      if (e.target instanceof HTMLElement && (e.target.closest('a') || e.target.closest('button') || e.target.closest('[role="button"]'))) {
         return;
       }
       e.preventDefault();
@@ -67,7 +65,7 @@ export function NoteWidget({
         <div className="widget__container">
           <header className="widget__header widget-header_hovered">
             <div 
-              className="flex items-center flex-grow cursor-pointer mr-2"
+              className="widget-header__title-clickable-area"
               onClick={() => onToggleCollapse(widget.id)}
               role="button"
               tabIndex={0}
@@ -77,46 +75,46 @@ export function NoteWidget({
             >
               <StickyNote className="widget-header__feather-icon h-5 w-5 mr-2" />
               <span className="widget-header__text text-lg font-semibold">{widget.title}</span>
-              {isCollapsed ? <ChevronDown className="h-4 w-4 text-muted-foreground ml-2" /> : <ChevronUp className="h-4 w-4 text-muted-foreground ml-2" />}
+              {isCollapsed ? <ChevronDown className="widget-header__chevron" /> : <ChevronUp className="widget-header__chevron" />}
             </div>
             <div className="widget-header__controls">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="widget-header__control h-7 w-7" onClick={(e) => e.stopPropagation()}>
                     <MoreVertical className="widget-header__feather-icon h-4 w-4" />
-                    <span className="sr-only">More options for {widget.title}</span>
+                    <span className="sr-only">{`${widget.title} 的更多选项`}</span>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onOpenEditDialog(widget.id); }}>
                     <Edit3 className="mr-2 h-4 w-4" />
-                    <span>Edit Note</span>
+                    <span>编辑笔记</span>
                   </DropdownMenuItem>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <DropdownMenuItem 
                         onSelect={(e) => e.preventDefault()} 
                         onClick={(e) => e.stopPropagation()} 
-                        className="text-destructive hover:!bg-destructive/10 focus:!bg-destructive/10"
+                        className="text-destructive hover:!bg-destructive/10 focus:!bg-destructive/10 focus:text-destructive-foreground"
                       >
                         <Trash2 className="mr-2 h-4 w-4" />
-                        <span>Delete Note</span>
+                        <span>删除笔记</span>
                       </DropdownMenuItem>
                     </AlertDialogTrigger>
                     <AlertDialogContent onClick={(e) => e.stopPropagation()}>
                       <AlertDialogHeader>
-                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogTitle>您确定吗？</AlertDialogTitle>
                         <AlertDialogDescription>
-                          This action cannot be undone. This will permanently delete the note "{widget.title}".
+                          {`此操作无法撤销。这将永久删除笔记 “${widget.title}”。`}
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel>取消</AlertDialogCancel>
                         <AlertDialogAction
                           onClick={() => onDeleteWidget(widget.id)}
                           className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
-                          Delete
+                          删除
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
@@ -127,24 +125,21 @@ export function NoteWidget({
           </header>
           {!isCollapsed && (
             <div className="widget__box" id={`widget-body-${widget.id}`}>
-              <div className="widget__body">
+              <div 
+                className="widget__body"
+                onClick={handleBodyClick}
+                role="button" 
+                tabIndex={0} 
+                onKeyDown={handleBodyKeyDown}
+                aria-label={widget.data.content ? `笔记内容：${widget.title}，点击编辑` : `空笔记：${widget.title}，点击开始写作`}
+              >
                 {widget.data.content ? (
-                   <div 
-                     className="note-widget__content cursor-pointer" 
-                     onClick={handleBodyClick}
-                     role="button" 
-                     tabIndex={0} 
-                     onKeyDown={handleBodyKeyDown}
-                   >
+                   <div className="note-widget__content">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{widget.data.content}</ReactMarkdown>
                    </div>
                 ) : (
                   <div 
                     className="note-widget__empty-prompt"
-                    onClick={(e) => { e.stopPropagation(); onOpenEditDialog(widget.id); }}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e) => { if(e.key === 'Enter' || e.key === ' ') {e.preventDefault(); e.stopPropagation(); onOpenEditDialog(widget.id);} }}
                   >
                     <p>开始写...</p>
                   </div>
@@ -157,3 +152,4 @@ export function NoteWidget({
     </div>
   );
 }
+

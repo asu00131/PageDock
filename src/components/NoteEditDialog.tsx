@@ -23,11 +23,11 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea'; // Assuming you have a Textarea component
+import { Textarea } from '@/components/ui/textarea'; 
 import { useEffect } from 'react';
 
 const noteSchema = z.object({
-  title: z.string().min(1, { message: 'Title is required.' }).max(100, { message: 'Title must be 100 characters or less.' }),
+  title: z.string().min(1, { message: '标题是必填项。' }).max(100, { message: '标题长度不能超过100个字符。' }),
   content: z.string().optional(),
 });
 
@@ -69,9 +69,9 @@ export function NoteEditDialog({ isOpen, onClose, onSubmit, defaultValues }: Not
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="sm:max-w-lg bg-background">
         <DialogHeader>
-          <DialogTitle>{defaultValues ? 'Edit Note' : 'Add New Note'}</DialogTitle>
+          <DialogTitle>{defaultValues ? '编辑笔记' : '添加新笔记'}</DialogTitle>
           <DialogDescription>
-            {defaultValues ? "Update your note's title and content." : "Enter a title and content for your new note."}
+            {defaultValues ? "更新笔记的标题和内容。" : "为新笔记输入标题和内容。"}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -81,9 +81,9 @@ export function NoteEditDialog({ isOpen, onClose, onSubmit, defaultValues }: Not
               name="title"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Title</FormLabel>
+                  <FormLabel>标题</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g. My Quick Thoughts" {...field} />
+                    <Input placeholder="例如：我的随想" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -94,9 +94,9 @@ export function NoteEditDialog({ isOpen, onClose, onSubmit, defaultValues }: Not
               name="content"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Content (Markdown supported)</FormLabel>
+                  <FormLabel>内容 (支持 Markdown)</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Start writing your note here..." {...field} rows={10} className="min-h-[200px]"/>
+                    <Textarea placeholder="在此处开始撰写笔记..." {...field} rows={10} className="min-h-[200px]"/>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -114,3 +114,4 @@ export function NoteEditDialog({ isOpen, onClose, onSubmit, defaultValues }: Not
     </Dialog>
   );
 }
+

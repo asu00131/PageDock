@@ -99,8 +99,8 @@ export function TodoListWidget({
     e.preventDefault();
     const sourceId = e.dataTransfer.getData('text/plain') || draggedItemId;
     
-    setDragOverItemId(null); // Clear drag over item
-    setDraggedItemId(null); // Clear dragged item
+    setDragOverItemId(null); 
+    setDraggedItemId(null); 
 
     if (!sourceId || sourceId === targetId) return;
 
@@ -136,7 +136,7 @@ export function TodoListWidget({
 
     const targetElement = e.target as HTMLElement;
     if (targetElement.closest('.todo-item')) {
-      return; // Drop was on an item, handled by item's onDrop
+      return; 
     }
     
     const sourceIndex = widget.data.items.findIndex(item => item.id === sourceId);
@@ -144,7 +144,7 @@ export function TodoListWidget({
 
     const reorderedItems = Array.from(widget.data.items);
     const [draggedItem] = reorderedItems.splice(sourceIndex, 1);
-    reorderedItems.push(draggedItem); // Move to the end
+    reorderedItems.push(draggedItem); 
     onReorderItems(widget.id, reorderedItems);
   };
 
@@ -171,13 +171,13 @@ export function TodoListWidget({
               {!isCollapsed && (
                 <div className="flex items-center space-x-2 mr-2">
                   <Label htmlFor={`show-completed-${widget.id}`} className="widget-header__control-label text-sm">
-                    {widget.data.showCompleted ? "Hide completed" : "Show completed"}
+                    {widget.data.showCompleted ? "隐藏已完成" : "显示已完成"}
                   </Label>
                   <Switch
                     id={`show-completed-${widget.id}`}
                     checked={widget.data.showCompleted}
                     onCheckedChange={() => onToggleShowCompleted(widget.id)}
-                    aria-label={widget.data.showCompleted ? "Hide completed tasks" : "Show completed tasks"}
+                    aria-label={widget.data.showCompleted ? "隐藏已完成任务" : "显示已完成任务"}
                   />
                 </div>
               )}
@@ -185,38 +185,38 @@ export function TodoListWidget({
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="widget-header__control h-7 w-7" onClick={(e) => e.stopPropagation()}>
                     <MoreVertical className="widget-header__feather-icon h-4 w-4" />
-                    <span className="sr-only">More options for {widget.title}</span>
+                    <span className="sr-only">{`${widget.title} 的更多选项`}</span>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                   <DropdownMenuItem onClick={() => onOpenWidgetTitleDialog(widget.id)}>
                     <Edit3 className="mr-2 h-4 w-4" />
-                    <span>Edit List Title</span>
+                    <span>编辑列表标题</span>
                   </DropdownMenuItem>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <DropdownMenuItem 
                         onSelect={(e) => e.preventDefault()}
-                        className="text-destructive hover:!bg-destructive/10 focus:!bg-destructive/10"
+                        className="text-destructive hover:!bg-destructive/10 focus:!bg-destructive/10 focus:text-destructive-foreground"
                       >
                         <Trash2 className="mr-2 h-4 w-4" />
-                        <span>Delete List</span>
+                        <span>删除列表</span>
                       </DropdownMenuItem>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
-                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogTitle>您确定吗？</AlertDialogTitle>
                         <AlertDialogDescription>
-                          This action cannot be undone. This will permanently delete the list "{widget.title}" and all its tasks.
+                          {`此操作无法撤销。这将永久删除列表 “${widget.title}” 及其所有任务。`}
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel>取消</AlertDialogCancel>
                         <AlertDialogAction
                           onClick={() => onDeleteWidget(widget.id)}
                           className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
-                          Delete
+                          删除
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
@@ -229,15 +229,15 @@ export function TodoListWidget({
             <div className="widget__box" id={`widget-body-${widget.id}`}>
               <div className="widget__body">
                 <div className="todo-widget__progress-bar-container">
-                  <Progress value={progressPercentage} className="flex-grow h-2" aria-label={`${Math.round(progressPercentage)}% completed`}/>
+                  <Progress value={progressPercentage} className="flex-grow h-2" aria-label={`${Math.round(progressPercentage)}% 已完成`}/>
                   <span className="todo-widget__progress-amount">{`${Math.round(progressPercentage)}%`}</span>
                 </div>
                 
                 {displayedItems.length === 0 && !widget.data.showCompleted && widget.data.items.length > 0 && (
-                   <div className="todo-widget__empty-prompt">All tasks completed! 🎉</div>
+                   <div className="todo-widget__empty-prompt">所有任务已完成！ 🎉</div>
                 )}
                 {widget.data.items.length === 0 && (
-                    <div className="todo-widget__empty-prompt">No tasks yet. Add one below!</div>
+                    <div className="todo-widget__empty-prompt">暂无任务。在下方添加一个吧！</div>
                 )}
 
                 <ul 
@@ -270,12 +270,12 @@ export function TodoListWidget({
                     value={newItemText}
                     onChange={(e) => setNewItemText(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleAddItem()}
-                    placeholder="Add a new task"
+                    placeholder="添加新任务"
                     className="h-9 text-sm flex-grow"
-                    aria-label="New task input"
+                    aria-label="新任务输入框"
                   />
-                  <Button onClick={handleAddItem} size="sm" aria-label="Add new task">
-                    <Plus className="h-4 w-4 mr-1" /> Add
+                  <Button onClick={handleAddItem} size="sm" aria-label="添加新任务按钮">
+                    <Plus className="h-4 w-4 mr-1" /> 添加
                   </Button>
                 </div>
               </div>
@@ -286,3 +286,4 @@ export function TodoListWidget({
     </div>
   );
 }
+
