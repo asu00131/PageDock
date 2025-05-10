@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
@@ -13,13 +14,14 @@ import { NoteEditDialog } from '@/components/NoteEditDialog';
 import { WidgetTitleDialog } from '@/components/CategoryDialog'; 
 import { CalendarIcsDialog } from '@/components/CalendarIcsDialog';
 import { CalendarIcsWidget } from '@/components/CalendarIcsWidget';
-import { AppWindow, FolderPlus, PlusSquare, Bookmark, StickyNote, ListChecks, CalendarDays, UploadCloud, DownloadCloud } from 'lucide-react';
+import { AppWindow, FolderPlus, PlusSquare, Bookmark, StickyNote, ListChecks, CalendarDays, UploadCloud, DownloadCloud, Rss, Code, GalleryVertical } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { cn } from '@/lib/utils';
 
@@ -79,6 +81,7 @@ export default function HomePage() {
 
   const [draggedWidgetId, setDraggedWidgetId] = useState<string | null>(null);
   const [dragOverWidgetId, setDragOverWidgetId] = useState<string | null>(null);
+  const [preDragCollapseStates, setPreDragCollapseStates] = useState<Record<string, boolean> | null>(null);
 
 
   useEffect(() => {
@@ -350,6 +353,9 @@ export default function HomePage() {
   };
 
   const handleToggleWidgetCollapse = (widgetId: string) => {
+    // If a drag is in progress, don't allow manual toggle
+    if (draggedWidgetId) return;
+
     setWidgets(prevWidgets =>
       prevWidgets.map(widget =>
         widget.id === widgetId ? { ...widget, isCollapsed: !widget.isCollapsed } : widget
@@ -492,11 +498,33 @@ export default function HomePage() {
   };
 
   // Widget Drag and Drop Handlers
+  const restoreWidgetCollapseStates = () => {
+    if (preDragCollapseStates) {
+      setWidgets(prevWidgets =>
+        prevWidgets.map(w => ({
+          ...w,
+          isCollapsed: preDragCollapseStates[w.id] ?? w.isCollapsed ?? false,
+        }))
+      );
+      setPreDragCollapseStates(null);
+    }
+  };
+
   const handleWidgetDragStart = (e: React.DragEvent<HTMLDivElement>, widgetId: string) => {
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', widgetId);
     setDraggedWidgetId(widgetId);
     setDragOverWidgetId(null);
+
+    const currentCollapseStates: Record<string, boolean> = {};
+    widgets.forEach(w => {
+      currentCollapseStates[w.id] = w.isCollapsed ?? false;
+    });
+    setPreDragCollapseStates(currentCollapseStates);
+
+    setWidgets(prevWidgets =>
+      prevWidgets.map(w => ({ ...w, isCollapsed: true }))
+    );
   };
 
   const handleWidgetDragOver = (e: React.DragEvent<HTMLDivElement>, widgetId: string) => {
@@ -518,6 +546,8 @@ export default function HomePage() {
     e.preventDefault();
     const sourceWidgetId = e.dataTransfer.getData('text/plain') || draggedWidgetId;
 
+    restoreWidgetCollapseStates();
+
     setDragOverWidgetId(null);
     setDraggedWidgetId(null);
 
@@ -534,13 +564,16 @@ export default function HomePage() {
       }
 
       const reorderedWidgets = Array.from(currentWidgets);
-      const [draggedWidget] = reorderedWidgets.splice(sourceIndex, 1);
-      reorderedWidgets.splice(targetIndex, 0, draggedWidget);
+      const [draggedItem] = reorderedWidgets.splice(sourceIndex, 1);
+      reorderedWidgets.splice(targetIndex, 0, draggedItem);
       return reorderedWidgets;
     });
   };
 
   const handleWidgetDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
+    if (draggedWidgetId) { // Only restore if a drag was actually initiated
+        restoreWidgetCollapseStates();
+    }
     setDraggedWidgetId(null);
     setDragOverWidgetId(null);
   };
@@ -553,8 +586,10 @@ export default function HomePage() {
     e.preventDefault();
     const sourceWidgetId = e.dataTransfer.getData('text/plain') || draggedWidgetId;
   
+    restoreWidgetCollapseStates();
+
     const targetElement = e.target as HTMLElement;
-    if (targetElement.closest('.page-section__widget-draggable-area')) { // Check against draggable area
+    if (targetElement.closest('.page-section__widget-draggable-area')) { 
         if (dragOverWidgetId) return; 
     }
 
@@ -568,8 +603,8 @@ export default function HomePage() {
       if (sourceIndex === -1) return currentWidgets;
   
       const reorderedWidgets = Array.from(currentWidgets);
-      const [draggedWidget] = reorderedWidgets.splice(sourceIndex, 1);
-      reorderedWidgets.push(draggedWidget); 
+      const [draggedItem] = reorderedWidgets.splice(sourceIndex, 1);
+      reorderedWidgets.push(draggedItem); 
       return reorderedWidgets;
     });
   };
@@ -802,3 +837,5 @@ export default function HomePage() {
   );
 }
 
+
+    
