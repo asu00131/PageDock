@@ -1,4 +1,3 @@
-
 "use client";
 
 import type { TodoListAppWidget, TodoItem } from '@/types';
@@ -9,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { ListChecks, Edit3, MoreVertical, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { ListChecks, Edit3, MoreVertical, Plus, Trash2, ChevronDown, ChevronUp, GripVertical } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,8 +27,19 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import type React from 'react';
+import { cn } from '@/lib/utils';
 
-interface TodoListWidgetProps {
+interface WidgetDragProps {
+  onWidgetDragStart: (e: React.DragEvent<HTMLDivElement>, widgetId: string) => void;
+  onWidgetDragOver: (e: React.DragEvent<HTMLDivElement>, widgetId: string) => void;
+  onWidgetDragLeave: (e: React.DragEvent<HTMLDivElement>) => void;
+  onWidgetDrop: (e: React.DragEvent<HTMLDivElement>, widgetId: string) => void;
+  onWidgetDragEnd: (e: React.DragEvent<HTMLDivElement>) => void;
+  draggedWidgetId: string | null;
+  dragOverWidgetId: string | null;
+}
+
+interface TodoListWidgetProps extends WidgetDragProps {
   widget: TodoListAppWidget;
   onOpenWidgetTitleDialog: (widgetId: string) => void;
   onDeleteWidget: (widgetId: string) => void;
@@ -55,11 +65,18 @@ export function TodoListWidget({
   onToggleShowCompleted,
   isCollapsed,
   onToggleCollapse,
+  onWidgetDragStart,
+  onWidgetDragOver,
+  onWidgetDragLeave,
+  onWidgetDrop,
+  onWidgetDragEnd,
+  draggedWidgetId,
+  dragOverWidgetId,
 }: TodoListWidgetProps) {
   const [newItemText, setNewItemText] = useState('');
   
-  const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
-  const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
+  const [draggedTodoItemId, setDraggedTodoItemId] = useState<string | null>(null);
+  const [dragOverTodoItemId, setDragOverTodoItemId] = useState<string | null>(null);
 
   const handleAddItem = () => {
     if (newItemText.trim() !== '') {
@@ -73,34 +90,35 @@ export function TodoListWidget({
 
   const displayedItems = widget.data.showCompleted ? widget.data.items : widget.data.items.filter(item => !item.completed);
 
-  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, id: string) => {
+  // Todo Item Drag Handlers
+  const handleTodoItemDragStart = (e: React.DragEvent<HTMLDivElement>, id: string) => {
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', id);
-    setDraggedItemId(id);
-    setDragOverItemId(null); 
+    setDraggedTodoItemId(id);
+    setDragOverTodoItemId(null); 
   };
 
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>, id: string) => {
+  const handleTodoItemDragOver = (e: React.DragEvent<HTMLDivElement>, id: string) => {
     e.preventDefault(); 
-    if (id !== draggedItemId) {
-        setDragOverItemId(id);
+    if (id !== draggedTodoItemId) {
+        setDragOverTodoItemId(id);
     }
   };
   
-  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+  const handleTodoItemDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
     const relatedTarget = e.relatedTarget as HTMLElement;
     if (relatedTarget && e.currentTarget.contains(relatedTarget)) {
       return;
     }
-    setDragOverItemId(null);
+    setDragOverTodoItemId(null);
   };
 
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>, targetId: string) => {
+  const handleTodoItemDrop = (e: React.DragEvent<HTMLDivElement>, targetId: string) => {
     e.preventDefault();
-    const sourceId = e.dataTransfer.getData('text/plain') || draggedItemId;
+    const sourceId = e.dataTransfer.getData('text/plain') || draggedTodoItemId;
     
-    setDragOverItemId(null); 
-    setDraggedItemId(null); 
+    setDragOverTodoItemId(null); 
+    setDraggedTodoItemId(null); 
 
     if (!sourceId || sourceId === targetId) return;
 
@@ -116,26 +134,26 @@ export function TodoListWidget({
     onReorderItems(widget.id, reorderedItems);
   };
   
-  const handleDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
-    setDraggedItemId(null);
-    setDragOverItemId(null);
+  const handleTodoItemDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
+    setDraggedTodoItemId(null);
+    setDragOverTodoItemId(null);
   };
 
-  const handleContainerDragOver = (e: React.DragEvent<HTMLUListElement>) => {
+  const handleTodoItemContainerDragOver = (e: React.DragEvent<HTMLUListElement>) => {
     e.preventDefault();
   };
 
-  const handleContainerDrop = (e: React.DragEvent<HTMLUListElement>) => {
+  const handleTodoItemContainerDrop = (e: React.DragEvent<HTMLUListElement>) => {
     e.preventDefault();
-    const sourceId = e.dataTransfer.getData('text/plain') || draggedItemId;
+    const sourceId = e.dataTransfer.getData('text/plain') || draggedTodoItemId;
     
-    setDraggedItemId(null);
-    setDragOverItemId(null);
+    setDraggedTodoItemId(null);
+    setDragOverTodoItemId(null);
 
     if (!sourceId) return;
 
     const targetElement = e.target as HTMLElement;
-    if (targetElement.closest('.todo-item')) {
+    if (targetElement.closest('.todo-item')) { // Check against the specific class for todo items
       return; 
     }
     
@@ -150,10 +168,25 @@ export function TodoListWidget({
 
 
   return (
-    <div className="page-section__widget">
+    <div 
+      className={cn(
+        "page-section__widget page-section__widget-draggable-area",
+        draggedWidgetId === widget.id && "opacity-50 cursor-grabbing",
+        dragOverWidgetId === widget.id && draggedWidgetId !== widget.id && "ring-2 ring-primary ring-offset-2 rounded-lg"
+      )}
+      draggable={true}
+      onDragStart={(e) => onWidgetDragStart(e, widget.id)}
+      onDragOver={(e) => onWidgetDragOver(e, widget.id)}
+      onDrop={(e) => onWidgetDrop(e, widget.id)}
+      onDragLeave={onWidgetDragLeave}
+      onDragEnd={onWidgetDragEnd}
+    >
       <article className="widget todo-widget">
         <div className="widget__container">
           <header className="widget__header">
+            <div className="widget-header__drag-handle">
+                <GripVertical className="h-5 w-5 text-muted-foreground cursor-grab" />
+            </div>
              <div 
               className="widget-header__title-clickable-area"
               onClick={() => onToggleCollapse(widget.id)}
@@ -197,7 +230,7 @@ export function TodoListWidget({
                     <AlertDialogTrigger asChild>
                       <DropdownMenuItem 
                         onSelect={(e) => e.preventDefault()}
-                        className="text-destructive hover:!bg-destructive/10 focus:!bg-destructive/10 focus:text-destructive-foreground"
+                        className="text-destructive hover:!bg-destructive/10 focus:!bg-destructive/10 focus:text-destructive-foreground hover:!text-destructive-foreground focus:!bg-destructive focus:!text-destructive-foreground"
                       >
                         <Trash2 className="mr-2 h-4 w-4" />
                         <span>删除列表</span>
@@ -242,8 +275,8 @@ export function TodoListWidget({
 
                 <ul 
                   className="todo-widget__list"
-                  onDragOver={handleContainerDragOver}
-                  onDrop={handleContainerDrop}
+                  onDragOver={handleTodoItemContainerDragOver}
+                  onDrop={handleTodoItemContainerDrop}
                 >
                   {displayedItems.map(item => (
                     <li key={item.id}>
@@ -252,13 +285,13 @@ export function TodoListWidget({
                         onToggle={(itemId) => onToggleItem(widget.id, itemId)}
                         onDelete={(itemId) => onDeleteItem(widget.id, itemId)}
                         onUpdateText={(itemId, text) => onUpdateItemText(widget.id, itemId, text)}
-                        onDragStartHandler={handleDragStart}
-                        onDragOverHandler={handleDragOver}
-                        onDropHandler={handleDrop}
-                        onDragLeaveHandler={handleDragLeave}
-                        onDragEndHandler={handleDragEnd}
-                        isDragging={draggedItemId === item.id}
-                        isDragOver={dragOverItemId === item.id && draggedItemId !== item.id}
+                        onDragStartHandler={handleTodoItemDragStart}
+                        onDragOverHandler={handleTodoItemDragOver}
+                        onDropHandler={handleTodoItemDrop}
+                        onDragLeaveHandler={handleTodoItemDragLeave}
+                        onDragEndHandler={handleTodoItemDragEnd}
+                        isDragging={draggedTodoItemId === item.id}
+                        isDragOver={dragOverTodoItemId === item.id && draggedTodoItemId !== item.id}
                       />
                     </li>
                   ))}

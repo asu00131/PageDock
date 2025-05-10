@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
@@ -21,8 +20,9 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { cn } from '@/lib/utils';
+
 
 // For migrating old data structures
 interface OldLinkCategory {
@@ -76,6 +76,9 @@ export default function HomePage() {
   const [currentCalendarIcsWidgetId, setCurrentCalendarIcsWidgetId] = useState<string | undefined>(undefined);
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [draggedWidgetId, setDraggedWidgetId] = useState<string | null>(null);
+  const [dragOverWidgetId, setDragOverWidgetId] = useState<string | null>(null);
 
 
   useEffect(() => {
@@ -488,6 +491,89 @@ export default function HomePage() {
     }
   };
 
+  // Widget Drag and Drop Handlers
+  const handleWidgetDragStart = (e: React.DragEvent<HTMLDivElement>, widgetId: string) => {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', widgetId);
+    setDraggedWidgetId(widgetId);
+    setDragOverWidgetId(null);
+  };
+
+  const handleWidgetDragOver = (e: React.DragEvent<HTMLDivElement>, widgetId: string) => {
+    e.preventDefault();
+    if (widgetId !== draggedWidgetId) {
+      setDragOverWidgetId(widgetId);
+    }
+  };
+
+  const handleWidgetDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    const relatedTarget = e.relatedTarget as HTMLElement;
+    if (relatedTarget && e.currentTarget.contains(relatedTarget)) {
+      return;
+    }
+    setDragOverWidgetId(null);
+  };
+
+  const handleWidgetDrop = (e: React.DragEvent<HTMLDivElement>, targetWidgetId: string) => {
+    e.preventDefault();
+    const sourceWidgetId = e.dataTransfer.getData('text/plain') || draggedWidgetId;
+
+    setDragOverWidgetId(null);
+    setDraggedWidgetId(null);
+
+    if (!sourceWidgetId || sourceWidgetId === targetWidgetId) {
+      return;
+    }
+
+    setWidgets(currentWidgets => {
+      const sourceIndex = currentWidgets.findIndex(w => w.id === sourceWidgetId);
+      const targetIndex = currentWidgets.findIndex(w => w.id === targetWidgetId);
+
+      if (sourceIndex === -1 || targetIndex === -1) {
+        return currentWidgets;
+      }
+
+      const reorderedWidgets = Array.from(currentWidgets);
+      const [draggedWidget] = reorderedWidgets.splice(sourceIndex, 1);
+      reorderedWidgets.splice(targetIndex, 0, draggedWidget);
+      return reorderedWidgets;
+    });
+  };
+
+  const handleWidgetDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
+    setDraggedWidgetId(null);
+    setDragOverWidgetId(null);
+  };
+  
+  const handleWidgetContainerDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault(); 
+  };
+  
+  const handleWidgetContainerDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const sourceWidgetId = e.dataTransfer.getData('text/plain') || draggedWidgetId;
+  
+    const targetElement = e.target as HTMLElement;
+    if (targetElement.closest('.page-section__widget-draggable-area')) { // Check against draggable area
+        if (dragOverWidgetId) return; 
+    }
+
+    setDraggedWidgetId(null);
+    setDragOverWidgetId(null);
+  
+    if (!sourceWidgetId) return;
+  
+    setWidgets(currentWidgets => {
+      const sourceIndex = currentWidgets.findIndex(w => w.id === sourceWidgetId);
+      if (sourceIndex === -1) return currentWidgets;
+  
+      const reorderedWidgets = Array.from(currentWidgets);
+      const [draggedWidget] = reorderedWidgets.splice(sourceIndex, 1);
+      reorderedWidgets.push(draggedWidget); 
+      return reorderedWidgets;
+    });
+  };
+
 
   const renderEmptyState = () => (
     <div className="flex flex-col items-center justify-center text-center p-10 border-2 border-dashed border-muted rounded-lg min-h-[200px]">
@@ -498,9 +584,6 @@ export default function HomePage() {
   );
 
   if (!isClientHydratedAndSetup) {
-    // Return a basic placeholder or null during server render / pre-hydration
-    // This helps prevent hydration mismatches if localStorage is used to initialize state
-    // which can only happen client-side.
     return (
        <div className="container mx-auto px-4 py-8 min-h-screen">
           <header className="mb-8">
@@ -588,8 +671,22 @@ export default function HomePage() {
       {widgets.length === 0 ? (
         renderEmptyState()
       ) : (
-        <div className="space-y-8">
+        <div 
+          className="space-y-8"
+          onDragOver={handleWidgetContainerDragOver}
+          onDrop={handleWidgetContainerDrop}
+        >
           {widgets.map(widget => {
+            const widgetDragProps = {
+                onWidgetDragStart: handleWidgetDragStart,
+                onWidgetDragOver: handleWidgetDragOver,
+                onWidgetDragLeave: handleWidgetDragLeave,
+                onWidgetDrop: handleWidgetDrop,
+                onWidgetDragEnd: handleWidgetDragEnd,
+                draggedWidgetId: draggedWidgetId,
+                dragOverWidgetId: dragOverWidgetId,
+            };
+
             if (isLinkCollectionWidget(widget)) {
               return (
                 <LinkCollectionWidget
@@ -609,6 +706,7 @@ export default function HomePage() {
                   onDeleteLink={handleDeleteLink}
                   isCollapsed={widget.isCollapsed}
                   onToggleCollapse={handleToggleWidgetCollapse}
+                  {...widgetDragProps}
                 />
               );
             } else if (isNoteWidget(widget)) {
@@ -620,6 +718,7 @@ export default function HomePage() {
                   onDeleteWidget={handleDeleteWidget}
                   isCollapsed={widget.isCollapsed}
                   onToggleCollapse={handleToggleWidgetCollapse}
+                  {...widgetDragProps}
                 />
               );
             } else if (isTodoListWidget(widget)) {
@@ -637,6 +736,7 @@ export default function HomePage() {
                   onToggleShowCompleted={handleToggleShowCompleted}
                   isCollapsed={widget.isCollapsed}
                   onToggleCollapse={handleToggleWidgetCollapse}
+                  {...widgetDragProps}
                 />
               );
             } else if (isCalendarIcsWidget(widget)) {
@@ -649,6 +749,7 @@ export default function HomePage() {
                   onDeleteWidget={handleDeleteWidget}
                   isCollapsed={widget.isCollapsed}
                   onToggleCollapse={handleToggleWidgetCollapse}
+                  {...widgetDragProps}
                 />
               );
             }

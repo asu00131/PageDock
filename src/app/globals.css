@@ -138,6 +138,11 @@
   .page-section__widget {
     @apply mb-6;
   }
+  .page-section__widget-draggable-area { /* New class for draggable area */
+    /* Styles for visual feedback during drag can be added here or via JS */
+    /* e.g. opacity, box-shadow, specific cursor */
+  }
+
 
   .widget { /* Generic widget class */
     @apply transition-shadow duration-300 ease-in-out;
@@ -147,6 +152,9 @@
   }
   .widget__header {
     @apply flex items-center justify-between p-3 border-b border-border;
+  }
+  .widget-header__drag-handle {
+    @apply p-1 mr-1 text-muted-foreground hover:text-foreground cursor-grab opacity-60 hover:opacity-100 transition-opacity;
   }
   .widget-header__title-clickable-area { /* Renamed for clarity, encompasses icon, title text, chevron */
     @apply flex items-center flex-grow cursor-pointer mr-2;
@@ -389,7 +397,7 @@
   }
   .calendar-widget__event-item strong, 
   .calendar-widget__event-item span {
-    @apply text-[hsl(var(--accent))]; /* Use main accent color for text on light accent bg */
+    @apply text-[hsl(var(--accent))] dark:text-[hsl(var(--accent-foreground))]; 
   }
   .calendar-widget__no-events {
     @apply text-xs text-muted-foreground;

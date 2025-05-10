@@ -1,10 +1,9 @@
-
 "use client";
 
 import type { LinkCollectionAppWidget, LinkItem } from '@/types';
 import { LinkGrid } from './LinkGrid';
 import { Button } from '@/components/ui/button';
-import { Edit3, MoreVertical, PlusCircle, Trash2, Bookmark, ChevronDown, ChevronUp } from 'lucide-react'; 
+import { Edit3, MoreVertical, PlusCircle, Trash2, Bookmark, ChevronDown, ChevronUp, GripVertical } from 'lucide-react'; 
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,8 +21,20 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { cn } from '@/lib/utils';
+import type React from 'react';
 
-interface LinkCollectionWidgetProps {
+interface WidgetDragProps {
+  onWidgetDragStart: (e: React.DragEvent<HTMLDivElement>, widgetId: string) => void;
+  onWidgetDragOver: (e: React.DragEvent<HTMLDivElement>, widgetId: string) => void;
+  onWidgetDragLeave: (e: React.DragEvent<HTMLDivElement>) => void;
+  onWidgetDrop: (e: React.DragEvent<HTMLDivElement>, widgetId: string) => void;
+  onWidgetDragEnd: (e: React.DragEvent<HTMLDivElement>) => void;
+  draggedWidgetId: string | null;
+  dragOverWidgetId: string | null;
+}
+
+interface LinkCollectionWidgetProps extends WidgetDragProps {
   widget: LinkCollectionAppWidget;
   onOpenLinkDialog: (widgetId: string, link?: LinkItem) => void;
   onOpenWidgetTitleDialog: (widgetId: string) => void;
@@ -45,6 +56,13 @@ export function LinkCollectionWidget({
   onLinksReordered,
   isCollapsed,
   onToggleCollapse,
+  onWidgetDragStart,
+  onWidgetDragOver,
+  onWidgetDragLeave,
+  onWidgetDrop,
+  onWidgetDragEnd,
+  draggedWidgetId,
+  dragOverWidgetId,
 }: LinkCollectionWidgetProps) {
   
   const handleEditLink = (linkId: string) => {
@@ -60,10 +78,25 @@ export function LinkCollectionWidget({
   };
 
   return (
-    <div className="page-section__widget">
+    <div 
+      className={cn(
+        "page-section__widget page-section__widget-draggable-area", // Added draggable area class
+        draggedWidgetId === widget.id && "opacity-50 cursor-grabbing",
+        dragOverWidgetId === widget.id && draggedWidgetId !== widget.id && "ring-2 ring-primary ring-offset-2 rounded-lg"
+      )}
+      draggable={true}
+      onDragStart={(e) => onWidgetDragStart(e, widget.id)}
+      onDragOver={(e) => onWidgetDragOver(e, widget.id)}
+      onDrop={(e) => onWidgetDrop(e, widget.id)}
+      onDragLeave={onWidgetDragLeave}
+      onDragEnd={onWidgetDragEnd}
+    >
       <article className="widget bookmark-widget">
         <div className="widget__container">
           <header className="widget__header widget-header_hovered">
+             <div className="widget-header__drag-handle">
+                <GripVertical className="h-5 w-5 text-muted-foreground cursor-grab" />
+            </div>
             <div 
               className="widget-header__title-clickable-area"
               onClick={() => onToggleCollapse(widget.id)}
@@ -89,7 +122,7 @@ export function LinkCollectionWidget({
                     <span className="sr-only">{`${widget.title} 的更多选项`}</span>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+                <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                   <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onOpenWidgetTitleDialog(widget.id); }}>
                     <Edit3 className="mr-2 h-4 w-4" />
                     <span>编辑合集标题</span>
@@ -99,7 +132,7 @@ export function LinkCollectionWidget({
                        <DropdownMenuItem 
                          onSelect={(e) => e.preventDefault()} 
                          onClick={(e) => e.stopPropagation()} 
-                         className="text-destructive hover:!bg-destructive/10 focus:!bg-destructive/10 focus:text-destructive-foreground"
+                         className="text-destructive hover:!bg-destructive/10 focus:!bg-destructive/10 focus:text-destructive-foreground hover:!text-destructive-foreground focus:!bg-destructive focus:!text-destructive-foreground"
                        >
                         <Trash2 className="mr-2 h-4 w-4" />
                         <span>删除合集</span>
