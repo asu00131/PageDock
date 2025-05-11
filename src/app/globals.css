@@ -553,22 +553,12 @@
 
 /* Drag handles for bookmark items */
 .bookmark-item__drag-handle {
-  @apply opacity-0 group-hover/bookmark-item:opacity-0; /* Initially hidden */
+  @apply opacity-0 group-hover/bookmark-item:opacity-0; /* Initially hidden, and stay hidden on individual item hover unless in edit mode */
 }
 .is-layout-editing .bookmark-item .bookmark-item__drag-handle,
 .is-item-sorting .bookmark-item .bookmark-item__drag-handle {
-  @apply opacity-100 cursor-grab; /* Visible when layout editing or item sorting */
+  @apply opacity-100 cursor-grab; /* Visible when global layout editing or specific item sorting is active */
 }
 
-/* Ensure these modes also show drag handle when is-item-sorting or is-layout-editing */
-.is-item-sorting .bookmark-item_mode_icons .bookmark-item__drag-handle,
-.is-item-sorting .bookmark-item_mode_cloud .bookmark-item__drag-handle,
-.is-item-sorting .bookmark-item_mode_list .bookmark-item__drag-handle,
-.is-item-sorting .bookmark-item_mode_detailed-list .bookmark-item__drag-handle {
-  @apply opacity-100 cursor-grab;
-}
-
-/* Ensure todo items also show drag handle when is-layout-editing */
-.is-layout-editing .todo-item .todo-item__drag-handle {
-  @apply opacity-100 cursor-grab;
-}
+/* Ensured todo items also show drag handle when is-layout-editing */
+/* Removed duplicate of .is-layout-editing .todo-item .todo-item__drag-handle here, it's defined above */
