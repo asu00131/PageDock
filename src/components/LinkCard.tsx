@@ -29,6 +29,7 @@ interface LinkCardProps {
   onDragEndHandler: (e: React.DragEvent<HTMLDivElement>) => void;
   isDragging?: boolean;
   isDragOver?: boolean;
+  isLayoutEditing?: boolean; // Added to control dragability
 }
 
 export function LinkCard({ 
@@ -43,10 +44,11 @@ export function LinkCard({
   onDragEndHandler,
   isDragging,
   isDragOver,
+  isLayoutEditing,
 }: LinkCardProps) {
   return (
     <div 
-      draggable={true}
+      draggable={isLayoutEditing} // Only draggable if layout editing is active
       onDragStart={(e) => onDragStartHandler(e, link.id)}
       onDragOver={(e) => onDragOverHandler(e, link.id)}
       onDrop={(e) => onDropHandler(e, link.id)}
@@ -57,10 +59,17 @@ export function LinkCard({
         "py-px px-[0.5em]", 
         className,
         isDragging && "opacity-50 cursor-grabbing",
-        isDragOver && "ring-2 ring-primary ring-offset-1"
+        isDragOver && "ring-2 ring-primary ring-offset-1",
+        isLayoutEditing && "cursor-grab" // Show grab cursor in edit mode
       )}
     >
-      <GripVertical className="h-4 w-4 text-muted-foreground mr-2 cursor-grab flex-shrink-0" aria-label="拖动以重新排序" />
+      <GripVertical 
+        className={cn(
+            "h-4 w-4 text-muted-foreground mr-2 flex-shrink-0",
+            isLayoutEditing ? "cursor-grab opacity-100" : "opacity-0 group-hover/bookmark-item:opacity-100" 
+        )} 
+        aria-label="拖动以重新排序" 
+      />
       <a
         href={link.url}
         target="_blank"
@@ -81,7 +90,11 @@ export function LinkCard({
           </span>
         </div>
       </a>
-      <div className="bookmark-item__actions">
+      <div className={cn(
+          "bookmark-item__actions",
+          !isLayoutEditing && "opacity-0 group-hover/bookmark-item:opacity-100" // Standard hover behavior
+        )}
+      >
         <Button
           variant="ghost"
           size="icon"
@@ -125,4 +138,3 @@ export function LinkCard({
     </div>
   );
 }
-

@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { TodoListAppWidget, TodoItem } from '@/types';
@@ -37,6 +38,7 @@ interface WidgetDragProps {
   onWidgetDragEnd: (e: React.DragEvent<HTMLDivElement>) => void;
   draggedWidgetId: string | null;
   dragOverWidgetId: string | null;
+  isLayoutEditing?: boolean;
 }
 
 interface TodoListWidgetProps extends WidgetDragProps {
@@ -72,6 +74,7 @@ export function TodoListWidget({
   onWidgetDragEnd,
   draggedWidgetId,
   dragOverWidgetId,
+  isLayoutEditing,
 }: TodoListWidgetProps) {
   const [newItemText, setNewItemText] = useState('');
   
@@ -92,6 +95,7 @@ export function TodoListWidget({
 
   // Todo Item Drag Handlers
   const handleTodoItemDragStart = (e: React.DragEvent<HTMLDivElement>, id: string) => {
+    if (!isLayoutEditing) { e.preventDefault(); return; } // Allow item drag only in layout editing mode for consistency
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', id);
     setDraggedTodoItemId(id);
@@ -99,6 +103,7 @@ export function TodoListWidget({
   };
 
   const handleTodoItemDragOver = (e: React.DragEvent<HTMLDivElement>, id: string) => {
+    if (!isLayoutEditing || !draggedTodoItemId) return;
     e.preventDefault(); 
     if (id !== draggedTodoItemId) {
         setDragOverTodoItemId(id);
@@ -106,6 +111,7 @@ export function TodoListWidget({
   };
   
   const handleTodoItemDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    if (!isLayoutEditing) return;
     const relatedTarget = e.relatedTarget as HTMLElement;
     if (relatedTarget && e.currentTarget.contains(relatedTarget)) {
       return;
@@ -114,6 +120,7 @@ export function TodoListWidget({
   };
 
   const handleTodoItemDrop = (e: React.DragEvent<HTMLDivElement>, targetId: string) => {
+    if (!isLayoutEditing || !draggedTodoItemId) return;
     e.preventDefault();
     const sourceId = e.dataTransfer.getData('text/plain') || draggedTodoItemId;
     
@@ -135,15 +142,18 @@ export function TodoListWidget({
   };
   
   const handleTodoItemDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
+    if (!isLayoutEditing) return;
     setDraggedTodoItemId(null);
     setDragOverTodoItemId(null);
   };
 
   const handleTodoItemContainerDragOver = (e: React.DragEvent<HTMLUListElement>) => {
+    if (!isLayoutEditing || !draggedTodoItemId) return;
     e.preventDefault();
   };
 
   const handleTodoItemContainerDrop = (e: React.DragEvent<HTMLUListElement>) => {
+    if (!isLayoutEditing || !draggedTodoItemId) return;
     e.preventDefault();
     const sourceId = e.dataTransfer.getData('text/plain') || draggedTodoItemId;
     
@@ -153,7 +163,7 @@ export function TodoListWidget({
     if (!sourceId) return;
 
     const targetElement = e.target as HTMLElement;
-    if (targetElement.closest('.todo-item')) { // Check against the specific class for todo items
+    if (targetElement.closest('.todo-item')) { 
       return; 
     }
     
@@ -170,22 +180,23 @@ export function TodoListWidget({
   return (
     <div 
       className={cn(
-        "page-section__widget page-section__widget-draggable-area",
+        "page-section__widget",
+        isLayoutEditing && "is-layout-editing",
         draggedWidgetId === widget.id && "opacity-50 cursor-grabbing",
         dragOverWidgetId === widget.id && draggedWidgetId !== widget.id && "ring-2 ring-primary ring-offset-2 rounded-lg"
       )}
-      draggable={true}
+      draggable={isLayoutEditing}
       onDragStart={(e) => onWidgetDragStart(e, widget.id)}
       onDragOver={(e) => onWidgetDragOver(e, widget.id)}
       onDrop={(e) => onWidgetDrop(e, widget.id)}
       onDragLeave={onWidgetDragLeave}
       onDragEnd={onWidgetDragEnd}
     >
-      <article className="widget todo-widget">
+      <article className="widget todo-widget group/widget">
         <div className="widget__container">
           <header className="widget__header">
             <div className="widget-header__drag-handle">
-                <GripVertical className="h-5 w-5 text-muted-foreground cursor-grab" />
+                <GripVertical className="h-5 w-5" />
             </div>
              <div 
               className="widget-header__title-clickable-area"
@@ -230,7 +241,7 @@ export function TodoListWidget({
                     <AlertDialogTrigger asChild>
                       <DropdownMenuItem 
                         onSelect={(e) => e.preventDefault()}
-                        className="text-destructive hover:!bg-destructive/10 focus:!bg-destructive/10 focus:text-destructive-foreground hover:!text-destructive-foreground focus:!bg-destructive focus:!text-destructive-foreground"
+                         className="text-destructive focus:text-destructive-foreground hover:!text-destructive-foreground hover:!bg-destructive/90 focus:!bg-destructive focus:!text-destructive-foreground"
                       >
                         <Trash2 className="mr-2 h-4 w-4" />
                         <span>删除列表</span>
@@ -292,6 +303,7 @@ export function TodoListWidget({
                         onDragEndHandler={handleTodoItemDragEnd}
                         isDragging={draggedTodoItemId === item.id}
                         isDragOver={dragOverTodoItemId === item.id && draggedTodoItemId !== item.id}
+                        isLayoutEditing={isLayoutEditing}
                       />
                     </li>
                   ))}
@@ -319,4 +331,3 @@ export function TodoListWidget({
     </div>
   );
 }
-

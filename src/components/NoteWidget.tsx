@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { NoteAppWidget } from '@/types';
@@ -33,6 +34,7 @@ interface WidgetDragProps {
   onWidgetDragEnd: (e: React.DragEvent<HTMLDivElement>) => void;
   draggedWidgetId: string | null;
   dragOverWidgetId: string | null;
+  isLayoutEditing?: boolean;
 }
 
 interface NoteWidgetProps extends WidgetDragProps {
@@ -56,9 +58,11 @@ export function NoteWidget({
   onWidgetDragEnd,
   draggedWidgetId,
   dragOverWidgetId,
+  isLayoutEditing,
 }: NoteWidgetProps) {
   
   const handleBodyClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isLayoutEditing) return; // Don't open edit dialog if in layout editing mode
     if (e.target instanceof HTMLElement && (e.target.closest('a') || e.target.closest('button') || e.target.closest('[role="button"]'))) {
       return;
     }
@@ -67,6 +71,7 @@ export function NoteWidget({
   };
   
   const handleBodyKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (isLayoutEditing) return; // Don't open edit dialog if in layout editing mode
     if (e.key === 'Enter' || e.key === ' ') {
       if (e.target instanceof HTMLElement && (e.target.closest('a') || e.target.closest('button') || e.target.closest('[role="button"]'))) {
         return;
@@ -79,23 +84,25 @@ export function NoteWidget({
 
   return (
     <div 
+      data-testid={`note-widget-${widget.id}`}
       className={cn(
-        "page-section__widget page-section__widget-draggable-area",
+        "page-section__widget",
+        isLayoutEditing && "is-layout-editing",
         draggedWidgetId === widget.id && "opacity-50 cursor-grabbing",
         dragOverWidgetId === widget.id && draggedWidgetId !== widget.id && "ring-2 ring-primary ring-offset-2 rounded-lg"
       )}
-      draggable={true}
+      draggable={isLayoutEditing}
       onDragStart={(e) => onWidgetDragStart(e, widget.id)}
       onDragOver={(e) => onWidgetDragOver(e, widget.id)}
       onDrop={(e) => onWidgetDrop(e, widget.id)}
       onDragLeave={onWidgetDragLeave}
       onDragEnd={onWidgetDragEnd}
     >
-      <article className="widget note-widget">
+      <article className="widget note-widget group/widget">
         <div className="widget__container">
-          <header className="widget__header widget-header_hovered">
+          <header className="widget__header">
             <div className="widget-header__drag-handle">
-                <GripVertical className="h-5 w-5 text-muted-foreground cursor-grab" />
+                <GripVertical className="h-5 w-5" />
             </div>
             <div 
               className="widget-header__title-clickable-area"
@@ -128,7 +135,7 @@ export function NoteWidget({
                       <DropdownMenuItem 
                         onSelect={(e) => e.preventDefault()} 
                         onClick={(e) => e.stopPropagation()} 
-                        className="text-destructive hover:!bg-destructive/10 focus:!bg-destructive/10 focus:text-destructive-foreground hover:!text-destructive-foreground focus:!bg-destructive focus:!text-destructive-foreground"
+                         className="text-destructive focus:text-destructive-foreground hover:!text-destructive-foreground hover:!bg-destructive/90 focus:!bg-destructive focus:!text-destructive-foreground"
                       >
                         <Trash2 className="mr-2 h-4 w-4" />
                         <span>删除笔记</span>
@@ -161,8 +168,8 @@ export function NoteWidget({
               <div 
                 className="widget__body"
                 onClick={handleBodyClick}
-                role="button" 
-                tabIndex={0} 
+                role={isLayoutEditing ? undefined : "button"}
+                tabIndex={isLayoutEditing ? undefined : 0}
                 onKeyDown={handleBodyKeyDown}
                 aria-label={widget.data.content ? `笔记内容：${widget.title}，点击编辑` : `空笔记：${widget.title}，点击开始写作`}
               >
@@ -185,4 +192,3 @@ export function NoteWidget({
     </div>
   );
 }
-

@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -138,13 +139,8 @@
   .page-section__widget {
     @apply mb-6;
   }
-  .page-section__widget-draggable-area { /* New class for draggable area */
-    /* Styles for visual feedback during drag can be added here or via JS */
-    /* e.g. opacity, box-shadow, specific cursor */
-  }
-
-
-  .widget { /* Generic widget class */
+  
+  .widget { 
     @apply transition-shadow duration-300 ease-in-out;
   }
   .widget__container {
@@ -153,34 +149,49 @@
   .widget__header {
     @apply flex items-center justify-between p-3 border-b border-border;
   }
+
   .widget-header__drag-handle {
-    @apply p-1 mr-1 text-muted-foreground hover:text-foreground cursor-grab opacity-60 hover:opacity-100 transition-opacity;
+    @apply p-1 mr-1 text-muted-foreground transition-opacity duration-200;
   }
-  .widget-header__title-clickable-area { /* Renamed for clarity, encompasses icon, title text, chevron */
+
+  /* Default state for drag handle: hidden, shows on widget hover */
+  .widget .widget-header__drag-handle {
+    @apply opacity-0 group-hover/widget:opacity-100 cursor-grab;
+  }
+
+  /* When layout editing is active, drag handle is always visible */
+  .is-layout-editing .widget .widget-header__drag-handle {
+    @apply opacity-100 cursor-grab;
+  }
+  
+  /* Visual cue for widgets when in layout editing mode */
+  .is-layout-editing.page-section__widget > .widget > .widget__container {
+    @apply ring-2 ring-primary/50 ring-offset-1 ring-offset-background;
+  }
+
+
+  .widget-header__title-clickable-area { 
     @apply flex items-center flex-grow cursor-pointer mr-2;
-    /* Text and icon color will be inherited or set by specific widget type */
   }
-  .widget-header__title { /* This class is now more for the text part only, if needed, or remove if not directly styled */
-     @apply text-lg font-semibold flex items-center; /* Default title styling */
+  .widget-header__title { 
+     @apply text-lg font-semibold flex items-center; 
   }
-  .widget-header__text { /* Specific to the text part of the title */
-    @apply mr-2; /* Retain margin for spacing text and chevron */
-    /* Font size and weight now on .widget-header__title-clickable-area or .widget-header__title */
+  .widget-header__text { 
+    @apply mr-2; 
   }
-  .widget-header__chevron { /* Chevron for collapse/expand */
-    @apply h-4 w-4 text-muted-foreground; /* Default chevron styling */
+  .widget-header__chevron { 
+    @apply h-4 w-4 text-muted-foreground; 
   }
   .widget-header__controls {
     @apply flex items-center space-x-2;
   }
-  .widget-header__control .widget-header__feather-icon { /* Applied to icons within controls */
+  .widget-header__control .widget-header__feather-icon { 
     @apply h-5 w-5 text-muted-foreground hover:text-foreground cursor-pointer;
   }
   .widget-header__control-label {
     @apply text-sm text-muted-foreground mr-1;
   }
   .widget__box {
-    /* No direct styles, acts as a container */
   }
   .widget__body {
     @apply p-1; 
@@ -188,7 +199,6 @@
   
   /* Specific to Link Collection (Bookmark) Widget */
   .bookmark-widget .widget__container {
-     /* Uses default .widget__container */
   }
   .bookmark-widget .widget-header__title-clickable-area .widget-header__text {
     @apply text-[hsl(var(--link-card-foreground))]; 
@@ -198,17 +208,13 @@
   }
 
    .bookmark-widget__body_mode_cloud {
-    /* Styles for cloud mode body can be added if different from generic widget__body */
   }
   .bookmark-widget__list {
-    @apply flex flex-wrap; /* This allows items to wrap like a cloud */
+    @apply flex flex-wrap; 
   }
   .bookmark-widget__item-wrapper {
-    /* Wrapper for each bookmark item, no specific styles from example here */
-    /* margin applied by bookmark-item_mode_cloud */
   }
 
-  /* Styles for LinkCard (bookmark-item) based on user's CSS */
   .bookmark-item {
     @apply relative transition-all duration-200 ease-in-out;
   }
@@ -216,16 +222,16 @@
     @apply bg-[hsl(var(--link-card-background))] text-[hsl(var(--link-card-foreground))] flex items-center; 
     max-width: 100%;
     margin: 0.15em;
-    border: 1px solid hsl(var(--link-card-foreground) / 0.2); /* Fainter border for links */
-    border-radius: 2px; /* Much smaller radius */
-    padding: 1px .5em; /* Explicitly set padding */
+    border: 1px solid hsl(var(--link-card-foreground) / 0.2); 
+    border-radius: 2px; 
+    padding: 1px .5em; 
   }
   .bookmark-item_mode_cloud:hover {
      @apply shadow-md border-[hsl(var(--primary)/0.7)];
   }
 
   .bookmark-item__link {
-    @apply flex items-center text-sm no-underline w-full; /* Text color will be inherited */
+    @apply flex items-center text-sm no-underline w-full; 
   }
   .bookmark-item__icon-wrapper {
     @apply mr-2 flex-shrink-0;
@@ -242,12 +248,16 @@
   .bookmark-item__title {
     @apply font-medium truncate;
   }
-  .bookmark-item__url { /* For URL if shown, not in current design but good to have */
+  .bookmark-item__url { 
     @apply text-xs text-muted-foreground truncate mt-0.5;
   }
   .bookmark-item__actions {
     @apply ml-2 flex-shrink-0 flex items-center space-x-1 opacity-0 group-hover/bookmark-item:opacity-100 transition-opacity;
   }
+  .is-layout-editing .bookmark-item__actions { /* Keep actions visible in edit mode if desired */
+    /* @apply opacity-100; */
+  }
+
 
   /* Specific to Note Widget */
   .note-widget .widget__container {
@@ -260,7 +270,7 @@
      @apply text-[hsl(var(--note-card-foreground))]; 
   }
   .note-widget .widget__body {
-    @apply p-4; /* More padding for note body */
+    @apply p-4; 
   }
   .note-widget__content {
     @apply prose prose-sm max-w-none 
@@ -316,7 +326,7 @@
     @apply flex items-center space-x-2 text-sm;
   }
   .todo-widget__progress-amount {
-    @apply text-muted-foreground w-10 text-right; /* Fixed width for alignment */
+    @apply text-muted-foreground w-10 text-right; 
   }
   .todo-widget__list {
     @apply space-y-1.5;
@@ -325,22 +335,28 @@
     @apply flex items-center p-1 rounded-md hover:bg-accent/10; 
   }
   .todo-item__drag-handle {
-    @apply cursor-grab text-muted-foreground hover:text-foreground mr-2 opacity-50 group-hover/todo-item:opacity-100;
+     @apply text-muted-foreground hover:text-foreground mr-2 opacity-0 group-hover/todo-item:opacity-100 transition-opacity;
   }
-  .todo-item__checkbox { /* Wrapper for ShadCN checkbox to align */
+  .is-layout-editing .todo-item__drag-handle { /* Make drag handle always visible in layout editing */
+    @apply opacity-100 cursor-grab;
+  }
+  .todo-item__checkbox { 
     @apply flex items-center justify-center h-5 w-5 mr-2;
   }
-  .todo-item__text-content { /* For displaying text, allows strikethrough */
+  .todo-item__text-content { 
     @apply flex-grow cursor-pointer break-all;
   }
   .todo-item__text-content_completed {
     @apply line-through text-muted-foreground;
   }
-  .todo-item__input { /* For editing text */
+  .todo-item__input { 
     @apply flex-grow;
   }
   .todo-item__actions {
     @apply ml-2 flex items-center space-x-1 opacity-0 group-hover/todo-item:opacity-100 transition-opacity;
+  }
+  .is-layout-editing .todo-item__actions { /* Keep actions visible in edit mode if desired */
+     /* @apply opacity-100; */
   }
   .todo-widget__adder {
     @apply flex space-x-2 mt-2;
@@ -360,12 +376,12 @@
      @apply text-[hsl(var(--calendar-card-foreground))];
   }
   .calendar-widget .widget__body {
-    @apply p-0 md:p-1; /* Less padding for calendar, responsive */
+    @apply p-0 md:p-1; 
   }
   .calendar-widget__toolbar {
     @apply flex justify-between items-center p-2 border-b;
   }
-  .calendar-widget .rdp { /* Targeting react-day-picker root */
+  .calendar-widget .rdp { 
     @apply w-full;
   }
   .calendar-widget .rdp-months {
@@ -375,7 +391,7 @@
     @apply text-base font-medium text-foreground; 
   }
   .calendar-widget .rdp-nav_button {
-    @apply h-8 w-8; /* Larger touch targets */
+    @apply h-8 w-8; 
   }
   .calendar-widget .rdp-day {
     @apply h-10 w-10 text-foreground;
@@ -384,7 +400,7 @@
      @apply bg-primary text-primary-foreground hover:bg-primary/90 focus:bg-primary/90;
   }
    .calendar-widget__empty-prompt {
-    @apply text-center text-muted-foreground py-4 min-h-[200px] flex flex-col justify-center items-center; /* Adjusted min-height */
+    @apply text-center text-muted-foreground py-4 min-h-[200px] flex flex-col justify-center items-center; 
   }
   .calendar-widget__event-list {
     @apply mt-4 p-3 border-t;
@@ -393,7 +409,10 @@
     @apply text-sm font-semibold mb-2 text-foreground;
   }
   .calendar-widget__event-item {
-    @apply text-xs p-1.5 mb-1 rounded bg-accent/10 flex justify-between items-center cursor-pointer;
+    @apply text-xs p-1.5 mb-1 rounded bg-accent/10 flex justify-between items-center;
+  }
+   .calendar-widget__event-item:not(.absolute) { /* Apply cursor pointer only if not absolutely positioned for timeline */
+    @apply cursor-pointer;
   }
   .calendar-widget__event-item strong, 
   .calendar-widget__event-item span {
@@ -408,23 +427,17 @@
   .calendar-widget__day-column {
     @apply bg-card p-1 min-h-[120px] border-b border-r hover:bg-accent/5 cursor-pointer;
   }
-  /* Day view timeline styles */
   .calendar-widget__day-timeline-container {
-    @apply relative; /* Container for timeline slots and events */
+    @apply relative; 
   }
   .calendar-widget__time-axis {
      @apply w-14 pr-2 text-right text-xs text-muted-foreground shrink-0 pt-1;
   }
   .calendar-widget__event-column {
-    @apply absolute inset-y-0 left-14 right-0; /* Position next to time axis, full height */
+    @apply absolute inset-y-0 left-14 right-0; 
   }
   .calendar-widget__time-slot {
-    @apply flex border-b border-border/50; /* Adjust height in component style */
+    @apply flex border-b border-border/50; 
   }
-  /* .calendar-widget__event-item.day-timeline is handled by inline styles for top/height */
 
 }
-
-    
-
-    

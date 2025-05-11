@@ -14,7 +14,7 @@ import { NoteEditDialog } from '@/components/NoteEditDialog';
 import { WidgetTitleDialog } from '@/components/CategoryDialog'; 
 import { CalendarIcsDialog } from '@/components/CalendarIcsDialog';
 import { CalendarIcsWidget } from '@/components/CalendarIcsWidget';
-import { AppWindow, FolderPlus, PlusSquare, Bookmark, StickyNote, ListChecks, CalendarDays, UploadCloud, DownloadCloud, Rss, Code, GalleryVertical } from 'lucide-react';
+import { AppWindow, FolderPlus, PlusSquare, Bookmark, StickyNote, ListChecks, CalendarDays, UploadCloud, DownloadCloud, LayoutDashboard, Edit } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import {
   DropdownMenu,
@@ -82,6 +82,7 @@ export default function HomePage() {
   const [draggedWidgetId, setDraggedWidgetId] = useState<string | null>(null);
   const [dragOverWidgetId, setDragOverWidgetId] = useState<string | null>(null);
   const [preDragCollapseStates, setPreDragCollapseStates] = useState<Record<string, boolean> | null>(null);
+  const [isLayoutEditing, setIsLayoutEditing] = useState(false);
 
 
   useEffect(() => {
@@ -319,7 +320,7 @@ export default function HomePage() {
         console.error("Unsupported widget type:", type);
         return;
     }
-    setWidgets(prev => [...prev, newWidget]);
+    setWidgets(prev => [newWidget, ...prev]); // Add to the beginning
   };
 
   const handleSubmitNote = (widgetId: string, title: string, content: string) => {
@@ -353,8 +354,8 @@ export default function HomePage() {
   };
 
   const handleToggleWidgetCollapse = (widgetId: string) => {
-    // If a drag is in progress, don't allow manual toggle
-    if (draggedWidgetId) return;
+    // If a drag is in progress OR layout editing is active, don't allow manual toggle via title click
+    if (draggedWidgetId || isLayoutEditing) return;
 
     setWidgets(prevWidgets =>
       prevWidgets.map(widget =>
@@ -497,6 +498,10 @@ export default function HomePage() {
     }
   };
 
+  const handleToggleLayoutEditing = () => {
+    setIsLayoutEditing(prev => !prev);
+  };
+
   // Widget Drag and Drop Handlers
   const restoreWidgetCollapseStates = () => {
     if (preDragCollapseStates) {
@@ -511,6 +516,10 @@ export default function HomePage() {
   };
 
   const handleWidgetDragStart = (e: React.DragEvent<HTMLDivElement>, widgetId: string) => {
+    if (!isLayoutEditing) {
+        e.preventDefault();
+        return;
+    }
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', widgetId);
     setDraggedWidgetId(widgetId);
@@ -522,12 +531,14 @@ export default function HomePage() {
     });
     setPreDragCollapseStates(currentCollapseStates);
 
+    // Collapse all widgets to make drag targets smaller and reordering easier
     setWidgets(prevWidgets =>
       prevWidgets.map(w => ({ ...w, isCollapsed: true }))
     );
   };
 
   const handleWidgetDragOver = (e: React.DragEvent<HTMLDivElement>, widgetId: string) => {
+    if (!isLayoutEditing || !draggedWidgetId) return;
     e.preventDefault();
     if (widgetId !== draggedWidgetId) {
       setDragOverWidgetId(widgetId);
@@ -535,6 +546,7 @@ export default function HomePage() {
   };
 
   const handleWidgetDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    if (!isLayoutEditing) return;
     const relatedTarget = e.relatedTarget as HTMLElement;
     if (relatedTarget && e.currentTarget.contains(relatedTarget)) {
       return;
@@ -543,10 +555,11 @@ export default function HomePage() {
   };
 
   const handleWidgetDrop = (e: React.DragEvent<HTMLDivElement>, targetWidgetId: string) => {
+    if (!isLayoutEditing || !draggedWidgetId) return;
     e.preventDefault();
     const sourceWidgetId = e.dataTransfer.getData('text/plain') || draggedWidgetId;
 
-    restoreWidgetCollapseStates();
+    restoreWidgetCollapseStates(); // Restore collapse states before reordering
 
     setDragOverWidgetId(null);
     setDraggedWidgetId(null);
@@ -571,7 +584,8 @@ export default function HomePage() {
   };
 
   const handleWidgetDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
-    if (draggedWidgetId) { // Only restore if a drag was actually initiated
+    if (!isLayoutEditing) return;
+    if (draggedWidgetId) { 
         restoreWidgetCollapseStates();
     }
     setDraggedWidgetId(null);
@@ -579,18 +593,22 @@ export default function HomePage() {
   };
   
   const handleWidgetContainerDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    if (!isLayoutEditing || !draggedWidgetId) return;
     e.preventDefault(); 
   };
   
   const handleWidgetContainerDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    if (!isLayoutEditing || !draggedWidgetId) return;
     e.preventDefault();
     const sourceWidgetId = e.dataTransfer.getData('text/plain') || draggedWidgetId;
   
     restoreWidgetCollapseStates();
 
+    // Check if the drop is happening on a widget itself (which should be handled by widget's onDrop)
+    // If closest returns null, it means it's dropped on the container padding.
     const targetElement = e.target as HTMLElement;
-    if (targetElement.closest('.page-section__widget-draggable-area')) { 
-        if (dragOverWidgetId) return; 
+    if (targetElement.closest('.page-section__widget')) { 
+        if (dragOverWidgetId) return; // If dragOverWidgetId is set, it means we're over a specific widget target
     }
 
     setDraggedWidgetId(null);
@@ -598,6 +616,7 @@ export default function HomePage() {
   
     if (!sourceWidgetId) return;
   
+    // Move the dragged widget to the end of the list
     setWidgets(currentWidgets => {
       const sourceIndex = currentWidgets.findIndex(w => w.id === sourceWidgetId);
       if (sourceIndex === -1) return currentWidgets;
@@ -629,6 +648,10 @@ export default function HomePage() {
             <p className="text-muted-foreground">您的个性化仪表板，可快速访问您喜爱的网页和工具。</p>
           </header>
            <div className="mb-8 flex justify-end space-x-2">
+            <Button size="lg" variant="outline" disabled>
+                <LayoutDashboard className="mr-2 h-5 w-5" />
+                编辑布局
+            </Button>
             <Button size="lg" variant="outline" onClick={handleImportJsonClick} disabled>
               <UploadCloud className="mr-2 h-5 w-5" />
               导入 JSON
@@ -666,6 +689,14 @@ export default function HomePage() {
       </header>
 
       <div className="mb-8 flex justify-end space-x-2">
+         <Button 
+            size="lg" 
+            variant={isLayoutEditing ? "default" : "outline"} 
+            onClick={handleToggleLayoutEditing}
+          >
+            {isLayoutEditing ? <Edit className="mr-2 h-5 w-5" /> : <LayoutDashboard className="mr-2 h-5 w-5" />}
+            {isLayoutEditing ? "完成编辑" : "编辑布局"}
+          </Button>
          <Button size="lg" variant="outline" onClick={handleImportJsonClick}>
             <UploadCloud className="mr-2 h-5 w-5" />
             导入 JSON
@@ -708,8 +739,8 @@ export default function HomePage() {
       ) : (
         <div 
           className="space-y-8"
-          onDragOver={handleWidgetContainerDragOver}
-          onDrop={handleWidgetContainerDrop}
+          onDragOver={isLayoutEditing ? handleWidgetContainerDragOver : undefined}
+          onDrop={isLayoutEditing ? handleWidgetContainerDrop : undefined}
         >
           {widgets.map(widget => {
             const widgetDragProps = {
@@ -720,6 +751,7 @@ export default function HomePage() {
                 onWidgetDragEnd: handleWidgetDragEnd,
                 draggedWidgetId: draggedWidgetId,
                 dragOverWidgetId: dragOverWidgetId,
+                isLayoutEditing: isLayoutEditing,
             };
 
             if (isLinkCollectionWidget(widget)) {
@@ -836,6 +868,3 @@ export default function HomePage() {
     </div>
   );
 }
-
-
-    

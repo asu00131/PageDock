@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { LinkCollectionAppWidget, LinkItem } from '@/types';
@@ -32,6 +33,7 @@ interface WidgetDragProps {
   onWidgetDragEnd: (e: React.DragEvent<HTMLDivElement>) => void;
   draggedWidgetId: string | null;
   dragOverWidgetId: string | null;
+  isLayoutEditing?: boolean; 
 }
 
 interface LinkCollectionWidgetProps extends WidgetDragProps {
@@ -63,6 +65,7 @@ export function LinkCollectionWidget({
   onWidgetDragEnd,
   draggedWidgetId,
   dragOverWidgetId,
+  isLayoutEditing,
 }: LinkCollectionWidgetProps) {
   
   const handleEditLink = (linkId: string) => {
@@ -79,23 +82,25 @@ export function LinkCollectionWidget({
 
   return (
     <div 
+      data-testid={`link-collection-widget-${widget.id}`}
       className={cn(
-        "page-section__widget page-section__widget-draggable-area", // Added draggable area class
+        "page-section__widget",
+        isLayoutEditing && "is-layout-editing",
         draggedWidgetId === widget.id && "opacity-50 cursor-grabbing",
         dragOverWidgetId === widget.id && draggedWidgetId !== widget.id && "ring-2 ring-primary ring-offset-2 rounded-lg"
       )}
-      draggable={true}
+      draggable={isLayoutEditing}
       onDragStart={(e) => onWidgetDragStart(e, widget.id)}
       onDragOver={(e) => onWidgetDragOver(e, widget.id)}
       onDrop={(e) => onWidgetDrop(e, widget.id)}
       onDragLeave={onWidgetDragLeave}
       onDragEnd={onWidgetDragEnd}
     >
-      <article className="widget bookmark-widget">
+      <article className="widget bookmark-widget group/widget">
         <div className="widget__container">
-          <header className="widget__header widget-header_hovered">
+          <header className="widget__header">
              <div className="widget-header__drag-handle">
-                <GripVertical className="h-5 w-5 text-muted-foreground cursor-grab" />
+                <GripVertical className="h-5 w-5" />
             </div>
             <div 
               className="widget-header__title-clickable-area"
@@ -132,7 +137,7 @@ export function LinkCollectionWidget({
                        <DropdownMenuItem 
                          onSelect={(e) => e.preventDefault()} 
                          onClick={(e) => e.stopPropagation()} 
-                         className="text-destructive hover:!bg-destructive/10 focus:!bg-destructive/10 focus:text-destructive-foreground hover:!text-destructive-foreground focus:!bg-destructive focus:!text-destructive-foreground"
+                         className="text-destructive focus:text-destructive-foreground hover:!text-destructive-foreground hover:!bg-destructive/90 focus:!bg-destructive focus:!text-destructive-foreground"
                        >
                         <Trash2 className="mr-2 h-4 w-4" />
                         <span>删除合集</span>
@@ -168,6 +173,7 @@ export function LinkCollectionWidget({
                   onEdit={handleEditLink}
                   onDelete={handleDeleteLink}
                   onLinksReordered={handleLinksReordered}
+                  isLayoutEditing={isLayoutEditing}
                 />
               </div>
             </div>
@@ -177,4 +183,3 @@ export function LinkCollectionWidget({
     </div>
   );
 }
-

@@ -38,6 +38,7 @@ interface WidgetDragProps {
   onWidgetDragEnd: (e: React.DragEvent<HTMLDivElement>) => void;
   draggedWidgetId: string | null;
   dragOverWidgetId: string | null;
+  isLayoutEditing?: boolean;
 }
 
 interface CalendarIcsWidgetProps extends WidgetDragProps {
@@ -92,6 +93,7 @@ export function CalendarIcsWidget({
   onWidgetDragEnd,
   draggedWidgetId,
   dragOverWidgetId,
+  isLayoutEditing,
 }: CalendarIcsWidgetProps) {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(startOfDay(new Date()));
   const [events, setEvents] = useState<CalendarEvent[]>([]);
@@ -134,17 +136,9 @@ export function CalendarIcsWidget({
 
             let endDate = parseIcalTime(event.endDate, event);
 
-             // If it's an all-day event (isDate is true), the endDate in iCAL might be exclusive.
-             // For example, an event on May 8th all day might have startDate May 8 and endDate May 9.
-             // We want our internal representation to have endDate be the end of May 8th if it's single all-day.
-             // However, ical.js parsing and our parseIcalTime already handle this by setting to startOfDay.
-             // If an all-day event ends on the same day it starts (common for single all-day events from some sources),
-             // make sure endDate is at least one day after startDate for full-day rendering logic, or handle appropriately.
-             if (event.startDate.isDate) { // All-day event
-                 // If endDate is on or before startDate for an all-day event, it's likely a single all-day event.
-                 // We make endDate the start of the next day to cover the full current day.
+             if (event.startDate.isDate) { 
                  if (compareAsc(endDate, startDate) <= 0) {
-                    endDate = startOfDay(addDays(startDate,1)); // Covers the entirety of startDate
+                    endDate = startOfDay(addDays(startDate,1)); 
                  }
             }
 
@@ -184,15 +178,11 @@ export function CalendarIcsWidget({
   const getEventsForDay = useCallback((day: Date | undefined): CalendarEvent[] => {
     if (!day) return [];
     const targetDayStart = startOfDay(day);
-    const targetDayEnd = addDays(targetDayStart, 1); // End of the target day (exclusive)
+    const targetDayEnd = addDays(targetDayStart, 1); 
 
     return events.filter(event => {
       const eventStart = event.startDate;
       const eventEnd = event.endDate;
-
-      // Check if the event overlaps with the target day.
-      // An event overlaps if its start is before the target day ends,
-      // AND its end is after the target day starts.
       return compareAsc(eventStart, targetDayEnd) < 0 && compareAsc(eventEnd, targetDayStart) > 0;
     }).sort((a, b) => {
       if (a.isAllDay && !b.isAllDay) return -1;
@@ -207,7 +197,7 @@ export function CalendarIcsWidget({
   }, [selectedDate, getEventsForDay]);
 
   const weekRange = useMemo(() => {
-    const start = startOfWeek(displayDate, { weekStartsOn: 1 }); // Monday
+    const start = startOfWeek(displayDate, { weekStartsOn: 1 }); 
     const end = endOfWeek(displayDate, { weekStartsOn: 1 });
     return { start, end };
   }, [displayDate]);
@@ -228,6 +218,7 @@ export function CalendarIcsWidget({
 
 
   const handleBodyClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isLayoutEditing) return;
     if (e.target instanceof HTMLElement && (e.target.closest('button, a') || e.target.closest('.rdp-nav_button') || e.target.closest('.view-switcher') || e.target.closest('[role="button"]'))) {
       return;
     }
@@ -238,6 +229,7 @@ export function CalendarIcsWidget({
   };
 
   const handleBodyKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (isLayoutEditing) return;
     if (e.key === 'Enter' || e.key === ' ') {
        if (e.target instanceof HTMLElement && (e.target.closest('button, a') || e.target.closest('.rdp-nav_button') || e.target.closest('.view-switcher') || e.target.closest('[role="button"]'))) {
         return;
@@ -268,7 +260,6 @@ export function CalendarIcsWidget({
                 event.id === updatedEventData.id ? { ...event, ...updatedEventData } : event
             ).sort((a,b) => compareAsc(a.startDate, b.startDate));
         } else {
-            // New event, ensure it has a unique ID (crypto.randomUUID() is already in EventDetailDialog if needed)
             const newEventWithId = { ...updatedEventData, id: updatedEventData.id || crypto.randomUUID()};
             return [...prevEvents, newEventWithId].sort((a,b) => compareAsc(a.startDate, b.startDate));
         }
@@ -288,7 +279,7 @@ export function CalendarIcsWidget({
     setSelectedDate(todayAnchor);
     setDisplayDate(todayAnchor);
     setCurrentMonth(todayAnchor);
-    setCurrentView('day'); // Switch to day view when going to today
+    setCurrentView('day'); 
   };
 
   const renderEventItem = (event: CalendarEvent, context?: 'week-column' | 'list' | 'day-detail' | 'day-timeline') => {
@@ -305,16 +296,21 @@ export function CalendarIcsWidget({
         actionButtonSizeClasses = "h-6 w-6 p-0.5";
         actionIconSizeClasses = "h-3 w-3";
     } else if (context === 'day-timeline') {
-        baseItemClasses = "calendar-widget__event-item group/event-item !p-1.5 text-xs";
+        baseItemClasses = cn(
+          "calendar-widget__event-item group/event-item !p-1.5 text-xs",
+          event.isAllDay ? "relative" : "absolute" // All-day events flow, timed events are positioned
+        );
         titleClasses = "truncate block font-semibold text-accent dark:text-[hsl(var(--accent-foreground))]";
         timeClasses = "text-xs block text-accent dark:text-[hsl(var(--accent-foreground))/90]";
         actionButtonSizeClasses = "h-5 w-5 p-0.5";
         actionIconSizeClasses = "h-3 w-3";
     }
+    
+    const eventStyle = context === 'day-timeline' && !event.isAllDay ? getTimelineEventStyle(event) : {};
 
     return (
     <li key={event.id} className={baseItemClasses}
-        style={context === 'day-timeline' ? getTimelineEventStyle(event) : {}}
+        style={eventStyle}
         onClick={(e) => { e.stopPropagation(); handleOpenEventDetailDialog(event); }}
         role="button"
         tabIndex={0}
@@ -388,16 +384,15 @@ export function CalendarIcsWidget({
   );
 
 
-  const hourSlotHeight = 60; // pixels
+  const hourSlotHeight = 60; 
   const getTimelineEventStyle = (event: CalendarEvent): React.CSSProperties => {
-    if (event.isAllDay) return { position: 'relative' }; // All-day events handled separately or differently
+    if (event.isAllDay) return { position: 'relative' }; 
 
     const startHour = getHours(event.startDate);
     const startMinute = getMinutes(event.startDate);
 
-    // Ensure endDate is after startDate for duration calculation
     let durationMinutes = differenceInMinutes(event.endDate, event.startDate);
-    if (durationMinutes <=0) durationMinutes = 30; // Default to 30 mins if invalid duration
+    if (durationMinutes <=0) durationMinutes = 30; 
 
     const top = (startHour + startMinute / 60) * hourSlotHeight;
     const height = (durationMinutes / 60) * hourSlotHeight;
@@ -405,17 +400,10 @@ export function CalendarIcsWidget({
     return {
       position: 'absolute',
       top: `${top}px`,
-      height: `${Math.max(height, 20)}px`, // Minimum height for visibility
-      left: '0.25rem', // Small offset from the time axis
-      right: '0.25rem', // Fit within the column
-      zIndex: 10, // Ensure events are on top of time slots
-      // backgroundColor: 'hsl(var(--accent)/0.7)', // Example styling
-      // borderColor: 'hsl(var(--accent))',
-      // borderWidth: '1px',
-      // borderRadius: '0.25rem',
-      // padding: '0.125rem 0.25rem', // Minimal padding
-      // overflow: 'hidden',
-      // color: 'hsl(var(--accent-foreground))'
+      height: `${Math.max(height, 20)}px`, 
+      left: '0.25rem', 
+      right: '0.25rem', 
+      zIndex: 10, 
     };
   };
 
@@ -443,15 +431,14 @@ export function CalendarIcsWidget({
           <div className="mb-3 border-b pb-2">
             <h4 className="text-sm font-semibold mb-1 text-foreground">全天事件</h4>
             <ul className="space-y-1">
-              {allDayEvents.map(event => renderEventItem(event, 'day-detail'))}
+              {allDayEvents.map(event => renderEventItem(event, 'day-timeline'))}
             </ul>
           </div>
         )}
 
         <ScrollArea className="h-[500px] w-full">
-          <div className="calendar-widget__day-timeline-container flex"> {/* Added flex */}
-            {/* Time Axis */}
-            <div className="calendar-widget__time-axis pt-1"> {/* Adjusted padding, ensure class exists or define */}
+          <div className="calendar-widget__day-timeline-container flex"> 
+            <div className="calendar-widget__time-axis pt-1"> 
               {hours.map(hour => (
                 <div key={`time-label-${hour}`} className="flex items-center justify-end" style={{ height: `${hourSlotHeight}px` }}>
                   {format(setHours(setMinutes(new Date(),0), hour), 'HH:mm')}
@@ -459,15 +446,11 @@ export function CalendarIcsWidget({
               ))}
             </div>
 
-            {/* Event Slots and Events Column */}
             <div className="relative flex-grow">
-              {/* Background Time Slots */}
               {hours.map(hour => (
                 <div key={`timeslot-bg-${hour}`} className="calendar-widget__time-slot" style={{ height: `${hourSlotHeight}px` }}>
-                  {/* This is just for the horizontal line styling from CSS */}
                 </div>
               ))}
-              {/* Positioned Events */}
               <div className="calendar-widget__event-column">
                 <ul className="relative h-full">
                   {timedEvents.map(event => renderEventItem(event, 'day-timeline'))}
@@ -513,7 +496,6 @@ export function CalendarIcsWidget({
           <Button variant="ghost" size="icon" onClick={(e)=>{e.stopPropagation(); setDisplayDate(addWeeks(displayDate, 1))}}><ChevronRight className="h-5 w-5" /></Button>
         </div>
 
-        {/* Week Grid - All Day Events Header Row */}
         <div className="grid grid-cols-[auto_repeat(7,1fr)] gap-px bg-border border-t border-l">
             <div className="calendar-widget__time-axis p-1 border-b border-r text-xs font-semibold text-muted-foreground flex items-center justify-center">全天</div>
             {daysOfWeek.map(day => (
@@ -529,16 +511,14 @@ export function CalendarIcsWidget({
                         <ul className="space-y-0.5 mt-1">
                             {allDayEventsByDay[format(day, 'yyyy-MM-dd')].map(event => renderEventItem(event, 'week-column'))}
                         </ul>
-                    ) : (<div className="h-4"></div>) /* Placeholder for consistent height */}
+                    ) : (<div className="h-4"></div>) }
                 </div>
             ))}
         </div>
 
-        {/* Week Grid - Timed Events Body */}
         <ScrollArea className="h-[500px] w-full">
             <div className="relative grid grid-cols-[auto_repeat(7,1fr)] gap-px bg-border border-l">
-                {/* Time Axis Column */}
-                <div className="sticky left-0 z-10 bg-card calendar-widget__time-axis pt-1"> {/* Added pt-1 */}
+                <div className="sticky left-0 z-10 bg-card calendar-widget__time-axis pt-1"> 
                     {hours.map(hour => (
                         <div key={`week-timeslot-label-${hour}`} className="flex items-center justify-end border-r" style={{ height: `${hourSlotHeight}px` }}>
                             {format(setHours(setMinutes(new Date(),0), hour), 'HH:mm')}
@@ -546,12 +526,11 @@ export function CalendarIcsWidget({
                     ))}
                 </div>
 
-                {/* Day Columns for Timed Events */}
                 {daysOfWeek.map(day => (
                     <div key={`week-daycol-${day.toISOString()}`}
                          className={`relative calendar-widget__day-column !min-h-[${hours.length * hourSlotHeight}px] !p-0 !border-b-0 ${isSameDay(day, startOfDay(new Date())) ? 'border-primary border-l-0 border-t-0 border-b-0 !border-r-2' : ''}`}
                          onClick={(e) => {
-                            if (e.target === e.currentTarget) { // Only trigger if clicking on column, not an event
+                            if (e.target === e.currentTarget) { 
                                 setSelectedDate(day); setDisplayDate(day); setCurrentView('day');
                             }
                          }}
@@ -559,14 +538,11 @@ export function CalendarIcsWidget({
                          onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) { e.preventDefault(); setSelectedDate(day); setDisplayDate(day); setCurrentView('day');}}}
                          aria-label={`查看 ${format(day, 'MMMM d, yyyy')} 的日程`}
                     >
-                         {/* Background hour lines for this day column */}
                         {hours.map(hour => (
                             <div key={`week-day-${format(day, 'yyyy-MM-dd')}-timeslot-line-${hour}`}
                                 className="calendar-widget__time-slot" style={{ height: `${hourSlotHeight}px` }}>
-                                {/* This div is just for the horizontal line within the day column */}
                             </div>
                         ))}
-                        {/* Events for this day column */}
                         <ul className="absolute inset-0">
                             {timedEventsByDay[format(day, 'yyyy-MM-dd')].map(event => renderEventItem(event, 'day-timeline'))}
                         </ul>
@@ -578,27 +554,29 @@ export function CalendarIcsWidget({
       </div>
     );
   };
-
+  
 
   return (
     <div
+        data-testid="calendar-ics-widget-main"
         className={cn(
             "page-section__widget",
+            isLayoutEditing && "is-layout-editing",
             draggedWidgetId === widget.id && "opacity-50 cursor-grabbing",
             dragOverWidgetId === widget.id && draggedWidgetId !== widget.id && "ring-2 ring-primary ring-offset-2 rounded-lg"
         )}
-        draggable={true}
+        draggable={isLayoutEditing}
         onDragStart={(e) => onWidgetDragStart(e, widget.id)}
         onDragOver={(e) => onWidgetDragOver(e, widget.id)}
         onDrop={(e) => onWidgetDrop(e, widget.id)}
         onDragLeave={onWidgetDragLeave}
         onDragEnd={onWidgetDragEnd}
     >
-      <article className="widget calendar-widget">
+      <article className="widget calendar-widget group/widget">
         <div className="widget__container">
-          <header className="widget__header widget-header_hovered">
+          <header className="widget__header">
             <div className="widget-header__drag-handle">
-                <GripVertical className="h-5 w-5 text-muted-foreground cursor-grab" />
+                <GripVertical className="h-5 w-5" />
             </div>
             <div
               className="widget-header__title-clickable-area"
@@ -640,8 +618,8 @@ export function CalendarIcsWidget({
                      const newEventStart = selectedDate || startOfDay(new Date());
                      const newEvent: Omit<CalendarEvent, 'id'> = {
                        summary: "新事件",
-                       startDate: setMinutes(setHours(newEventStart, getHours(new Date())),0), // Default to current hour
-                       endDate: setMinutes(setHours(newEventStart, getHours(new Date()) + 1),0), // Default to one hour later
+                       startDate: setMinutes(setHours(newEventStart, getHours(new Date())),0), 
+                       endDate: setMinutes(setHours(newEventStart, getHours(new Date()) + 1),0), 
                        isAllDay: false,
                        description: ""
                      };
@@ -654,7 +632,7 @@ export function CalendarIcsWidget({
                     <AlertDialogTrigger asChild>
                       <DropdownMenuItem
                         onSelect={(e) => e.preventDefault()}
-                        className="text-destructive focus:text-destructive-foreground hover:!text-destructive-foreground hover:!bg-destructive/90 focus:!bg-destructive focus:!text-destructive-foreground"
+                         className="text-destructive focus:text-destructive-foreground hover:!text-destructive-foreground hover:!bg-destructive/90 focus:!bg-destructive focus:!text-destructive-foreground"
                       >
                         <Trash2 className="mr-2 h-4 w-4" />
                         <span>删除日历</span>
@@ -688,8 +666,8 @@ export function CalendarIcsWidget({
                 className="widget__body"
                 onClick={handleBodyClick}
                 onKeyDown={handleBodyKeyDown}
-                role={!widget.data.icsUrl ? "button" : undefined}
-                tabIndex={!widget.data.icsUrl ? 0 : undefined}
+                role={!widget.data.icsUrl && !isLayoutEditing ? "button" : undefined}
+                tabIndex={!widget.data.icsUrl && !isLayoutEditing ? 0 : undefined}
                 aria-label={!widget.data.icsUrl ? "设置日历链接" : `${widget.title} 日历区域`}
               >
                 {isLoading && <p className="p-4 text-center text-muted-foreground">正在加载日历...</p>}
@@ -774,20 +752,17 @@ export function CalendarIcsWidget({
                           month={currentMonth}
                           onMonthChange={(month) => {
                             setCurrentMonth(month);
-                            // Also update selectedDate if month changes without a day click
-                            // This helps keep the event list relevant if user navigates months only
                             if (selectedDate && (selectedDate.getMonth() !== month.getMonth() || selectedDate.getFullYear() !== month.getFullYear())) {
                                 const dayInNewMonth = new Date(month.getFullYear(), month.getMonth(), selectedDate.getDate());
-                                // check if dayInNewMonth is valid (e.g. Feb 30 doesn't exist)
                                 if (dayInNewMonth.getMonth() === month.getMonth()) {
                                      setSelectedDate(startOfDay(dayInNewMonth));
                                      setDisplayDate(startOfDay(dayInNewMonth));
-                                } else { // day doesn't exist (e.g. selected 31st, new month has 30 days) - select 1st
+                                } else { 
                                      const firstOfNewMonth = startOfDay(new Date(month.getFullYear(), month.getMonth(), 1));
                                      setSelectedDate(firstOfNewMonth);
                                      setDisplayDate(firstOfNewMonth);
                                 }
-                            } else if (!selectedDate) { // If no date was selected, select the first of the new month
+                            } else if (!selectedDate) { 
                                 const firstOfNewMonth = startOfDay(new Date(month.getFullYear(), month.getMonth(), 1));
                                 setSelectedDate(firstOfNewMonth);
                                 setDisplayDate(firstOfNewMonth);

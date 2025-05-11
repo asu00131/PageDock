@@ -32,6 +32,7 @@ interface TodoItemCardProps {
   onDragEndHandler: (e: React.DragEvent<HTMLDivElement>) => void;
   isDragging?: boolean;
   isDragOver?: boolean;
+  isLayoutEditing?: boolean; // Added to control dragability
 }
 
 export function TodoItemCard({
@@ -46,6 +47,7 @@ export function TodoItemCard({
   onDragEndHandler,
   isDragging,
   isDragOver,
+  isLayoutEditing,
 }: TodoItemCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(item.text);
@@ -78,7 +80,7 @@ export function TodoItemCard({
 
   return (
     <div
-      draggable={true}
+      draggable={isLayoutEditing} // Only draggable if layout editing is active
       onDragStart={(e) => onDragStartHandler(e, item.id)}
       onDragOver={(e) => onDragOverHandler(e, item.id)}
       onDrop={(e) => onDropHandler(e, item.id)}
@@ -92,7 +94,10 @@ export function TodoItemCard({
     >
       <div className="flex items-center">
         <GripVertical
-          className="todo-item__drag-handle h-5 w-5"
+          className={cn(
+            "todo-item__drag-handle h-5 w-5",
+            !isLayoutEditing && "opacity-0" // Hide drag handle if not in layout edit mode
+          )}
           aria-label="拖动以重新排序"
         />
         <div className="todo-item__checkbox">
@@ -121,11 +126,11 @@ export function TodoItemCard({
               "todo-item__text-content",
               item.completed && "todo-item__text-content_completed"
             )}
-            onClick={() => setIsEditing(true)}
-            onDoubleClick={() => setIsEditing(true)} 
+            onClick={() => { if (!isLayoutEditing) setIsEditing(true); }} // Don't allow edit by click if layout editing
+            onDoubleClick={() => { if (!isLayoutEditing) setIsEditing(true); }} 
             role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {if(e.key === 'Enter' || e.key === ' ') setIsEditing(true)}}
+            tabIndex={isLayoutEditing ? -1 : 0} // Not focusable if layout editing
+            onKeyDown={(e) => {if(!isLayoutEditing && (e.key === 'Enter' || e.key === ' ')) setIsEditing(true)}}
             aria-label={`待办事项：${item.text}。状态：${item.completed ? '已完成' : '未完成'}。点击以编辑。`}
           >
             {item.text}
@@ -168,4 +173,3 @@ export function TodoItemCard({
     </div>
   );
 }
-
