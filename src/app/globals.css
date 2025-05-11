@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -236,7 +235,7 @@
    .bookmark-item_mode_icons:hover {
      @apply shadow-lg border-primary;
    }
-  .bookmark-item_mode_icons .bookmark-item__icon-wrapper { @apply mb-1; } /* Removed mr-2 as it's flex-col */
+  
   .bookmark-item_mode_icons .bookmark-item__title { @apply text-center text-xs; }
   .bookmark-item_mode_icons .bookmark-item__url { @apply hidden; }
   .bookmark-item_mode_icons .bookmark-item__link { @apply flex-col items-center justify-center; } /* Ensure link itself is flex-col for icon mode */
@@ -245,12 +244,12 @@
   .bookmark-item_mode_list {
     @apply w-full p-2 border-b border-border/50 hover:bg-accent/10; /* flex items-center is on .bookmark-item */
   }
-  .bookmark-item_mode_list .bookmark-item__icon-wrapper { @apply mr-2; }
+  
 
   .bookmark-item_mode_detailed-list {
     @apply w-full p-2 border-b border-border/50 hover:bg-accent/10 items-start; /* flex is on .bookmark-item, items-start for this mode */
   }
-  .bookmark-item_mode_detailed-list .bookmark-item__icon-wrapper { @apply mr-2 mt-1; }
+  
   .bookmark-item_mode_detailed-list .bookmark-item__info { @apply flex flex-col; }
 
 
@@ -264,11 +263,24 @@
 
   .bookmark-item__icon-wrapper {
     @apply flex-shrink-0 flex items-center justify-center; /* General wrapper for icon/image */
-    /* Default margin-right for non-icon modes */
-    &:not(:closest(.bookmark-item_mode_icons) > *) {
-        @apply mr-2;
-    }
+     /* Margins are now handled by mode-specific styles below */
   }
+
+  /* Specific icon wrapper styles for each mode */
+  .bookmark-item_mode_cloud .bookmark-item__icon-wrapper {
+    @apply mr-2;
+  }
+  .bookmark-item_mode_icons .bookmark-item__icon-wrapper {
+    @apply mb-1; /* Vertical margin, no horizontal needed due to flex-col */
+  }
+  .bookmark-item_mode_list .bookmark-item__icon-wrapper {
+    @apply mr-2;
+  }
+  .bookmark-item_mode_detailed-list .bookmark-item__icon-wrapper {
+    @apply mr-2 mt-1;
+  }
+
+
   .bookmark-item__icon { /* For Lucide Icon fallback */
     @apply text-primary; /* Specific Lucide icon classes will set size */
   }
@@ -527,3 +539,4 @@
   -webkit-line-clamp: 3;
 }
 /* Add more if needed, or use inline style for dynamic line-clamp */
+
