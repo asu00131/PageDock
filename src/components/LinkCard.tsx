@@ -1,9 +1,8 @@
-
 "use client";
 
 import type { LinkItem, LinkCollectionDisplaySettings, LinkCollectionIconSize } from '@/types';
 import { Button } from '@/components/ui/button';
-import { Link as LinkIconLucide, Pencil, Trash2, GripVertical } from 'lucide-react'; // Renamed LinkIcon to LinkIconLucide to avoid conflict
+import { Link as LinkIconLucide, Pencil, Trash2, GripVertical } from 'lucide-react';
 import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import {
@@ -32,7 +31,7 @@ interface LinkCardProps {
   onDragEndHandler: (e: React.DragEvent<HTMLDivElement>) => void;
   isDragging?: boolean;
   isDragOver?: boolean;
-  isLayoutEditing?: boolean;
+  isLayoutEditing?: boolean; // This is effectively `effectiveItemEditing` from LinkCollectionWidget
 }
 
 function getFaviconUrl(url: string): string | null {
@@ -77,12 +76,12 @@ export function LinkCard({
   const faviconUrl = getFaviconUrl(link.url);
 
   useEffect(() => {
-    setShowFallbackIcon(false); // Reset error state when link URL changes
+    setShowFallbackIcon(false);
   }, [link.url]);
 
   const iconPx = displayMode === 'icons' ? 32 : getPixelSize(iconSize);
 
-  const fallbackIconDynamicClasses = displayMode === 'icons' ? "h-8 w-8" : // 32px for icons mode
+  const fallbackIconDynamicClasses = displayMode === 'icons' ? "h-8 w-8" : 
     cn({
       "h-4 w-4": iconSize === 'small',
       "h-5 w-5": iconSize === 'medium',
@@ -96,14 +95,18 @@ export function LinkCard({
   const titleClasses = cn("bookmark-item__title", {
     "truncate": titleLines === 1,
     "line-clamp-2": titleLines === 2,
-    // For titleLines > 2 or -1 (full title), WebkitLineClamp is used directly
   });
-
 
   return (
     <div 
-      draggable={isLayoutEditing}
-      onDragStart={(e) => onDragStartHandler(e, link.id)}
+      draggable={isLayoutEditing} // Draggable if item sorting or global layout editing is active
+      onDragStart={(e) => {
+        if (isLayoutEditing) {
+          // Stop propagation to prevent parent widget's drag handler if active
+          e.stopPropagation(); 
+        }
+        onDragStartHandler(e, link.id);
+      }}
       onDragOver={(e) => onDragOverHandler(e, link.id)}
       onDrop={(e) => onDropHandler(e, link.id)}
       onDragLeave={onDragLeaveHandler}
@@ -117,16 +120,16 @@ export function LinkCard({
           "bookmark-item_mode_detailed-list": displayMode === 'detailedList',
         },
         className,
-        isDragging && "opacity-50 cursor-grabbing",
-        isDragOver && "ring-2 ring-primary ring-offset-1",
-        isLayoutEditing && "cursor-grab" // Apply grab cursor when layout editing
+        isDragging && "opacity-50 cursor-grabbing", // Styles for when this item is being dragged
+        isDragOver && "ring-2 ring-primary ring-offset-1", // Styles for when another item is dragged over this one
+        isLayoutEditing && !isDragging && "cursor-grab" // Grab cursor if draggable and not currently being dragged
       )}
     >
       {isLayoutEditing && (
         <GripVertical 
           className={cn(
               "h-4 w-4 text-muted-foreground mr-1 flex-shrink-0 bookmark-item__drag-handle",
-              isLayoutEditing ? "opacity-50 group-hover/bookmark-item:opacity-100 cursor-grab" : "opacity-0" 
+              "opacity-100 cursor-grab" // Always visible and grabbable if layout editing is active for items
           )} 
           aria-label="拖动以重新排序" 
         />
@@ -138,7 +141,7 @@ export function LinkCard({
         className="bookmark-item__link"
         title={`${link.title}\n${link.url}`}
         onClick={(e) => {
-          if (isLayoutEditing) e.preventDefault(); // Prevent navigation in layout editing mode
+          if (isLayoutEditing) e.preventDefault(); 
           if (e.ctrlKey || e.metaKey || e.button === 1) return;
         }}
         draggable={false} 
@@ -148,11 +151,12 @@ export function LinkCard({
             {faviconUrl && !showFallbackIcon ? (
               <Image
                 src={faviconUrl}
-                alt="" // Decorative, title is on the link
+                alt="" 
                 width={iconPx}
                 height={iconPx}
                 className="bookmark-item__favicon-image object-contain"
                 onError={() => setShowFallbackIcon(true)}
+                data-ai-hint="website logo"
               />
             ) : (
               <LinkIconLucide className={cn("bookmark-item__icon", fallbackIconDynamicClasses)} />
@@ -223,4 +227,3 @@ export function LinkCard({
     </div>
   );
 }
-

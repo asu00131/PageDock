@@ -1,12 +1,14 @@
 "use client";
 
-import type { NoteAppWidget } from '@/types';
+import type { LinkCollectionAppWidget, LinkItem } from '@/types';
+import { LinkGrid } from './LinkGrid';
 import { Button } from '@/components/ui/button';
-import { MoreVertical, Edit3, Trash2, StickyNote, ChevronDown, ChevronUp, GripVertical } from 'lucide-react';
+import { Edit3, MoreVertical, PlusCircle, Trash2, Bookmark, ChevronDown, ChevronUp, GripVertical, SlidersHorizontal, ListOrdered, Check } from 'lucide-react'; 
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -20,10 +22,10 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
 import type React from 'react';
+import { useState } from 'react';
+
 
 interface WidgetDragProps {
   onWidgetDragStart: (e: React.DragEvent<HTMLDivElement>, widgetId: string) => void;
@@ -36,18 +38,28 @@ interface WidgetDragProps {
   isLayoutEditing?: boolean; // This is the GLOBAL layout editing state from HomePage
 }
 
-interface NoteWidgetProps extends WidgetDragProps {
-  widget: NoteAppWidget;
-  onOpenEditDialog: (widgetId: string) => void;
+interface LinkCollectionWidgetProps extends WidgetDragProps {
+  widget: LinkCollectionAppWidget;
+  onOpenLinkDialog: (widgetId: string, link?: LinkItem) => void;
+  onOpenWidgetTitleDialog: (widgetId: string) => void;
+  onOpenLinkDisplaySettingsDialog: (widgetId: string) => void; 
   onDeleteWidget: (widgetId: string) => void;
+  onEditLink: (widgetId: string, linkId: string) => void;
+  onDeleteLink: (widgetId: string, linkId: string) => void;
+  onLinksReordered: (widgetId: string, newLinks: LinkItem[]) => void;
   isCollapsed?: boolean;
   onToggleCollapse: (widgetId: string) => void;
 }
 
-export function NoteWidget({
+export function LinkCollectionWidget({
   widget,
-  onOpenEditDialog,
+  onOpenLinkDialog,
+  onOpenWidgetTitleDialog,
+  onOpenLinkDisplaySettingsDialog, 
   onDeleteWidget,
+  onEditLink,
+  onDeleteLink,
+  onLinksReordered,
   isCollapsed,
   onToggleCollapse,
   onWidgetDragStart,
@@ -57,64 +69,59 @@ export function NoteWidget({
   onWidgetDragEnd,
   draggedWidgetId,
   dragOverWidgetId,
-  isLayoutEditing, // Global layout editing state
-}: NoteWidgetProps) {
+  isLayoutEditing, // This is the global layout editing mode from HomePage
+}: LinkCollectionWidgetProps) {
+  const [isItemSortingActive, setIsItemSortingActive] = useState(false);
   
-  const handleBodyClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (isLayoutEditing) {
-      e.stopPropagation(); // Prevent opening edit dialog if in layout editing mode
-      return;
-    }
-    if (e.target instanceof HTMLElement && (e.target.closest('a') || e.target.closest('button') || e.target.closest('[role="button"]'))) {
-      return;
-    }
-    e.stopPropagation(); 
-    onOpenEditDialog(widget.id);
-  };
-  
-  const handleBodyKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (isLayoutEditing) {
-      e.stopPropagation(); // Prevent opening edit dialog if in layout editing mode
-      return;
-    }
-    if (e.key === 'Enter' || e.key === ' ') {
-      if (e.target instanceof HTMLElement && (e.target.closest('a') || e.target.closest('button') || e.target.closest('[role="button"]'))) {
-        return;
-      }
-      e.preventDefault();
-      e.stopPropagation();
-      onOpenEditDialog(widget.id);
-    }
+  const handleEditLink = (linkId: string) => {
+    onEditLink(widget.id, linkId);
   };
 
-  const isWidgetItselfDraggable = isLayoutEditing;
+  const handleDeleteLink = (linkId: string) => {
+    onDeleteLink(widget.id, linkId);
+  };
 
-  return (
+  const handleLocalLinksReordered = (newLinks: LinkItem[]) => {
+    onLinksReordered(widget.id, newLinks);
+  };
+
+  const handleToggleItemSorting = () => {
+    setIsItemSortingActive(prev => !prev);
+  };
+  
+  // Widget itself is draggable only if global layout editing is on AND item sorting is OFF.
+  const isWidgetItselfDraggable = isLayoutEditing && !isItemSortingActive;
+  // Items can be sorted if global layout editing is on OR item sorting is on.
+  const canItemsBeSorted = isLayoutEditing || isItemSortingActive;
+
+  return ( 
     <div 
-      data-testid={`note-widget-${widget.id}`}
+      data-testid={`link-collection-widget-${widget.id}`}
       className={cn(
         "page-section__widget",
-        isLayoutEditing && "is-layout-editing",
+        isLayoutEditing && "is-layout-editing", 
         draggedWidgetId === widget.id && "opacity-50 cursor-grabbing",
         dragOverWidgetId === widget.id && draggedWidgetId !== widget.id && "ring-2 ring-primary ring-offset-2 rounded-lg"
       )}
-      draggable={isWidgetItselfDraggable}
+      draggable={isWidgetItselfDraggable} 
       onDragStart={(e) => {
         if (isWidgetItselfDraggable) {
           onWidgetDragStart(e, widget.id);
         } else {
-          e.preventDefault();
+          e.preventDefault(); 
         }
       }}
+      // These handlers are for when ANOTHER widget is dragged over THIS widget.
+      // They should be active if global layout editing is on.
       onDragOver={(e) => { if (isLayoutEditing) onWidgetDragOver(e, widget.id);}}
       onDrop={(e) => { if (isLayoutEditing) onWidgetDrop(e, widget.id);}}
       onDragLeave={(e) => { if (isLayoutEditing) onWidgetDragLeave(e);}}
       onDragEnd={(e) => { if (isLayoutEditing) onWidgetDragEnd(e);}}
     >
-      <article className="widget note-widget group/widget">
+      <article className="widget bookmark-widget group/widget">
         <div className="widget__container">
           <header className="widget__header">
-            <div className="widget-header__drag-handle">
+             <div className="widget-header__drag-handle">
                 <GripVertical className="h-5 w-5" />
             </div>
             <div 
@@ -126,11 +133,15 @@ export function NoteWidget({
               aria-expanded={!isCollapsed}
               aria-controls={`widget-body-${widget.id}`}
             >
-              <StickyNote className="widget-header__feather-icon h-5 w-5 mr-2" />
-              <span className="widget-header__text text-lg font-semibold">{widget.title}</span>
+              <Bookmark className="widget-header__feather-icon h-5 w-5 mr-2 text-[hsl(var(--link-card-foreground))]" />
+              <span className="widget-header__text text-lg font-semibold text-[hsl(var(--link-card-foreground))]">{widget.title}</span>
               {isCollapsed ? <ChevronDown className="widget-header__chevron" /> : <ChevronUp className="widget-header__chevron" />}
             </div>
             <div className="widget-header__controls">
+              <Button variant="ghost" size="icon" className="widget-header__control h-7 w-7" onClick={(e) => { e.stopPropagation(); onOpenLinkDialog(widget.id); }}>
+                <PlusCircle className="widget-header__feather-icon h-4 w-4" />
+                <span className="sr-only">{`为 ${widget.title} 添加链接`}</span>
+              </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="widget-header__control h-7 w-7" onClick={(e) => e.stopPropagation()}>
@@ -138,27 +149,38 @@ export function NoteWidget({
                     <span className="sr-only">{`${widget.title} 的更多选项`}</span>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onOpenEditDialog(widget.id); }}>
+                <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onOpenWidgetTitleDialog(widget.id); }}>
                     <Edit3 className="mr-2 h-4 w-4" />
-                    <span>编辑笔记</span>
+                    <span>编辑合集标题</span>
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onOpenLinkDisplaySettingsDialog(widget.id); }}> 
+                    <SlidersHorizontal className="mr-2 h-4 w-4" />
+                    <span>显示设置</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleToggleItemSorting(); }}>
+                    {isItemSortingActive 
+                      ? <Check className="mr-2 h-4 w-4" /> 
+                      : <ListOrdered className="mr-2 h-4 w-4" />
+                    }
+                    <span>{isItemSortingActive ? "完成排序" : "书签排序"}</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <DropdownMenuItem 
-                        onSelect={(e) => e.preventDefault()} 
-                        onClick={(e) => e.stopPropagation()} 
+                       <DropdownMenuItem 
+                         onSelect={(e) => e.preventDefault()} 
                          className="text-destructive focus:text-destructive-foreground hover:!text-destructive-foreground hover:!bg-destructive/90 focus:!bg-destructive focus:!text-destructive-foreground"
-                      >
+                       >
                         <Trash2 className="mr-2 h-4 w-4" />
-                        <span>删除笔记</span>
+                        <span>删除合集</span>
                       </DropdownMenuItem>
                     </AlertDialogTrigger>
-                    <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                    <AlertDialogContent>
                       <AlertDialogHeader>
                         <AlertDialogTitle>您确定吗？</AlertDialogTitle>
                         <AlertDialogDescription>
-                          {`此操作无法撤销。这将永久删除笔记 “${widget.title}”。`}
+                          {`此操作无法撤销。这将永久删除合集 “${widget.title}” 及其所有链接。`}
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
@@ -178,25 +200,15 @@ export function NoteWidget({
           </header>
           {!isCollapsed && (
             <div className="widget__box" id={`widget-body-${widget.id}`}>
-              <div 
-                className="widget__body"
-                onClick={handleBodyClick}
-                role={isLayoutEditing ? undefined : "button"}
-                tabIndex={isLayoutEditing ? undefined : 0}
-                onKeyDown={handleBodyKeyDown}
-                aria-label={widget.data.content ? `笔记内容：${widget.title}，点击编辑` : `空笔记：${widget.title}，点击开始写作`}
-              >
-                {widget.data.content ? (
-                   <div className="note-widget__content">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{widget.data.content}</ReactMarkdown>
-                   </div>
-                ) : (
-                  <div 
-                    className="note-widget__empty-prompt"
-                  >
-                    <p>开始写...</p>
-                  </div>
-                )}
+              <div className="widget__body">
+                <LinkGrid
+                  links={widget.data.links}
+                  displaySettings={widget.data.displaySettings} 
+                  onEdit={handleEditLink}
+                  onDelete={handleDeleteLink}
+                  onLinksReordered={handleLocalLinksReordered}
+                  isLayoutEditing={canItemsBeSorted} 
+                />
               </div>
             </div>
           )}

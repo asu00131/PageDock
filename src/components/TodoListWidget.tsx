@@ -1,4 +1,3 @@
-
 "use client";
 
 import type { TodoListAppWidget, TodoItem } from '@/types';
@@ -38,7 +37,7 @@ interface WidgetDragProps {
   onWidgetDragEnd: (e: React.DragEvent<HTMLDivElement>) => void;
   draggedWidgetId: string | null;
   dragOverWidgetId: string | null;
-  isLayoutEditing?: boolean;
+  isLayoutEditing?: boolean; // This is the GLOBAL layout editing state from HomePage
 }
 
 interface TodoListWidgetProps extends WidgetDragProps {
@@ -74,7 +73,7 @@ export function TodoListWidget({
   onWidgetDragEnd,
   draggedWidgetId,
   dragOverWidgetId,
-  isLayoutEditing,
+  isLayoutEditing, // Global layout editing state
 }: TodoListWidgetProps) {
   const [newItemText, setNewItemText] = useState('');
   
@@ -93,9 +92,12 @@ export function TodoListWidget({
 
   const displayedItems = widget.data.showCompleted ? widget.data.items : widget.data.items.filter(item => !item.completed);
 
-  // Todo Item Drag Handlers
+  // Todo item dragging is enabled if global layout editing is active.
+  const canItemsBeSorted = isLayoutEditing; 
+
   const handleTodoItemDragStart = (e: React.DragEvent<HTMLDivElement>, id: string) => {
-    if (!isLayoutEditing) { e.preventDefault(); return; } // Allow item drag only in layout editing mode for consistency
+    if (!canItemsBeSorted) { e.preventDefault(); return; }
+    e.stopPropagation(); // Prevent widget drag start
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', id);
     setDraggedTodoItemId(id);
@@ -103,7 +105,7 @@ export function TodoListWidget({
   };
 
   const handleTodoItemDragOver = (e: React.DragEvent<HTMLDivElement>, id: string) => {
-    if (!isLayoutEditing || !draggedTodoItemId) return;
+    if (!canItemsBeSorted || !draggedTodoItemId) return;
     e.preventDefault(); 
     if (id !== draggedTodoItemId) {
         setDragOverTodoItemId(id);
@@ -111,7 +113,7 @@ export function TodoListWidget({
   };
   
   const handleTodoItemDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-    if (!isLayoutEditing) return;
+    if (!canItemsBeSorted) return;
     const relatedTarget = e.relatedTarget as HTMLElement;
     if (relatedTarget && e.currentTarget.contains(relatedTarget)) {
       return;
@@ -120,7 +122,7 @@ export function TodoListWidget({
   };
 
   const handleTodoItemDrop = (e: React.DragEvent<HTMLDivElement>, targetId: string) => {
-    if (!isLayoutEditing || !draggedTodoItemId) return;
+    if (!canItemsBeSorted || !draggedTodoItemId) return;
     e.preventDefault();
     const sourceId = e.dataTransfer.getData('text/plain') || draggedTodoItemId;
     
@@ -142,18 +144,18 @@ export function TodoListWidget({
   };
   
   const handleTodoItemDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
-    if (!isLayoutEditing) return;
+    if (!canItemsBeSorted) return;
     setDraggedTodoItemId(null);
     setDragOverTodoItemId(null);
   };
 
   const handleTodoItemContainerDragOver = (e: React.DragEvent<HTMLUListElement>) => {
-    if (!isLayoutEditing || !draggedTodoItemId) return;
+    if (!canItemsBeSorted || !draggedTodoItemId) return;
     e.preventDefault();
   };
 
   const handleTodoItemContainerDrop = (e: React.DragEvent<HTMLUListElement>) => {
-    if (!isLayoutEditing || !draggedTodoItemId) return;
+    if (!canItemsBeSorted || !draggedTodoItemId) return;
     e.preventDefault();
     const sourceId = e.dataTransfer.getData('text/plain') || draggedTodoItemId;
     
@@ -176,6 +178,9 @@ export function TodoListWidget({
     onReorderItems(widget.id, reorderedItems);
   };
 
+  // Widget itself is draggable only if global layout editing is on.
+  // Item dragging within the widget is also controlled by global layout editing.
+  const isWidgetItselfDraggable = isLayoutEditing;
 
   return (
     <div 
@@ -185,12 +190,24 @@ export function TodoListWidget({
         draggedWidgetId === widget.id && "opacity-50 cursor-grabbing",
         dragOverWidgetId === widget.id && draggedWidgetId !== widget.id && "ring-2 ring-primary ring-offset-2 rounded-lg"
       )}
-      draggable={isLayoutEditing}
-      onDragStart={(e) => onWidgetDragStart(e, widget.id)}
-      onDragOver={(e) => onWidgetDragOver(e, widget.id)}
-      onDrop={(e) => onWidgetDrop(e, widget.id)}
-      onDragLeave={onWidgetDragLeave}
-      onDragEnd={onWidgetDragEnd}
+      draggable={isWidgetItselfDraggable}
+      onDragStart={(e) => {
+        if (isWidgetItselfDraggable) {
+          // Check if the drag target is an inner draggable item (like a todo item handle)
+          // If so, let that item's drag handler take precedence by not starting widget drag.
+          if (e.target instanceof HTMLElement && e.target.closest('.todo-item__drag-handle')) {
+            e.preventDefault();
+            return;
+          }
+          onWidgetDragStart(e, widget.id);
+        } else {
+          e.preventDefault();
+        }
+      }}
+      onDragOver={(e) => { if (isLayoutEditing) onWidgetDragOver(e, widget.id);}}
+      onDrop={(e) => { if (isLayoutEditing) onWidgetDrop(e, widget.id);}}
+      onDragLeave={(e) => { if (isLayoutEditing) onWidgetDragLeave(e);}}
+      onDragEnd={(e) => { if (isLayoutEditing) onWidgetDragEnd(e);}}
     >
       <article className="widget todo-widget group/widget">
         <div className="widget__container">
@@ -303,7 +320,7 @@ export function TodoListWidget({
                         onDragEndHandler={handleTodoItemDragEnd}
                         isDragging={draggedTodoItemId === item.id}
                         isDragOver={dragOverTodoItemId === item.id && draggedTodoItemId !== item.id}
-                        isLayoutEditing={isLayoutEditing}
+                        isLayoutEditing={canItemsBeSorted} // Pass down item sortability status
                       />
                     </li>
                   ))}
