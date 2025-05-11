@@ -4,7 +4,7 @@
 import type { LinkCollectionAppWidget, LinkItem } from '@/types';
 import { LinkGrid } from './LinkGrid';
 import { Button } from '@/components/ui/button';
-import { Edit3, MoreVertical, PlusCircle, Trash2, Bookmark, ChevronDown, ChevronUp, GripVertical } from 'lucide-react'; 
+import { Edit3, MoreVertical, PlusCircle, Trash2, Bookmark, ChevronDown, ChevronUp, GripVertical, SlidersHorizontal } from 'lucide-react'; 
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,6 +40,7 @@ interface LinkCollectionWidgetProps extends WidgetDragProps {
   widget: LinkCollectionAppWidget;
   onOpenLinkDialog: (widgetId: string, link?: LinkItem) => void;
   onOpenWidgetTitleDialog: (widgetId: string) => void;
+  onOpenLinkDisplaySettingsDialog: (widgetId: string) => void; // Added
   onDeleteWidget: (widgetId: string) => void;
   onEditLink: (widgetId: string, linkId: string) => void;
   onDeleteLink: (widgetId: string, linkId: string) => void;
@@ -52,6 +53,7 @@ export function LinkCollectionWidget({
   widget,
   onOpenLinkDialog,
   onOpenWidgetTitleDialog,
+  onOpenLinkDisplaySettingsDialog, // Added
   onDeleteWidget,
   onEditLink,
   onDeleteLink,
@@ -79,8 +81,8 @@ export function LinkCollectionWidget({
   const handleLinksReordered = (newLinks: LinkItem[]) => {
     onLinksReordered(widget.id, newLinks);
   };
-
-  return (
+  
+  return ( 
     <div 
       data-testid={`link-collection-widget-${widget.id}`}
       className={cn(
@@ -132,18 +134,21 @@ export function LinkCollectionWidget({
                     <Edit3 className="mr-2 h-4 w-4" />
                     <span>编辑合集标题</span>
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onOpenLinkDisplaySettingsDialog(widget.id); }}> {/* Added */}
+                    <SlidersHorizontal className="mr-2 h-4 w-4" />
+                    <span>显示设置</span>
+                  </DropdownMenuItem>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                        <DropdownMenuItem 
                          onSelect={(e) => e.preventDefault()} 
-                         onClick={(e) => e.stopPropagation()} 
                          className="text-destructive focus:text-destructive-foreground hover:!text-destructive-foreground hover:!bg-destructive/90 focus:!bg-destructive focus:!text-destructive-foreground"
                        >
                         <Trash2 className="mr-2 h-4 w-4" />
                         <span>删除合集</span>
                       </DropdownMenuItem>
                     </AlertDialogTrigger>
-                    <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                    <AlertDialogContent>
                       <AlertDialogHeader>
                         <AlertDialogTitle>您确定吗？</AlertDialogTitle>
                         <AlertDialogDescription>
@@ -170,6 +175,7 @@ export function LinkCollectionWidget({
               <div className="widget__body">
                 <LinkGrid
                   links={widget.data.links}
+                  displaySettings={widget.data.displaySettings} // Added
                   onEdit={handleEditLink}
                   onDelete={handleDeleteLink}
                   onLinksReordered={handleLinksReordered}

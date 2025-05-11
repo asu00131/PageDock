@@ -5,11 +5,6 @@ export interface LinkItem {
   title: string;
 }
 
-// Data specific to a Link Collection widget
-export interface LinkCollectionWidgetData {
-  links: LinkItem[];
-}
-
 // Data specific to a Note widget
 export interface NoteWidgetData {
   content: string;
@@ -30,7 +25,6 @@ export interface TodoListWidgetData {
 // Data specific to a Calendar ICS widget
 export interface CalendarIcsWidgetData {
   icsUrl: string;
-  // Events are managed internally by the widget component after fetching
 }
 
 export interface CalendarEvent {
@@ -39,7 +33,24 @@ export interface CalendarEvent {
   startDate: Date;
   endDate: Date;
   isAllDay: boolean;
-  description?: string; // Added for event details
+  description?: string;
+}
+
+// Display settings for Link Collection widget
+export type LinkCollectionDisplayMode = 'list' | 'detailedList' | 'icons' | 'cloud';
+export type LinkCollectionIconSize = 'small' | 'medium' | 'large';
+
+export interface LinkCollectionDisplaySettings {
+  displayMode: LinkCollectionDisplayMode;
+  iconSize: LinkCollectionIconSize;
+  visibleLinksCount: number; // 0 for all, -1 for none, positive number for specific count
+  titleLines: number; // 0 for hide, -1 for full, 1 for 1 line, 2 for 2 lines
+}
+
+// Data specific to a Link Collection widget
+export interface LinkCollectionWidgetData {
+  links: LinkItem[];
+  displaySettings: LinkCollectionDisplaySettings;
 }
 
 
@@ -49,7 +60,7 @@ export type WidgetType = 'linkCollection' | 'note' | 'todoList' | 'calendarIcs';
 interface BaseWidget {
   id: string;
   type: WidgetType;
-  title: string; // Title displayed in the widget header
+  title: string; 
   isCollapsed?: boolean;
 }
 

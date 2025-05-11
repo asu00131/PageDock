@@ -154,17 +154,14 @@
     @apply p-1 mr-1 text-muted-foreground transition-opacity duration-200;
   }
 
-  /* Default state for drag handle: hidden, shows on widget hover */
   .widget .widget-header__drag-handle {
     @apply opacity-0 group-hover/widget:opacity-100 cursor-grab;
   }
 
-  /* When layout editing is active, drag handle is always visible */
   .is-layout-editing .widget .widget-header__drag-handle {
     @apply opacity-100 cursor-grab;
   }
   
-  /* Visual cue for widgets when in layout editing mode */
   .is-layout-editing.page-section__widget > .widget > .widget__container {
     @apply ring-2 ring-primary/50 ring-offset-1 ring-offset-background;
   }
@@ -207,12 +204,11 @@
      @apply text-[hsl(var(--link-card-foreground))];
   }
 
-   .bookmark-widget__body_mode_cloud {
-  }
   .bookmark-widget__list {
     @apply flex flex-wrap; 
   }
   .bookmark-widget__item-wrapper {
+     /* Styles for li wrapper if needed */
   }
 
   .bookmark-item {
@@ -222,21 +218,52 @@
     @apply bg-[hsl(var(--link-card-background))] text-[hsl(var(--link-card-foreground))] flex items-center; 
     max-width: 100%;
     margin: 0.15em;
-    border: 1px solid hsl(var(--link-card-foreground) / 0.2); 
+    border: 1px solid hsl(var(--foreground) / 0.1); /* Updated border color */
     border-radius: 2px; 
     padding: 1px .5em; 
   }
   .bookmark-item_mode_cloud:hover {
      @apply shadow-md border-[hsl(var(--primary)/0.7)];
   }
+  .bookmark-item_mode_icons { /* Similar to cloud but might have different padding/margin or icon sizing logic */
+    @apply bg-[hsl(var(--link-card-background))] text-[hsl(var(--link-card-foreground))] flex flex-col items-center justify-center p-2 m-1;
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+    width: 80px; /* Example fixed size for icon mode */
+    height: 80px; /* Example fixed size for icon mode */
+  }
+   .bookmark-item_mode_icons:hover {
+     @apply shadow-lg border-primary;
+   }
+  .bookmark-item_mode_icons .bookmark-item__icon-wrapper { @apply mb-1; }
+  .bookmark-item_mode_icons .bookmark-item__title { @apply text-center text-xs; }
+  .bookmark-item_mode_icons .bookmark-item__url { @apply hidden; }
+
+
+  .bookmark-item_mode_list {
+    @apply flex items-center w-full p-2 border-b border-border/50 hover:bg-accent/10;
+  }
+  .bookmark-item_mode_list .bookmark-item__icon-wrapper { @apply mr-2; }
+
+  .bookmark-item_mode_detailed-list {
+    @apply flex items-start w-full p-2 border-b border-border/50 hover:bg-accent/10;
+  }
+  .bookmark-item_mode_detailed-list .bookmark-item__icon-wrapper { @apply mr-2 mt-1; }
+  .bookmark-item_mode_detailed-list .bookmark-item__info { @apply flex flex-col; }
+
 
   .bookmark-item__link {
     @apply flex items-center text-sm no-underline w-full; 
   }
+  .bookmark-item_mode_list .bookmark-item__link,
+  .bookmark-item_mode_detailed-list .bookmark-item__link {
+    @apply text-foreground;
+  }
+
   .bookmark-item__icon-wrapper {
     @apply mr-2 flex-shrink-0;
   }
-  .bookmark-item__icon {
+  .bookmark-item__icon { /* Default small size */
     @apply h-4 w-4 text-primary;
   }
   .bookmark-item__info {
@@ -254,7 +281,7 @@
   .bookmark-item__actions {
     @apply ml-2 flex-shrink-0 flex items-center space-x-1 opacity-0 group-hover/bookmark-item:opacity-100 transition-opacity;
   }
-  .is-layout-editing .bookmark-item__actions { /* Keep actions visible in edit mode if desired */
+  .is-layout-editing .bookmark-item__actions { 
     /* @apply opacity-100; */
   }
 
@@ -337,7 +364,7 @@
   .todo-item__drag-handle {
      @apply text-muted-foreground hover:text-foreground mr-2 opacity-0 group-hover/todo-item:opacity-100 transition-opacity;
   }
-  .is-layout-editing .todo-item__drag-handle { /* Make drag handle always visible in layout editing */
+  .is-layout-editing .todo-item__drag-handle { 
     @apply opacity-100 cursor-grab;
   }
   .todo-item__checkbox { 
@@ -355,7 +382,7 @@
   .todo-item__actions {
     @apply ml-2 flex items-center space-x-1 opacity-0 group-hover/todo-item:opacity-100 transition-opacity;
   }
-  .is-layout-editing .todo-item__actions { /* Keep actions visible in edit mode if desired */
+  .is-layout-editing .todo-item__actions { 
      /* @apply opacity-100; */
   }
   .todo-widget__adder {
@@ -411,13 +438,19 @@
   .calendar-widget__event-item {
     @apply text-xs p-1.5 mb-1 rounded bg-accent/10 flex justify-between items-center;
   }
-   .calendar-widget__event-item:not(.absolute) { /* Apply cursor pointer only if not absolutely positioned for timeline */
+   .calendar-widget__event-item:not(.absolute) { 
     @apply cursor-pointer;
   }
   .calendar-widget__event-item strong, 
   .calendar-widget__event-item span {
-    @apply text-[hsl(var(--accent))] dark:text-[hsl(var(--accent-foreground))]; 
+    @apply text-accent-foreground; 
   }
+  .dark .calendar-widget__event-item strong,
+  .dark .calendar-widget__event-item span {
+     @apply text-accent;
+  }
+
+
   .calendar-widget__no-events {
     @apply text-xs text-muted-foreground;
   }

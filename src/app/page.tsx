@@ -1,7 +1,8 @@
+
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import type { AppWidget, LinkCollectionAppWidget, NoteAppWidget, TodoListAppWidget, CalendarIcsAppWidget, LinkItem, TodoItem, WidgetType } from '@/types';
+import type { AppWidget, LinkCollectionAppWidget, NoteAppWidget, TodoListAppWidget, CalendarIcsAppWidget, LinkItem, TodoItem, WidgetType, LinkCollectionDisplaySettings, LinkCollectionWidgetData } from '@/types';
 import { isLinkCollectionWidget, isNoteWidget, isTodoListWidget, isCalendarIcsWidget } from '@/types';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Button } from '@/components/ui/button';
@@ -13,13 +14,13 @@ import { NoteEditDialog } from '@/components/NoteEditDialog';
 import { WidgetTitleDialog } from '@/components/CategoryDialog'; 
 import { CalendarIcsDialog } from '@/components/CalendarIcsDialog';
 import { CalendarIcsWidget } from '@/components/CalendarIcsWidget';
+import { LinkDisplaySettingsDialog } from '@/components/LinkDisplaySettingsDialog'; // Added
 import { AppWindow, FolderPlus, PlusSquare, Bookmark, StickyNote, ListChecks, CalendarDays, UploadCloud, DownloadCloud, LayoutDashboard, Edit, GripVertical } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from '@/lib/utils';
@@ -42,7 +43,11 @@ function isValidAppWidget(obj: any): obj is AppWidget {
     case 'linkCollection':
       return obj.data && Array.isArray(obj.data.links) && obj.data.links.every((link: any) => 
         typeof link?.id === 'string' && typeof link?.url === 'string' && typeof link?.title === 'string'
-      );
+      ) && obj.data.displaySettings && 
+        typeof obj.data.displaySettings.displayMode === 'string' &&
+        typeof obj.data.displaySettings.iconSize === 'string' &&
+        typeof obj.data.displaySettings.visibleLinksCount === 'number' &&
+        typeof obj.data.displaySettings.titleLines === 'number';
     case 'note':
       return obj.data && typeof obj.data.content === 'string';
     case 'todoList':
@@ -70,6 +75,7 @@ export default function HomePage() {
   const [isWidgetTitleDialogOpen, setIsWidgetTitleDialogOpen] = useState(false);
   const [isNoteEditDialogOpen, setIsNoteEditDialogOpen] = useState(false);
   const [isCalendarIcsDialogOpen, setIsCalendarIcsDialogOpen] = useState(false);
+  const [isLinkDisplaySettingsDialogOpen, setIsLinkDisplaySettingsDialogOpen] = useState(false); // Added
   
   const [editingLink, setEditingLink] = useState<LinkItem | undefined>(undefined);
   const [editingWidget, setEditingWidget] = useState<AppWidget | undefined>(undefined); 
@@ -85,16 +91,21 @@ export default function HomePage() {
 
 
   useEffect(() => {
-    // This effect runs only on the client.
-    let currentWidgetsSnapshot = [...widgets]; // Take a snapshot of widgets from useLocalStorage
+    let currentWidgetsSnapshot = [...widgets];
     let widgetsWereModifiedDuringSetup = false;
   
     const oldCategoriesRaw = window.localStorage.getItem('pageDockCategories');
     const oldLinksRaw = window.localStorage.getItem('pageDockLinks');
   
-    // Only attempt migration if currentWidgetsSnapshot is empty (meaning useLocalStorage found nothing or initialized with empty)
     if (currentWidgetsSnapshot.length === 0) {
       let migrated = false;
+      const defaultDisplaySettings: LinkCollectionDisplaySettings = {
+        displayMode: 'cloud',
+        iconSize: 'small',
+        visibleLinksCount: 0, 
+        titleLines: -1, 
+      };
+
       if (oldCategoriesRaw) {
         try {
           const oldCategories = JSON.parse(oldCategoriesRaw) as OldLinkCategory[];
@@ -103,7 +114,7 @@ export default function HomePage() {
               id: cat.id,
               type: 'linkCollection',
               title: cat.title,
-              data: { links: cat.links },
+              data: { links: cat.links, displaySettings: { ...defaultDisplaySettings } },
               isCollapsed: false,
             }));
             widgetsWereModifiedDuringSetup = true;
@@ -122,7 +133,7 @@ export default function HomePage() {
               id: crypto.randomUUID(),
               type: 'linkCollection',
               title: 'My Links',
-              data: { links: oldLinks },
+              data: { links: oldLinks, displaySettings: { ...defaultDisplaySettings } },
               isCollapsed: false,
             }];
             widgetsWereModifiedDuringSetup = true;
@@ -133,33 +144,58 @@ export default function HomePage() {
       }
     }
   
-    // After potential migration, if still no widgets, add a default one.
     if (currentWidgetsSnapshot.length === 0) {
       currentWidgetsSnapshot = [{
         id: crypto.randomUUID(),
         type: 'linkCollection',
         title: '我的第一个合集',
-        data: { links: [] },
+        data: { 
+          links: [],
+          displaySettings: {
+            displayMode: 'cloud',
+            iconSize: 'small',
+            visibleLinksCount: 0,
+            titleLines: -1,
+          }
+        },
         isCollapsed: false,
       }];
       widgetsWereModifiedDuringSetup = true;
     }
   
-    // Ensure all widgets have isCollapsed property.
-    const needsCollapseDefaulting = currentWidgetsSnapshot.some(w => typeof w.isCollapsed === 'undefined');
-    if (needsCollapseDefaulting) {
-      currentWidgetsSnapshot = currentWidgetsSnapshot.map(w => ({ ...w, isCollapsed: w.isCollapsed ?? false }));
+    const needsDefaults = currentWidgetsSnapshot.map(w => {
+      let modified = false;
+      if (typeof w.isCollapsed === 'undefined') {
+        w.isCollapsed = false;
+        modified = true;
+      }
+      if (isLinkCollectionWidget(w) && typeof w.data.displaySettings === 'undefined') {
+        w.data.displaySettings = {
+          displayMode: 'cloud',
+          iconSize: 'small',
+          visibleLinksCount: 0,
+          titleLines: -1,
+        };
+        modified = true;
+      }
+      return modified ? w : null;
+    }).filter(Boolean);
+
+    if (needsDefaults.length > 0) {
+      currentWidgetsSnapshot = currentWidgetsSnapshot.map(w => {
+        const defaultToApply = needsDefaults.find(def => def!.id === w.id);
+        return defaultToApply ? {...w, ...defaultToApply} : w;
+      });
       widgetsWereModifiedDuringSetup = true;
     }
   
     if (widgetsWereModifiedDuringSetup) {
-      setWidgets(currentWidgetsSnapshot); // Update state if modifications occurred
+      setWidgets(currentWidgetsSnapshot);
     }
   
-    setIsClientHydratedAndSetup(true); // Mark setup as complete
-  
+    setIsClientHydratedAndSetup(true);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Run once on mount.
+  }, []);
 
 
   const handleOpenLinkDialog = (widgetId: string, link?: LinkItem) => {
@@ -213,6 +249,19 @@ export default function HomePage() {
     setIsCalendarIcsDialogOpen(false);
     setEditingWidget(undefined);
     setCurrentCalendarIcsWidgetId(undefined);
+  };
+
+  const handleOpenLinkDisplaySettingsDialog = (widgetId: string) => {
+    const widgetToEdit = widgets.find(w => w.id === widgetId);
+    if (widgetToEdit && isLinkCollectionWidget(widgetToEdit)) {
+      setEditingWidget(widgetToEdit);
+      setIsLinkDisplaySettingsDialogOpen(true);
+    }
+  };
+
+  const handleCloseLinkDisplaySettingsDialog = () => {
+    setIsLinkDisplaySettingsDialogOpen(false);
+    setEditingWidget(undefined);
   };
 
   const handleSubmitLink = (data: Omit<LinkItem, 'id'>, linkId?: string) => {
@@ -280,7 +329,15 @@ export default function HomePage() {
           id: baseId,
           type: 'linkCollection',
           title: '新链接合集',
-          data: { links: [] },
+          data: { 
+            links: [],
+            displaySettings: {
+              displayMode: 'cloud',
+              iconSize: 'small',
+              visibleLinksCount: 0,
+              titleLines: -1,
+            }
+          },
           isCollapsed: false,
         } as LinkCollectionAppWidget;
         break;
@@ -319,7 +376,7 @@ export default function HomePage() {
         console.error("Unsupported widget type:", type);
         return;
     }
-    setWidgets(prev => [newWidget, ...prev]); // Add to the beginning
+    setWidgets(prev => [newWidget, ...prev]);
   };
 
   const handleSubmitNote = (widgetId: string, title: string, content: string) => {
@@ -352,8 +409,21 @@ export default function HomePage() {
     );
   };
 
+  const handleSubmitLinkDisplaySettings = (widgetId: string, settings: LinkCollectionDisplaySettings) => {
+    setWidgets(prevWidgets =>
+      prevWidgets.map(widget => {
+        if (isLinkCollectionWidget(widget) && widget.id === widgetId) {
+          return {
+            ...widget,
+            data: { ...widget.data, displaySettings: settings },
+          };
+        }
+        return widget;
+      })
+    );
+  };
+
   const handleToggleWidgetCollapse = (widgetId: string) => {
-    // If a drag is in progress OR layout editing is active, don't allow manual toggle via title click
     if (draggedWidgetId || isLayoutEditing) return;
 
     setWidgets(prevWidgets =>
@@ -363,7 +433,6 @@ export default function HomePage() {
     );
   };
 
-  // TodoList specific handlers
   const handleAddTodoItem = (widgetId: string, text: string) => {
     setWidgets(prev => prev.map(w => {
       if (isTodoListWidget(w) && w.id === widgetId) {
@@ -481,7 +550,6 @@ export default function HomePage() {
           console.error("Error importing JSON:", error);
           toast({ variant: "destructive", title: "导入错误", description: error instanceof Error ? error.message : "无法解析 JSON 文件。" });
         } finally {
-          // Reset file input to allow importing the same file again if needed
           if (fileInputRef.current) {
             fileInputRef.current.value = "";
           }
@@ -500,23 +568,23 @@ export default function HomePage() {
   const handleToggleLayoutEditing = () => {
     setIsLayoutEditing(prev => {
         const newIsLayoutEditing = !prev;
-        if (newIsLayoutEditing) { // Entering edit mode
+        if (newIsLayoutEditing) {
             const currentCollapseStates: Record<string, boolean> = {};
             widgets.forEach(w => {
                 currentCollapseStates[w.id] = w.isCollapsed ?? false;
             });
             setPreDragCollapseStates(currentCollapseStates);
+            // Force collapse all widgets when entering edit mode
             setWidgets(prevWidgets =>
                 prevWidgets.map(w => ({ ...w, isCollapsed: true }))
             );
-        } else { // Exiting edit mode
+        } else {
             restoreWidgetCollapseStates();
         }
         return newIsLayoutEditing;
     });
   };
 
-  // Widget Drag and Drop Handlers
   const restoreWidgetCollapseStates = () => {
     if (preDragCollapseStates) {
       setWidgets(prevWidgets =>
@@ -537,19 +605,19 @@ export default function HomePage() {
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', widgetId);
     setDraggedWidgetId(widgetId);
-    setDragOverWidgetId(null); // Reset this on new drag start
+    setDragOverWidgetId(null);
 
-    // Ensure all widgets are collapsed if not already handled by toggle
-    if (!preDragCollapseStates) { // If drag started without explicitly clicking "Edit Layout" first
+    if (!preDragCollapseStates) {
         const currentCollapseStates: Record<string, boolean> = {};
         widgets.forEach(w => {
             currentCollapseStates[w.id] = w.isCollapsed ?? false;
         });
         setPreDragCollapseStates(currentCollapseStates);
-         setWidgets(prevWidgets =>
-            prevWidgets.map(w => ({ ...w, isCollapsed: true }))
-        );
     }
+    // Ensure all widgets remain collapsed during drag
+    setWidgets(prevWidgets =>
+        prevWidgets.map(w => ({ ...w, isCollapsed: true }))
+    );
   };
 
   const handleWidgetDragOver = (e: React.DragEvent<HTMLDivElement>, widgetId: string) => {
@@ -562,10 +630,9 @@ export default function HomePage() {
 
   const handleWidgetDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
     if (!isLayoutEditing) return;
-    // Check if the mouse is leaving to an element outside of the current drag target
     const relatedTarget = e.relatedTarget as Node;
     if (relatedTarget && e.currentTarget.contains(relatedTarget)) {
-        return; // Still inside a child, don't clear dragOverWidgetId
+        return; 
     }
     setDragOverWidgetId(null);
   };
@@ -577,14 +644,13 @@ export default function HomePage() {
 
     const sourceWidgetId = e.dataTransfer.getData('text/plain') || draggedWidgetId;
     
-    setDragOverWidgetId(null); // Clear highlight
-    // draggedWidgetId is cleared in handleWidgetDragEnd
+    setDragOverWidgetId(null);
 
     if (!sourceWidgetId || sourceWidgetId === targetWidgetId) {
-      if (isLayoutEditing && preDragCollapseStates) {
+      if (isLayoutEditing && preDragCollapseStates) { // If dropped on itself
           setWidgets(prevWidgets => prevWidgets.map(w => ({ ...w, isCollapsed: true })));
       }
-      setDraggedWidgetId(null); // Also clear draggedWidgetId here
+      setDraggedWidgetId(null);
       return;
     }
 
@@ -600,21 +666,20 @@ export default function HomePage() {
       const [draggedItem] = reorderedWidgets.splice(sourceIndex, 1);
       reorderedWidgets.splice(targetIndex, 0, draggedItem);
       
-      if (isLayoutEditing && preDragCollapseStates) {
-          return reorderedWidgets.map(w => ({...w, isCollapsed: true}));
-      }
-      return reorderedWidgets;
+      // Keep widgets collapsed after drop if in layout editing mode
+      return reorderedWidgets.map(w => ({...w, isCollapsed: true}));
     });
-    setDraggedWidgetId(null); // Clear after successful drop and reorder
+    setDraggedWidgetId(null); 
   };
 
   const handleWidgetDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
-    if (isLayoutEditing && preDragCollapseStates) {
+    // If layout editing is still active, keep widgets collapsed.
+    // If it was turned off during drag (unlikely but possible), restore states.
+    if (isLayoutEditing) {
         setWidgets(prevWidgets => prevWidgets.map(w => ({ ...w, isCollapsed: true })));
-    } else if (!isLayoutEditing) { 
+    } else if (preDragCollapseStates) { // If layout editing was toggled off
         restoreWidgetCollapseStates();
     }
-
     setDraggedWidgetId(null);
     setDragOverWidgetId(null);
   };
@@ -622,7 +687,6 @@ export default function HomePage() {
   const handleWidgetContainerDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     if (!isLayoutEditing || !draggedWidgetId) return;
     e.preventDefault(); 
-    // If dragging over the container but not over a specific widget, clear dragOverWidgetId
     const targetElement = e.target as HTMLElement;
     if (!targetElement.closest('.page-section__widget')) {
         setDragOverWidgetId(null); 
@@ -635,15 +699,11 @@ export default function HomePage() {
     const sourceWidgetId = e.dataTransfer.getData('text/plain') || draggedWidgetId;
     
     const targetElement = e.target as HTMLElement;
-    // If dropped on a specific widget, its onDrop should handle it.
-    // This onDrop is for the container itself (dropping at the end).
     if (targetElement.closest('.page-section__widget')) { 
         if (dragOverWidgetId) {
-             if (isLayoutEditing && preDragCollapseStates) { 
+             if (isLayoutEditing) { 
                 setWidgets(prevWidgets => prevWidgets.map(w => ({ ...w, isCollapsed: true })));
              }
-             // Don't clear draggedWidgetId here yet, let the specific widget's drop handle it
-             // setDragOverWidgetId(null); // Already handled by widget's onDrop or dragLeave
              return;
         }
     }
@@ -662,17 +722,11 @@ export default function HomePage() {
       const [draggedItem] = reorderedWidgets.splice(sourceIndex, 1);
       reorderedWidgets.push(draggedItem); 
 
-      if (isLayoutEditing && preDragCollapseStates) {
-          return reorderedWidgets.map(w => ({...w, isCollapsed: true}));
-      }
-      return reorderedWidgets;
+      return reorderedWidgets.map(w => ({...w, isCollapsed: true}));
     });
-
-    // Clear drag states after processing the drop
     setDraggedWidgetId(null);
     setDragOverWidgetId(null);
   };
-
 
   const renderEmptyState = () => (
     <div className="flex flex-col items-center justify-center text-center p-10 border-2 border-dashed border-muted rounded-lg min-h-[200px]">
@@ -806,6 +860,7 @@ export default function HomePage() {
                   widget={widget}
                   onOpenLinkDialog={handleOpenLinkDialog}
                   onOpenWidgetTitleDialog={() => handleOpenWidgetTitleDialog(widget.id)}
+                  onOpenLinkDisplaySettingsDialog={() => handleOpenLinkDisplaySettingsDialog(widget.id)} // Added
                   onDeleteWidget={handleDeleteWidget}
                   onLinksReordered={handleLinksReordered}
                   onEditLink={(widgetId, linkId) => {
@@ -904,6 +959,16 @@ export default function HomePage() {
           onClose={handleCloseCalendarIcsDialog}
           onSubmit={handleSubmitCalendarIcs}
           defaultValues={editingWidget}
+        />
+      )}
+
+      {isLinkDisplaySettingsDialogOpen && editingWidget && isLinkCollectionWidget(editingWidget) && (
+        <LinkDisplaySettingsDialog
+          isOpen={isLinkDisplaySettingsDialogOpen}
+          onClose={handleCloseLinkDisplaySettingsDialog}
+          onSubmit={handleSubmitLinkDisplaySettings}
+          defaultValues={editingWidget.data.displaySettings}
+          widgetId={editingWidget.id}
         />
       )}
       
