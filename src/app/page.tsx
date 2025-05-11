@@ -2,12 +2,12 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import type { AppWidget, LinkCollectionAppWidget, NoteAppWidget, TodoListAppWidget, CalendarIcsAppWidget, EmbedAppWidget, LinkItem, TodoItem, WidgetType, LinkCollectionDisplaySettings, EmbedWidgetData } from '@/types';
+import type { AppWidget, LinkCollectionAppWidget, NoteAppWidget, TodoListAppWidget, CalendarIcsAppWidget, EmbedAppWidget, LinkItem, TodoItem, WidgetType, LinkCollectionDisplaySettings, EmbedWidgetData, IframeEmbedData, ImageEmbedData, CodeEmbedData } from '@/types';
 import { isLinkCollectionWidget, isNoteWidget, isTodoListWidget, isCalendarIcsWidget, isEmbedWidget } from '@/types';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Button } from '@/components/ui/button';
 import { LinkDialog } from '@/components/LinkDialog';
-import { LinkCollectionWidget } from '@/components/LinkCategoryWidget';
+import { LinkCollectionWidget } from '@/components/LinkCollectionWidget';
 import { NoteWidget } from '@/components/NoteWidget';
 import { TodoListWidget } from '@/components/TodoListWidget';
 import { NoteEditDialog } from '@/components/NoteEditDialog';
@@ -60,8 +60,18 @@ function isValidAppWidget(obj: any): obj is AppWidget {
     case 'calendarIcs':
       return obj.data && typeof obj.data.icsUrl === 'string';
     case 'embed':
-      return obj.data && typeof obj.data.embedUrl === 'string' && typeof obj.data.embedType === 'string' &&
-       (obj.data.embedType === 'iframe' ? typeof obj.data.iframeHeight === 'string' || typeof obj.data.iframeHeight === 'undefined' : true);
+      if (!obj.data || typeof obj.data.embedType !== 'string') return false;
+      const embedData = obj.data as EmbedWidgetData;
+      switch (embedData.embedType) {
+        case 'iframe':
+          return typeof embedData.embedUrl === 'string' && (typeof embedData.iframeHeight === 'string' || typeof embedData.iframeHeight === 'undefined');
+        case 'image':
+          return typeof embedData.embedUrl === 'string' && (typeof embedData.iframeHeight === 'string' || typeof embedData.iframeHeight === 'undefined');
+        case 'code':
+          return typeof embedData.codeContent === 'string' && (typeof embedData.iframeHeight === 'string' || typeof embedData.iframeHeight === 'undefined');
+        default:
+          return false;
+      }
     default:
       return false;
   }
@@ -86,7 +96,6 @@ export default function HomePage() {
   const [editingLink, setEditingLink] = useState<LinkItem | undefined>(undefined);
   const [editingWidget, setEditingWidget] = useState<AppWidget | undefined>(undefined); 
   const [currentLinkCollectionWidgetId, setCurrentLinkCollectionWidgetId] = useState<string | undefined>(undefined);
-  // const [currentCalendarIcsWidgetId, setCurrentCalendarIcsWidgetId] = useState<string | undefined>(undefined); // No longer needed here
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -138,7 +147,7 @@ export default function HomePage() {
             currentWidgetsSnapshot = [{
               id: crypto.randomUUID(),
               type: 'linkCollection',
-              title: 'My Links',
+              title: '我的链接',
               data: { links: oldLinks, displaySettings: { ...defaultDisplaySettings } },
               isCollapsed: false,
             }];
@@ -184,9 +193,18 @@ export default function HomePage() {
         };
         modified = true;
       }
-      if (isEmbedWidget(w) && typeof w.data.iframeHeight === 'undefined' && w.data.embedType === 'iframe') {
-        w.data.iframeHeight = '400px';
-        modified = true;
+      if (isEmbedWidget(w)) {
+        const embedData = w.data as EmbedWidgetData; // Temporary cast for logic
+        if (embedData.embedType === 'iframe' && typeof embedData.iframeHeight === 'undefined') {
+             (w.data as IframeEmbedData).iframeHeight = '400px';
+             modified = true;
+        } else if (embedData.embedType === 'image' && typeof embedData.iframeHeight === 'undefined') {
+            (w.data as ImageEmbedData).iframeHeight = '400px'; // Or 'auto' or another default
+            modified = true;
+        } else if (embedData.embedType === 'code' && typeof embedData.iframeHeight === 'undefined') {
+            (w.data as CodeEmbedData).iframeHeight = '300px'; // Default height for code embeds
+            modified = true;
+        }
       }
       return modified ? w : null;
     }).filter(Boolean);
@@ -398,7 +416,7 @@ export default function HomePage() {
           id: baseId,
           type: 'embed',
           title: '新嵌入内容',
-          data: { embedUrl: '', embedType: 'iframe', iframeHeight: '400px' },
+          data: { embedType: 'iframe', embedUrl: '', iframeHeight: '400px' }, // Default to iframe
           isCollapsed: false,
         } as EmbedAppWidget;
         setWidgets(prev => [...prev, newWidget]);

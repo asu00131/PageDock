@@ -54,15 +54,27 @@ export interface LinkCollectionWidgetData {
 }
 
 // Data specific to an Embed widget
-export type EmbedType = 'iframe' | 'image'; // Future: | 'aiTranslation' | 'aiSummary';
-export interface EmbedWidgetData {
+export type EmbedType = 'iframe' | 'image' | 'code';
+
+export interface IframeEmbedData {
+  embedType: 'iframe';
   embedUrl: string;
-  embedType: EmbedType;
   iframeHeight?: string; // e.g., "400px", "100%"
-  // Future fields for AI embeds:
-  // sourceTextForAI?: string;
-  // targetLanguageForTranslation?: string;
 }
+
+export interface ImageEmbedData {
+  embedType: 'image';
+  embedUrl: string;
+  iframeHeight?: string; // e.g., "400px", "auto" for images
+}
+
+export interface CodeEmbedData {
+  embedType: 'code';
+  codeContent: string;
+  iframeHeight?: string; // e.g., "400px", "auto"
+}
+
+export type EmbedWidgetData = IframeEmbedData | ImageEmbedData | CodeEmbedData;
 
 
 export type WidgetType = 'linkCollection' | 'note' | 'todoList' | 'calendarIcs' | 'embed';
@@ -98,7 +110,7 @@ export interface CalendarIcsAppWidget extends BaseWidget {
 
 export interface EmbedAppWidget extends BaseWidget {
   type: 'embed';
-  data: EmbedWidgetData;
+  data: EmbedWidgetData; // Updated to use the discriminated union
 }
 
 // Union type for all possible widgets

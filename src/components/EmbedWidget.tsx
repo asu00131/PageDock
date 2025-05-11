@@ -61,7 +61,8 @@ export function EmbedWidget({
   dragOverWidgetId,
   isLayoutEditing,
 }: EmbedWidgetProps) {
-  const { embedUrl, embedType, iframeHeight } = widget.data;
+  const { data } = widget;
+  const { iframeHeight } = data; // Common property
 
   const handleBodyClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (isLayoutEditing) {
@@ -69,10 +70,12 @@ export function EmbedWidget({
       return;
     }
     if (e.target instanceof HTMLElement && (e.target.closest('a, button, iframe, img'))) {
-      return; // Don't trigger edit if clicking interactive elements within the embed
+      return; 
     }
     e.stopPropagation(); 
-    if (!embedUrl) {
+    if ((data.embedType === 'iframe' || data.embedType === 'image') && !data.embedUrl) {
+        onOpenEditDialog(widget.id);
+    } else if (data.embedType === 'code' && !data.codeContent) {
         onOpenEditDialog(widget.id);
     }
   };
@@ -88,13 +91,82 @@ export function EmbedWidget({
       }
       e.preventDefault();
       e.stopPropagation();
-       if (!embedUrl) {
-           onOpenEditDialog(widget.id);
-       }
+      if ((data.embedType === 'iframe' || data.embedType === 'image') && !data.embedUrl) {
+        onOpenEditDialog(widget.id);
+      } else if (data.embedType === 'code' && !data.codeContent) {
+        onOpenEditDialog(widget.id);
+      }
     }
   };
 
   const isWidgetItselfDraggable = isLayoutEditing;
+
+  const renderContent = () => {
+    if (data.embedType === 'iframe') {
+      if (!data.embedUrl) return renderEmptyPrompt();
+      return (
+        <div className="embed-widget__iframe-container">
+          <iframe
+            src={data.embedUrl}
+            width="100%"
+            height={data.iframeHeight || '400px'}
+            frameBorder="0"
+            title={widget.title}
+            sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+            className="rounded-b-md"
+            loading="lazy"
+          ></iframe>
+        </div>
+      );
+    } else if (data.embedType === 'image') {
+      if (!data.embedUrl) return renderEmptyPrompt();
+      return (
+        <div className="embed-widget__image-container">
+          <Image
+            src={data.embedUrl}
+            alt={widget.title}
+            width={0} 
+            height={0}
+            sizes="100vw"
+            style={{ width: '100%', height: 'auto', maxHeight: data.iframeHeight || '400px', objectFit: 'contain' }}
+            className="rounded-b-md"
+            data-ai-hint="embedded content"
+          />
+        </div>
+      );
+    } else if (data.embedType === 'code') {
+      if (!data.codeContent) return renderEmptyPrompt();
+      // Sanitize HTML if not using srcDoc, or ensure srcDoc is well-formed HTML.
+      // For simplicity and some level of sandboxing, using srcDoc.
+      const htmlContent = data.codeContent.startsWith('<html') ? data.codeContent : `<html><head><style>body{margin:0;padding:8px;font-family:sans-serif;color:hsl(var(--foreground));background-color:hsl(var(--background));}img{max-width:100%;height:auto;}</style></head><body>${data.codeContent}</body></html>`;
+      return (
+        <div className="embed-widget__iframe-container" style={{ height: data.iframeHeight || '400px', overflow: 'auto' }}>
+          <iframe
+            srcDoc={htmlContent}
+            width="100%"
+            height="100%" // Fill the container
+            frameBorder="0"
+            title={widget.title}
+            sandbox="allow-scripts" // Adjust sandbox as needed, be cautious
+            className="rounded-b-md"
+            loading="lazy"
+          ></iframe>
+        </div>
+      );
+    }
+    return <p className="p-4 text-center text-destructive">未知的嵌入类型。</p>;
+  };
+
+  const renderEmptyPrompt = () => (
+    <div className="embed-widget__empty-prompt">
+      <Code2 className="w-10 h-10 text-muted-foreground mb-3"/>
+      <p className="text-lg font-medium text-foreground mb-2">嵌入内容为空</p>
+      <p className="text-sm text-muted-foreground mb-4">编辑以设置嵌入网址、图片链接或 HTML 代码。</p>
+      <Button onClick={(e) => { e.stopPropagation(); onOpenEditDialog(widget.id); }}>
+        <Link2 className="mr-2 h-4 w-4" /> 设置嵌入源
+      </Button>
+    </div>
+  );
 
   return (
     <div
@@ -188,48 +260,11 @@ export function EmbedWidget({
                 className="widget__body"
                 onClick={handleBodyClick}
                 onKeyDown={handleBodyKeyDown}
-                role={!embedUrl && !isLayoutEditing ? "button" : undefined}
-                tabIndex={!embedUrl && !isLayoutEditing ? 0 : undefined}
-                aria-label={embedUrl ? `${widget.title} embedded content` : `设置 ${widget.title} 的嵌入源`}
+                role={!((data.embedType === 'iframe' || data.embedType === 'image') && data.embedUrl) && !(data.embedType === 'code' && data.codeContent) && !isLayoutEditing ? "button" : undefined}
+                tabIndex={!((data.embedType === 'iframe' || data.embedType === 'image') && data.embedUrl) && !(data.embedType === 'code' && data.codeContent) && !isLayoutEditing ? 0 : undefined}
+                aria-label={ ((data.embedType === 'iframe' || data.embedType === 'image') && data.embedUrl) || (data.embedType === 'code' && data.codeContent) ? `${widget.title} embedded content` : `设置 ${widget.title} 的嵌入源`}
               >
-                {!embedUrl ? (
-                  <div className="embed-widget__empty-prompt">
-                    <Code2 className="w-10 h-10 text-muted-foreground mb-3"/>
-                    <p className="text-lg font-medium text-foreground mb-2">嵌入内容为空</p>
-                    <p className="text-sm text-muted-foreground mb-4">编辑以设置嵌入网址或图片链接。</p>
-                    <Button onClick={(e) => { e.stopPropagation(); onOpenEditDialog(widget.id); }}>
-                      <Link2 className="mr-2 h-4 w-4" /> 嵌入代码，自适应图片，网址，代码
-                    </Button>
-                  </div>
-                ) : embedType === 'iframe' ? (
-                  <div className="embed-widget__iframe-container">
-                    <iframe
-                      src={embedUrl}
-                      width="100%"
-                      height={iframeHeight || '400px'}
-                      frameBorder="0"
-                      title={widget.title}
-                      sandbox="allow-scripts allow-same-origin allow-popups allow-forms" // Common permissions
-                      className="rounded-b-md"
-                      loading="lazy"
-                    ></iframe>
-                  </div>
-                ) : embedType === 'image' ? (
-                  <div className="embed-widget__image-container">
-                    <Image
-                      src={embedUrl}
-                      alt={widget.title}
-                      width={0} 
-                      height={0}
-                      sizes="100vw"
-                      style={{ width: '100%', height: 'auto', maxHeight: iframeHeight || '400px', objectFit: 'contain' }}
-                      className="rounded-b-md"
-                      data-ai-hint="embedded content"
-                    />
-                  </div>
-                ) : (
-                     <p className="p-4 text-center text-destructive">未知的嵌入类型。</p>
-                )}
+                {renderContent()}
               </div>
             </div>
           )}
@@ -238,4 +273,3 @@ export function EmbedWidget({
     </div>
   );
 }
-

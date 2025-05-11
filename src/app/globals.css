@@ -514,7 +514,9 @@
   .embed-widget .widget__body {
     @apply p-0; /* No padding for the direct body of embed, iframe/image will fill */
   }
-  .embed-widget__iframe-container, .embed-widget__image-container {
+  .embed-widget__iframe-container, 
+  .embed-widget__image-container,
+  .embed-widget__code-container { /* Added code container */
     @apply w-full overflow-hidden rounded-b-md; /* Ensure rounded corners for content */
   }
   .embed-widget__iframe-container iframe {
@@ -563,5 +565,10 @@
 .is-item-sorting .bookmark-item_mode_cloud .bookmark-item__drag-handle,
 .is-item-sorting .bookmark-item_mode_list .bookmark-item__drag-handle,
 .is-item-sorting .bookmark-item_mode_detailed-list .bookmark-item__drag-handle {
+  @apply opacity-100 cursor-grab;
+}
+
+/* Ensure todo items also show drag handle when is-layout-editing */
+.is-layout-editing .todo-item .todo-item__drag-handle {
   @apply opacity-100 cursor-grab;
 }
