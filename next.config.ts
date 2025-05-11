@@ -29,8 +29,15 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/faviconV2/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'www.zs.gov.cn',
+        port: '',
+        pathname: '/**',
+      }
     ],
   },
 };
 
 export default nextConfig;
+
