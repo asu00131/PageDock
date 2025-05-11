@@ -119,14 +119,14 @@ export function LinkCard({
         className,
         isDragging && "opacity-50 cursor-grabbing",
         isDragOver && "ring-2 ring-primary ring-offset-1",
-        isLayoutEditing && "cursor-grab"
+        isLayoutEditing && "cursor-grab" // Apply grab cursor when layout editing
       )}
     >
       {isLayoutEditing && (
         <GripVertical 
           className={cn(
-              "h-4 w-4 text-muted-foreground mr-1 flex-shrink-0 opacity-50 group-hover/bookmark-item:opacity-100",
-              isLayoutEditing ? "cursor-grab" : "" 
+              "h-4 w-4 text-muted-foreground mr-1 flex-shrink-0 bookmark-item__drag-handle",
+              isLayoutEditing ? "opacity-50 group-hover/bookmark-item:opacity-100 cursor-grab" : "opacity-0" 
           )} 
           aria-label="拖动以重新排序" 
         />
@@ -223,3 +223,4 @@ export function LinkCard({
     </div>
   );
 }
+

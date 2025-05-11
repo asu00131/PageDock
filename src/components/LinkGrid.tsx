@@ -50,6 +50,7 @@ export function LinkGrid({ links, displaySettings, onEdit, onDelete, onLinksReor
   const handleDrop = (e: React.DragEvent<HTMLDivElement>, targetId: string) => {
     if (!isLayoutEditing || !draggedItemId) return;
     e.preventDefault();
+    e.stopPropagation(); // Prevent drop event from bubbling to parent widget container
     const sourceId = e.dataTransfer.getData('text/plain') || draggedItemId;
     
     setDragOverItemId(null);
@@ -95,8 +96,9 @@ export function LinkGrid({ links, displaySettings, onEdit, onDelete, onLinksReor
     if (!sourceId) return;
 
     const targetElement = e.target as HTMLElement;
-    if (targetElement.closest('.bookmark-item')) {
-      return;
+    // Ensure drop is not on an item itself, which is handled by item's onDrop
+    if (targetElement.closest('.bookmark-item')) { 
+      return; 
     }
     
     const sourceIndex = links.findIndex(link => link.id === sourceId);
@@ -104,7 +106,7 @@ export function LinkGrid({ links, displaySettings, onEdit, onDelete, onLinksReor
 
     const reorderedLinks = Array.from(links);
     const [draggedItem] = reorderedLinks.splice(sourceIndex, 1);
-    reorderedLinks.push(draggedItem);
+    reorderedLinks.push(draggedItem); // Move to the end of the list
     onLinksReordered(reorderedLinks);
   };
 
@@ -172,3 +174,4 @@ export function LinkGrid({ links, displaySettings, onEdit, onDelete, onLinksReor
     </ul>
   );
 }
+

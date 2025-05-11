@@ -161,7 +161,7 @@
     @apply opacity-100 cursor-grab;
   }
   
-  .is-layout-editing.page-section__widget > .widget > .widget__container {
+  .is-layout-editing .page-section__widget > .widget > .widget__container {
     @apply ring-2 ring-primary/50 ring-offset-1 ring-offset-background;
   }
 
@@ -271,7 +271,7 @@
     @apply mr-2;
   }
   .bookmark-item_mode_icons .bookmark-item__icon-wrapper {
-    @apply mb-1; /* Vertical margin, no horizontal needed due to flex-col */
+    @apply mt-1 mb-1; /* Vertical margin, no horizontal needed due to flex-col */
   }
   .bookmark-item_mode_list .bookmark-item__icon-wrapper {
     @apply mr-2;
@@ -305,7 +305,7 @@
   }
   
   /* Ensure actions are visible during layout editing for all modes */
-  .is-layout-editing .bookmark-item__actions { 
+  .is-layout-editing .bookmark-item .bookmark-item__actions { 
     @apply opacity-100;
   }
 
@@ -388,7 +388,7 @@
   .todo-item__drag-handle {
      @apply text-muted-foreground hover:text-foreground mr-2 opacity-0 group-hover/todo-item:opacity-100 transition-opacity;
   }
-  .is-layout-editing .todo-item__drag-handle { 
+  .is-layout-editing .todo-item .todo-item__drag-handle { 
     @apply opacity-100 cursor-grab;
   }
   .todo-item__checkbox { 
@@ -406,8 +406,8 @@
   .todo-item__actions {
     @apply ml-2 flex items-center space-x-1 opacity-0 group-hover/todo-item:opacity-100 transition-opacity;
   }
-  .is-layout-editing .todo-item__actions { 
-     /* @apply opacity-100; */
+  .is-layout-editing .todo-item .todo-item__actions { 
+     @apply opacity-100;
   }
   .todo-widget__adder {
     @apply flex space-x-2 mt-2;
@@ -540,3 +540,16 @@
 }
 /* Add more if needed, or use inline style for dynamic line-clamp */
 
+/* Ensure drag handle for bookmark items is visible when layout editing */
+.is-layout-editing .bookmark-item_mode_icons .bookmark-item__drag-handle {
+  @apply opacity-100 cursor-grab;
+}
+.is-layout-editing .bookmark-item_mode_cloud .bookmark-item__drag-handle {
+  @apply opacity-100 cursor-grab;
+}
+.is-layout-editing .bookmark-item_mode_list .bookmark-item__drag-handle {
+  @apply opacity-100 cursor-grab;
+}
+.is-layout-editing .bookmark-item_mode_detailed-list .bookmark-item__drag-handle {
+  @apply opacity-100 cursor-grab;
+}
