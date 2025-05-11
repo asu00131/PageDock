@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -23,6 +24,9 @@
 
     --calendar-card-background: 0 0% 100%; /* Default card white for calendar widget */
     --calendar-card-foreground: 0 0% 20%; /* Default card foreground for calendar widget */
+
+    --embed-card-background: 0 0% 100%; /* Default card white for embed widget */
+    --embed-card-foreground: 0 0% 20%; /* Default card foreground for embed widget */
 
 
     --popover: 0 0% 100%; /* White for popovers */
@@ -85,6 +89,9 @@
 
     --calendar-card-background: 0 0% 15%; 
     --calendar-card-foreground: 0 0% 85%;
+
+    --embed-card-background: 0 0% 15%;
+    --embed-card-foreground: 0 0% 85%;
 
     --popover: 0 0% 15%; 
     --popover-foreground: 0 0% 90%; 
@@ -236,25 +243,22 @@
      @apply shadow-lg border-primary;
    }
   
-  .bookmark-item_mode_icons .bookmark-item__title { @apply text-center text-xs; }
+  .bookmark-item_mode_icons .bookmark-item__title { @apply text-center text-xs mt-1; } /* Added mt-1 for spacing */
   .bookmark-item_mode_icons .bookmark-item__url { @apply hidden; }
-  .bookmark-item_mode_icons .bookmark-item__link { @apply flex-col items-center justify-center; } /* Ensure link itself is flex-col for icon mode */
-
+  .bookmark-item_mode_icons .bookmark-item__link { @apply flex-col items-center justify-center; } 
 
   .bookmark-item_mode_list {
-    @apply w-full p-2 border-b border-border/50 hover:bg-accent/10; /* flex items-center is on .bookmark-item */
+    @apply w-full p-2 border-b border-border/50 hover:bg-accent/10; 
   }
   
-
   .bookmark-item_mode_detailed-list {
-    @apply w-full p-2 border-b border-border/50 hover:bg-accent/10 items-start; /* flex is on .bookmark-item, items-start for this mode */
+    @apply w-full p-2 border-b border-border/50 hover:bg-accent/10 items-start; 
   }
   
   .bookmark-item_mode_detailed-list .bookmark-item__info { @apply flex flex-col; }
 
-
   .bookmark-item__link {
-    @apply flex items-center text-sm no-underline w-full flex-grow; /* flex-grow to take available space */
+    @apply flex items-center text-sm no-underline w-full flex-grow; 
   }
   .bookmark-item_mode_list .bookmark-item__link,
   .bookmark-item_mode_detailed-list .bookmark-item__link {
@@ -262,8 +266,7 @@
   }
 
   .bookmark-item__icon-wrapper {
-    @apply flex-shrink-0 flex items-center justify-center; /* General wrapper for icon/image */
-     /* Margins are now handled by mode-specific styles below */
+    @apply flex-shrink-0 flex items-center justify-center; 
   }
 
   /* Specific icon wrapper styles for each mode */
@@ -271,7 +274,7 @@
     @apply mr-2;
   }
   .bookmark-item_mode_icons .bookmark-item__icon-wrapper {
-    @apply mt-1 mb-1; /* Vertical margin, no horizontal needed due to flex-col */
+    @apply mt-1 mb-1; 
   }
   .bookmark-item_mode_list .bookmark-item__icon-wrapper {
     @apply mr-2;
@@ -280,35 +283,32 @@
     @apply mr-2 mt-1;
   }
 
-
-  .bookmark-item__icon { /* For Lucide Icon fallback */
-    @apply text-primary; /* Specific Lucide icon classes will set size */
+  .bookmark-item__icon { 
+    @apply text-primary; 
   }
   .bookmark-item__favicon-image {
-    /* Next/Image handles sizing via props, add other styles if needed e.g. rounded corners */
+    /* Next/Image handles sizing */
   }
 
   .bookmark-item__info {
     @apply overflow-hidden flex-grow;
   }
   .bookmark-item__title-container {
-    /* Removed flex items-center, handled by parent or specific modes */
   }
   .bookmark-item__title {
-    @apply font-medium; /* Truncation/line-clamp handled by JS based on titleLines */
+    @apply font-medium; 
   }
   .bookmark-item__url { 
     @apply text-xs text-muted-foreground truncate mt-0.5;
   }
   .bookmark-item__actions {
-    @apply ml-auto flex-shrink-0 flex items-center space-x-1 transition-opacity pl-1; /* Use ml-auto and pl-1 for spacing */
+    @apply ml-auto flex-shrink-0 flex items-center space-x-1 transition-opacity pl-1; 
   }
   
-  /* Ensure actions are visible during layout editing for all modes */
-  .is-layout-editing .bookmark-item .bookmark-item__actions { 
+  .is-layout-editing .bookmark-item .bookmark-item__actions,
+  .is-item-sorting .bookmark-item .bookmark-item__actions { 
     @apply opacity-100;
   }
-
 
   /* Specific to Note Widget */
   .note-widget .widget__container {
@@ -465,33 +465,17 @@
    .calendar-widget__event-item:not(.absolute) { 
     @apply cursor-pointer;
   }
-  /* Light mode event text */
-  .calendar-widget__event-item strong, 
-  .calendar-widget__event-item span {
-    @apply text-[hsl(var(--accent-foreground))]; /* Uses accent-foreground from theme (light text on dark accent) */
-  }
-  /* Dark mode event text */
-  .dark .calendar-widget__event-item strong,
-  .dark .calendar-widget__event-item span {
-    /* In dark mode, --accent is darker, --accent-foreground is light. We want dark text on light accent bg.
-       So, we use a color that's typically dark. --foreground is a good general choice for dark text in dark mode.
-       Or, explicitly use a darker variant of the accent color itself.
-    */
-     @apply text-[hsl(var(--accent-foreground))]; /* For dark mode, this is light text, typically on dark accent. */
-                                                 /* If the accent background becomes light in dark mode, this needs adjustment. */
-                                                 /* Assuming accent-bg is dark, so foreground text is light */
-  }
-  /* Override for light mode when accent is light teal, text should be dark */
+
   :root:not(.dark) .calendar-widget__event-item strong,
   :root:not(.dark) .calendar-widget__event-item span {
-    @apply text-primary; /* Dark teal text on light teal background */
+    @apply text-primary; 
   }
   .dark .calendar-widget__event-item {
-    @apply bg-accent/20; /* Darker accent with more transparency */
+    @apply bg-accent/20; 
   }
   .dark .calendar-widget__event-item strong,
   .dark .calendar-widget__event-item span {
-    @apply text-accent-foreground; /* Should be light text for dark accent bg */
+    @apply text-accent-foreground; 
   }
 
 
@@ -517,6 +501,32 @@
     @apply flex border-b border-border/50; 
   }
 
+  /* Specific to Embed Widget */
+  .embed-widget .widget__container {
+    @apply bg-[hsl(var(--embed-card-background))] text-[hsl(var(--embed-card-foreground))];
+  }
+  .embed-widget .widget-header__title-clickable-area .widget-header__text {
+    @apply text-[hsl(var(--embed-card-foreground))];
+  }
+  .embed-widget .widget-header__title-clickable-area .widget-header__feather-icon {
+     @apply text-[hsl(var(--embed-card-foreground))];
+  }
+  .embed-widget .widget__body {
+    @apply p-0; /* No padding for the direct body of embed, iframe/image will fill */
+  }
+  .embed-widget__iframe-container, .embed-widget__image-container {
+    @apply w-full overflow-hidden rounded-b-md; /* Ensure rounded corners for content */
+  }
+  .embed-widget__iframe-container iframe {
+    @apply block; /* remove extra space below iframe */
+  }
+   .embed-widget__image-container img {
+    @apply block w-full h-auto object-contain; /* Ensure image is responsive and contained */
+  }
+  .embed-widget__empty-prompt {
+    @apply text-center text-muted-foreground py-8 min-h-[200px] flex flex-col justify-center items-center;
+  }
+
 }
 
 /* Tailwind CSS line-clamp utilities */
@@ -538,18 +548,20 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
 }
-/* Add more if needed, or use inline style for dynamic line-clamp */
 
-/* Ensure drag handle for bookmark items is visible when layout editing */
-.is-layout-editing .bookmark-item_mode_icons .bookmark-item__drag-handle {
-  @apply opacity-100 cursor-grab;
+/* Drag handles for bookmark items */
+.bookmark-item__drag-handle {
+  @apply opacity-0 group-hover/bookmark-item:opacity-0; /* Initially hidden */
 }
-.is-layout-editing .bookmark-item_mode_cloud .bookmark-item__drag-handle {
-  @apply opacity-100 cursor-grab;
+.is-layout-editing .bookmark-item .bookmark-item__drag-handle,
+.is-item-sorting .bookmark-item .bookmark-item__drag-handle {
+  @apply opacity-100 cursor-grab; /* Visible when layout editing or item sorting */
 }
-.is-layout-editing .bookmark-item_mode_list .bookmark-item__drag-handle {
-  @apply opacity-100 cursor-grab;
-}
-.is-layout-editing .bookmark-item_mode_detailed-list .bookmark-item__drag-handle {
+
+/* Ensure these modes also show drag handle when is-item-sorting or is-layout-editing */
+.is-item-sorting .bookmark-item_mode_icons .bookmark-item__drag-handle,
+.is-item-sorting .bookmark-item_mode_cloud .bookmark-item__drag-handle,
+.is-item-sorting .bookmark-item_mode_list .bookmark-item__drag-handle,
+.is-item-sorting .bookmark-item_mode_detailed-list .bookmark-item__drag-handle {
   @apply opacity-100 cursor-grab;
 }

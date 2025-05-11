@@ -1,8 +1,9 @@
+
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import type { AppWidget, LinkCollectionAppWidget, NoteAppWidget, TodoListAppWidget, CalendarIcsAppWidget, LinkItem, TodoItem, WidgetType, LinkCollectionDisplaySettings, LinkCollectionWidgetData } from '@/types';
-import { isLinkCollectionWidget, isNoteWidget, isTodoListWidget, isCalendarIcsWidget } from '@/types';
+import type { AppWidget, LinkCollectionAppWidget, NoteAppWidget, TodoListAppWidget, CalendarIcsAppWidget, EmbedAppWidget, LinkItem, TodoItem, WidgetType, LinkCollectionDisplaySettings, EmbedWidgetData } from '@/types';
+import { isLinkCollectionWidget, isNoteWidget, isTodoListWidget, isCalendarIcsWidget, isEmbedWidget } from '@/types';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Button } from '@/components/ui/button';
 import { LinkDialog } from '@/components/LinkDialog';
@@ -14,7 +15,9 @@ import { WidgetTitleDialog } from '@/components/CategoryDialog';
 import { CalendarIcsDialog } from '@/components/CalendarIcsDialog';
 import { CalendarIcsWidget } from '@/components/CalendarIcsWidget';
 import { LinkDisplaySettingsDialog } from '@/components/LinkDisplaySettingsDialog'; 
-import { AppWindow, FolderPlus, PlusSquare, Bookmark, StickyNote, ListChecks, CalendarDays, UploadCloud, DownloadCloud, LayoutDashboard, Edit, GripVertical, Check } from 'lucide-react';
+import { EmbedWidget } from '@/components/EmbedWidget';
+import { EmbedDialog } from '@/components/EmbedDialog';
+import { AppWindow, FolderPlus, PlusSquare, Bookmark, StickyNote, ListChecks, CalendarDays, UploadCloud, DownloadCloud, LayoutDashboard, Edit, GripVertical, Check, Code2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import {
   DropdownMenu,
@@ -56,6 +59,9 @@ function isValidAppWidget(obj: any): obj is AppWidget {
         );
     case 'calendarIcs':
       return obj.data && typeof obj.data.icsUrl === 'string';
+    case 'embed':
+      return obj.data && typeof obj.data.embedUrl === 'string' && typeof obj.data.embedType === 'string' &&
+       (obj.data.embedType === 'iframe' ? typeof obj.data.iframeHeight === 'string' || typeof obj.data.iframeHeight === 'undefined' : true);
     default:
       return false;
   }
@@ -75,11 +81,12 @@ export default function HomePage() {
   const [isNoteEditDialogOpen, setIsNoteEditDialogOpen] = useState(false);
   const [isCalendarIcsDialogOpen, setIsCalendarIcsDialogOpen] = useState(false);
   const [isLinkDisplaySettingsDialogOpen, setIsLinkDisplaySettingsDialogOpen] = useState(false); 
+  const [isEmbedDialogOpen, setIsEmbedDialogOpen] = useState(false);
   
   const [editingLink, setEditingLink] = useState<LinkItem | undefined>(undefined);
   const [editingWidget, setEditingWidget] = useState<AppWidget | undefined>(undefined); 
   const [currentLinkCollectionWidgetId, setCurrentLinkCollectionWidgetId] = useState<string | undefined>(undefined);
-  const [currentCalendarIcsWidgetId, setCurrentCalendarIcsWidgetId] = useState<string | undefined>(undefined);
+  // const [currentCalendarIcsWidgetId, setCurrentCalendarIcsWidgetId] = useState<string | undefined>(undefined); // No longer needed here
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -177,6 +184,10 @@ export default function HomePage() {
         };
         modified = true;
       }
+      if (isEmbedWidget(w) && typeof w.data.iframeHeight === 'undefined' && w.data.embedType === 'iframe') {
+        w.data.iframeHeight = '400px';
+        modified = true;
+      }
       return modified ? w : null;
     }).filter(Boolean);
 
@@ -239,7 +250,6 @@ export default function HomePage() {
     const widgetToEdit = widgets.find(w => w.id === widgetId);
     if (widgetToEdit && isCalendarIcsWidget(widgetToEdit)) {
       setEditingWidget(widgetToEdit);
-      setCurrentCalendarIcsWidgetId(widgetId);
       setIsCalendarIcsDialogOpen(true);
     }
   };
@@ -247,7 +257,6 @@ export default function HomePage() {
   const handleCloseCalendarIcsDialog = () => {
     setIsCalendarIcsDialogOpen(false);
     setEditingWidget(undefined);
-    setCurrentCalendarIcsWidgetId(undefined);
   };
 
   const handleOpenLinkDisplaySettingsDialog = (widgetId: string) => {
@@ -260,6 +269,19 @@ export default function HomePage() {
 
   const handleCloseLinkDisplaySettingsDialog = () => {
     setIsLinkDisplaySettingsDialogOpen(false);
+    setEditingWidget(undefined);
+  };
+
+  const handleOpenEmbedDialog = (widgetId: string) => {
+    const widgetToEdit = widgets.find(w => w.id === widgetId);
+    if (widgetToEdit && isEmbedWidget(widgetToEdit)) {
+      setEditingWidget(widgetToEdit);
+      setIsEmbedDialogOpen(true);
+    }
+  };
+
+  const handleCloseEmbedDialog = () => {
+    setIsEmbedDialogOpen(false);
     setEditingWidget(undefined);
   };
 
@@ -371,6 +393,17 @@ export default function HomePage() {
         setWidgets(prev => [...prev, newWidget]);
         handleOpenCalendarIcsDialog(baseId);
         return;
+      case 'embed':
+        newWidget = {
+          id: baseId,
+          type: 'embed',
+          title: '新嵌入内容',
+          data: { embedUrl: '', embedType: 'iframe', iframeHeight: '400px' },
+          isCollapsed: false,
+        } as EmbedAppWidget;
+        setWidgets(prev => [...prev, newWidget]);
+        handleOpenEmbedDialog(baseId);
+        return;
       default:
         console.error("Unsupported widget type:", type);
         return;
@@ -401,6 +434,21 @@ export default function HomePage() {
             ...widget,
             title, 
             data: { ...widget.data, icsUrl },
+          };
+        }
+        return widget;
+      })
+    );
+  };
+
+  const handleSubmitEmbedDialog = (widgetId: string, title: string, data: EmbedWidgetData) => {
+     setWidgets(prevWidgets =>
+      prevWidgets.map(widget => {
+        if (isEmbedWidget(widget) && widget.id === widgetId) {
+          return {
+            ...widget,
+            title,
+            data,
           };
         }
         return widget;
@@ -568,7 +616,6 @@ export default function HomePage() {
     setIsLayoutEditing(prev => {
         const newIsLayoutEditing = !prev;
         if (newIsLayoutEditing) {
-            // Store current collapse states and force collapse all widgets
             const currentCollapseStates: Record<string, boolean> = {};
             widgets.forEach(w => {
                 currentCollapseStates[w.id] = w.isCollapsed ?? false;
@@ -578,7 +625,6 @@ export default function HomePage() {
                 prevWidgets.map(w => ({ ...w, isCollapsed: true }))
             );
         } else {
-            // Restore collapse states when exiting edit mode
             restoreWidgetCollapseStates();
         }
         return newIsLayoutEditing;
@@ -607,7 +653,6 @@ export default function HomePage() {
     setDraggedWidgetId(widgetId);
     setDragOverWidgetId(null);
 
-    // Ensure widgets are collapsed during drag, if not already handled by handleToggleLayoutEditing
     if (!preDragCollapseStates) { 
         const currentCollapseStates: Record<string, boolean> = {};
         widgets.forEach(w => {
@@ -666,7 +711,6 @@ export default function HomePage() {
       const [draggedItem] = reorderedWidgets.splice(sourceIndex, 1);
       reorderedWidgets.splice(targetIndex, 0, draggedItem);
       
-      // Keep widgets collapsed after drop if in layout editing mode
       return reorderedWidgets.map(w => ({...w, isCollapsed: true}));
     });
     setDraggedWidgetId(null); 
@@ -827,6 +871,10 @@ export default function HomePage() {
               <CalendarDays className="mr-2 h-4 w-4" />
               <span>日历 (ics)</span>
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleAddWidget('embed')}>
+              <Code2 className="mr-2 h-4 w-4" />
+              <span>嵌入</span>
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -848,7 +896,7 @@ export default function HomePage() {
                 onWidgetDragEnd: handleWidgetDragEnd,
                 draggedWidgetId: draggedWidgetId,
                 dragOverWidgetId: dragOverWidgetId,
-                isLayoutEditing: isLayoutEditing, // This is the global layout editing state
+                isLayoutEditing: isLayoutEditing, 
             };
 
             if (isLinkCollectionWidget(widget)) {
@@ -917,6 +965,19 @@ export default function HomePage() {
                   {...widgetDragProps}
                 />
               );
+            } else if (isEmbedWidget(widget)) {
+              return (
+                <EmbedWidget
+                  key={widget.id}
+                  widget={widget}
+                  onOpenEditDialog={() => handleOpenEmbedDialog(widget.id)}
+                  onOpenWidgetTitleDialog={() => handleOpenWidgetTitleDialog(widget.id)}
+                  onDeleteWidget={handleDeleteWidget}
+                  isCollapsed={widget.isCollapsed}
+                  onToggleCollapse={handleToggleWidgetCollapse}
+                  {...widgetDragProps}
+                />
+              );
             }
             return null; 
           })}
@@ -967,6 +1028,15 @@ export default function HomePage() {
           onSubmit={handleSubmitLinkDisplaySettings}
           defaultValues={editingWidget.data.displaySettings}
           widgetId={editingWidget.id}
+        />
+      )}
+      
+      {isEmbedDialogOpen && editingWidget && isEmbedWidget(editingWidget) && (
+        <EmbedDialog
+          isOpen={isEmbedDialogOpen}
+          onClose={handleCloseEmbedDialog}
+          onSubmit={handleSubmitEmbedDialog}
+          defaultValues={editingWidget}
         />
       )}
       

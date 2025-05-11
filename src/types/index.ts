@@ -53,8 +53,19 @@ export interface LinkCollectionWidgetData {
   displaySettings: LinkCollectionDisplaySettings;
 }
 
+// Data specific to an Embed widget
+export type EmbedType = 'iframe' | 'image'; // Future: | 'aiTranslation' | 'aiSummary';
+export interface EmbedWidgetData {
+  embedUrl: string;
+  embedType: EmbedType;
+  iframeHeight?: string; // e.g., "400px", "100%"
+  // Future fields for AI embeds:
+  // sourceTextForAI?: string;
+  // targetLanguageForTranslation?: string;
+}
 
-export type WidgetType = 'linkCollection' | 'note' | 'todoList' | 'calendarIcs';
+
+export type WidgetType = 'linkCollection' | 'note' | 'todoList' | 'calendarIcs' | 'embed';
 
 // Base structure for all widgets
 interface BaseWidget {
@@ -85,8 +96,13 @@ export interface CalendarIcsAppWidget extends BaseWidget {
   data: CalendarIcsWidgetData;
 }
 
+export interface EmbedAppWidget extends BaseWidget {
+  type: 'embed';
+  data: EmbedWidgetData;
+}
+
 // Union type for all possible widgets
-export type AppWidget = LinkCollectionAppWidget | NoteAppWidget | TodoListAppWidget | CalendarIcsAppWidget;
+export type AppWidget = LinkCollectionAppWidget | NoteAppWidget | TodoListAppWidget | CalendarIcsAppWidget | EmbedAppWidget;
 
 // Type guard for LinkCollectionAppWidget
 export function isLinkCollectionWidget(widget: AppWidget): widget is LinkCollectionAppWidget {
@@ -106,4 +122,9 @@ export function isTodoListWidget(widget: AppWidget): widget is TodoListAppWidget
 // Type guard for CalendarIcsAppWidget
 export function isCalendarIcsWidget(widget: AppWidget): widget is CalendarIcsAppWidget {
   return widget.type === 'calendarIcs';
+}
+
+// Type guard for EmbedAppWidget
+export function isEmbedWidget(widget: AppWidget): widget is EmbedAppWidget {
+  return widget.type === 'embed';
 }
