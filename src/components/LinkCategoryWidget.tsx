@@ -1,10 +1,9 @@
-
 "use client";
 
 import type { LinkCollectionAppWidget, LinkItem } from '@/types';
 import { LinkGrid } from './LinkGrid';
 import { Button } from '@/components/ui/button';
-import { Edit3, MoreVertical, PlusCircle, Trash2, Bookmark, ChevronDown, ChevronUp, GripVertical, SlidersHorizontal, ArrowDownAZ } from 'lucide-react'; 
+import { Edit3, MoreVertical, PlusCircle, Trash2, Bookmark, ChevronDown, ChevronUp, GripVertical, SlidersHorizontal, ListOrdered, Check } from 'lucide-react'; 
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,7 +24,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 import type React from 'react';
-import { useToast } from "@/hooks/use-toast";
+import { useState } from 'react';
 
 
 interface WidgetDragProps {
@@ -70,9 +69,9 @@ export function LinkCollectionWidget({
   onWidgetDragEnd,
   draggedWidgetId,
   dragOverWidgetId,
-  isLayoutEditing,
+  isLayoutEditing, // This is the global layout editing mode from HomePage
 }: LinkCollectionWidgetProps) {
-  const { toast } = useToast();
+  const [isItemSortingActive, setIsItemSortingActive] = useState(false);
   
   const handleEditLink = (linkId: string) => {
     onEditLink(widget.id, linkId);
@@ -86,24 +85,23 @@ export function LinkCollectionWidget({
     onLinksReordered(widget.id, newLinks);
   };
 
-  const handleSortLinksByName = () => {
-    const sortedLinks = [...widget.data.links].sort((a, b) =>
-      a.title.localeCompare(b.title, undefined, { sensitivity: 'base' })
-    );
-    onLinksReordered(widget.id, sortedLinks);
-    toast({ title: "书签已排序", description: "书签已按名称 (A-Z) 排序。" });
+  const handleToggleItemSorting = () => {
+    setIsItemSortingActive(prev => !prev);
   };
   
+  // Items are draggable if either the global layout editing is active OR item sorting for this widget is active
+  const effectiveItemEditing = isLayoutEditing || isItemSortingActive;
+
   return ( 
     <div 
       data-testid={`link-collection-widget-${widget.id}`}
       className={cn(
         "page-section__widget",
-        isLayoutEditing && "is-layout-editing",
+        isLayoutEditing && "is-layout-editing", // This class applies effects when global layout editing is on
         draggedWidgetId === widget.id && "opacity-50 cursor-grabbing",
         dragOverWidgetId === widget.id && draggedWidgetId !== widget.id && "ring-2 ring-primary ring-offset-2 rounded-lg"
       )}
-      draggable={isLayoutEditing}
+      draggable={isLayoutEditing} // Widget itself is draggable only in global layout editing mode
       onDragStart={(e) => onWidgetDragStart(e, widget.id)}
       onDragOver={(e) => onWidgetDragOver(e, widget.id)}
       onDrop={(e) => onWidgetDrop(e, widget.id)}
@@ -150,9 +148,12 @@ export function LinkCollectionWidget({
                     <SlidersHorizontal className="mr-2 h-4 w-4" />
                     <span>显示设置</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleSortLinksByName(); }}>
-                    <ArrowDownAZ className="mr-2 h-4 w-4" />
-                    <span>书签排序 (A-Z)</span>
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleToggleItemSorting(); }}>
+                    {isItemSortingActive 
+                      ? <Check className="mr-2 h-4 w-4" /> 
+                      : <ListOrdered className="mr-2 h-4 w-4" />
+                    }
+                    <span>{isItemSortingActive ? "完成排序" : "书签排序"}</span>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <AlertDialog>
@@ -196,7 +197,7 @@ export function LinkCollectionWidget({
                   onEdit={handleEditLink}
                   onDelete={handleDeleteLink}
                   onLinksReordered={handleLocalLinksReordered}
-                  isLayoutEditing={isLayoutEditing}
+                  isLayoutEditing={effectiveItemEditing} // Pass the combined editing state
                 />
               </div>
             </div>

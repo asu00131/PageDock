@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
@@ -14,8 +13,8 @@ import { NoteEditDialog } from '@/components/NoteEditDialog';
 import { WidgetTitleDialog } from '@/components/CategoryDialog'; 
 import { CalendarIcsDialog } from '@/components/CalendarIcsDialog';
 import { CalendarIcsWidget } from '@/components/CalendarIcsWidget';
-import { LinkDisplaySettingsDialog } from '@/components/LinkDisplaySettingsDialog'; // Added
-import { AppWindow, FolderPlus, PlusSquare, Bookmark, StickyNote, ListChecks, CalendarDays, UploadCloud, DownloadCloud, LayoutDashboard, Edit, GripVertical } from 'lucide-react';
+import { LinkDisplaySettingsDialog } from '@/components/LinkDisplaySettingsDialog'; 
+import { AppWindow, FolderPlus, PlusSquare, Bookmark, StickyNote, ListChecks, CalendarDays, UploadCloud, DownloadCloud, LayoutDashboard, Edit, GripVertical, Check } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import {
   DropdownMenu,
@@ -75,7 +74,7 @@ export default function HomePage() {
   const [isWidgetTitleDialogOpen, setIsWidgetTitleDialogOpen] = useState(false);
   const [isNoteEditDialogOpen, setIsNoteEditDialogOpen] = useState(false);
   const [isCalendarIcsDialogOpen, setIsCalendarIcsDialogOpen] = useState(false);
-  const [isLinkDisplaySettingsDialogOpen, setIsLinkDisplaySettingsDialogOpen] = useState(false); // Added
+  const [isLinkDisplaySettingsDialogOpen, setIsLinkDisplaySettingsDialogOpen] = useState(false); 
   
   const [editingLink, setEditingLink] = useState<LinkItem | undefined>(undefined);
   const [editingWidget, setEditingWidget] = useState<AppWidget | undefined>(undefined); 
@@ -569,16 +568,17 @@ export default function HomePage() {
     setIsLayoutEditing(prev => {
         const newIsLayoutEditing = !prev;
         if (newIsLayoutEditing) {
+            // Store current collapse states and force collapse all widgets
             const currentCollapseStates: Record<string, boolean> = {};
             widgets.forEach(w => {
                 currentCollapseStates[w.id] = w.isCollapsed ?? false;
             });
             setPreDragCollapseStates(currentCollapseStates);
-            // Force collapse all widgets when entering edit mode
             setWidgets(prevWidgets =>
                 prevWidgets.map(w => ({ ...w, isCollapsed: true }))
             );
         } else {
+            // Restore collapse states when exiting edit mode
             restoreWidgetCollapseStates();
         }
         return newIsLayoutEditing;
@@ -607,14 +607,14 @@ export default function HomePage() {
     setDraggedWidgetId(widgetId);
     setDragOverWidgetId(null);
 
-    if (!preDragCollapseStates) {
+    // Ensure widgets are collapsed during drag, if not already handled by handleToggleLayoutEditing
+    if (!preDragCollapseStates) { 
         const currentCollapseStates: Record<string, boolean> = {};
         widgets.forEach(w => {
             currentCollapseStates[w.id] = w.isCollapsed ?? false;
         });
         setPreDragCollapseStates(currentCollapseStates);
     }
-    // Ensure all widgets remain collapsed during drag
     setWidgets(prevWidgets =>
         prevWidgets.map(w => ({ ...w, isCollapsed: true }))
     );
@@ -647,7 +647,7 @@ export default function HomePage() {
     setDragOverWidgetId(null);
 
     if (!sourceWidgetId || sourceWidgetId === targetWidgetId) {
-      if (isLayoutEditing && preDragCollapseStates) { // If dropped on itself
+      if (isLayoutEditing && preDragCollapseStates) { 
           setWidgets(prevWidgets => prevWidgets.map(w => ({ ...w, isCollapsed: true })));
       }
       setDraggedWidgetId(null);
@@ -673,11 +673,9 @@ export default function HomePage() {
   };
 
   const handleWidgetDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
-    // If layout editing is still active, keep widgets collapsed.
-    // If it was turned off during drag (unlikely but possible), restore states.
     if (isLayoutEditing) {
         setWidgets(prevWidgets => prevWidgets.map(w => ({ ...w, isCollapsed: true })));
-    } else if (preDragCollapseStates) { // If layout editing was toggled off
+    } else if (preDragCollapseStates) { 
         restoreWidgetCollapseStates();
     }
     setDraggedWidgetId(null);
@@ -793,7 +791,7 @@ export default function HomePage() {
             variant={isLayoutEditing ? "default" : "outline"} 
             onClick={handleToggleLayoutEditing}
           >
-            {isLayoutEditing ? <Edit className="mr-2 h-5 w-5" /> : <LayoutDashboard className="mr-2 h-5 w-5" />}
+            {isLayoutEditing ? <Check className="mr-2 h-5 w-5" /> : <Edit className="mr-2 h-5 w-5" />}
             {isLayoutEditing ? "完成编辑" : "编辑布局"}
           </Button>
          <Button size="lg" variant="outline" onClick={handleImportJsonClick}>
@@ -850,7 +848,7 @@ export default function HomePage() {
                 onWidgetDragEnd: handleWidgetDragEnd,
                 draggedWidgetId: draggedWidgetId,
                 dragOverWidgetId: dragOverWidgetId,
-                isLayoutEditing: isLayoutEditing,
+                isLayoutEditing: isLayoutEditing, // This is the global layout editing state
             };
 
             if (isLinkCollectionWidget(widget)) {
@@ -860,7 +858,7 @@ export default function HomePage() {
                   widget={widget}
                   onOpenLinkDialog={handleOpenLinkDialog}
                   onOpenWidgetTitleDialog={() => handleOpenWidgetTitleDialog(widget.id)}
-                  onOpenLinkDisplaySettingsDialog={() => handleOpenLinkDisplaySettingsDialog(widget.id)} // Added
+                  onOpenLinkDisplaySettingsDialog={() => handleOpenLinkDisplaySettingsDialog(widget.id)}
                   onDeleteWidget={handleDeleteWidget}
                   onLinksReordered={handleLinksReordered}
                   onEditLink={(widgetId, linkId) => {
