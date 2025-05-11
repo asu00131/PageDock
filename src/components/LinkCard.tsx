@@ -1,9 +1,11 @@
 
 "use client";
 
-import type { LinkItem, LinkCollectionDisplaySettings } from '@/types';
+import type { LinkItem, LinkCollectionDisplaySettings, LinkCollectionIconSize } from '@/types';
 import { Button } from '@/components/ui/button';
-import { LinkIcon, Pencil, Trash2, GripVertical } from 'lucide-react';
+import { Link as LinkIconLucide, Pencil, Trash2, GripVertical } from 'lucide-react'; // Renamed LinkIcon to LinkIconLucide to avoid conflict
+import Image from 'next/image';
+import { useState, useEffect } from 'react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,6 +35,27 @@ interface LinkCardProps {
   isLayoutEditing?: boolean;
 }
 
+function getFaviconUrl(url: string): string | null {
+  try {
+    const urlObj = new URL(url);
+    const domain = urlObj.hostname;
+    if (!domain) return null;
+    return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+  } catch (error) {
+    // console.error("Invalid URL for favicon:", url, error);
+    return null;
+  }
+}
+
+const getPixelSize = (size: LinkCollectionIconSize): number => {
+  switch (size) {
+    case 'small': return 16;
+    case 'medium': return 20;
+    case 'large': return 24;
+    default: return 16;
+  }
+};
+
 export function LinkCard({ 
   link, 
   displaySettings,
@@ -49,12 +72,22 @@ export function LinkCard({
   isLayoutEditing,
 }: LinkCardProps) {
   const { displayMode, iconSize, titleLines } = displaySettings;
+  const [showFallbackIcon, setShowFallbackIcon] = useState(false);
+  
+  const faviconUrl = getFaviconUrl(link.url);
 
-  const iconClasses = cn("bookmark-item__icon", {
-    "h-4 w-4": iconSize === 'small', // Default
-    "h-5 w-5": iconSize === 'medium',
-    "h-6 w-6": iconSize === 'large',
-  });
+  useEffect(() => {
+    setShowFallbackIcon(false); // Reset error state when link URL changes
+  }, [link.url]);
+
+  const iconPx = displayMode === 'icons' ? 32 : getPixelSize(iconSize);
+
+  const fallbackIconDynamicClasses = displayMode === 'icons' ? "h-8 w-8" : // 32px for icons mode
+    cn({
+      "h-4 w-4": iconSize === 'small',
+      "h-5 w-5": iconSize === 'medium',
+      "h-6 w-6": iconSize === 'large',
+    });
 
   const titleContainerClasses = cn("bookmark-item__title-container", {
     "hidden": titleLines === 0,
@@ -63,7 +96,7 @@ export function LinkCard({
   const titleClasses = cn("bookmark-item__title", {
     "truncate": titleLines === 1,
     "line-clamp-2": titleLines === 2,
-    // No specific class for -1 (full title) or other positive numbers, relies on default behavior or parent width
+    // For titleLines > 2 or -1 (full title), WebkitLineClamp is used directly
   });
 
 
@@ -82,7 +115,6 @@ export function LinkCard({
           "bookmark-item_mode_icons": displayMode === 'icons',
           "bookmark-item_mode_list": displayMode === 'list',
           "bookmark-item_mode_detailed-list": displayMode === 'detailedList',
-          "py-px px-[0.5em]": displayMode === 'cloud' || displayMode === 'icons', 
         },
         className,
         isDragging && "opacity-50 cursor-grabbing",
@@ -90,13 +122,15 @@ export function LinkCard({
         isLayoutEditing && "cursor-grab"
       )}
     >
-      <GripVertical 
-        className={cn(
-            "h-4 w-4 text-muted-foreground mr-2 flex-shrink-0",
-            isLayoutEditing ? "cursor-grab opacity-100" : "opacity-0 group-hover/bookmark-item:opacity-100" 
-        )} 
-        aria-label="拖动以重新排序" 
-      />
+      {isLayoutEditing && (
+        <GripVertical 
+          className={cn(
+              "h-4 w-4 text-muted-foreground mr-1 flex-shrink-0 opacity-50 group-hover/bookmark-item:opacity-100",
+              isLayoutEditing ? "cursor-grab" : "" 
+          )} 
+          aria-label="拖动以重新排序" 
+        />
+      )}
       <a
         href={link.url}
         target="_blank"
@@ -104,21 +138,38 @@ export function LinkCard({
         className="bookmark-item__link"
         title={`${link.title}\n${link.url}`}
         onClick={(e) => {
+          if (isLayoutEditing) e.preventDefault(); // Prevent navigation in layout editing mode
           if (e.ctrlKey || e.metaKey || e.button === 1) return;
         }}
-        draggable="false" 
+        draggable={false} 
       >
         {(displayMode === 'cloud' || displayMode === 'icons' || displayMode === 'detailedList' || displayMode === 'list') && (
           <div className="bookmark-item__icon-wrapper">
-            <LinkIcon className={iconClasses} />
+            {faviconUrl && !showFallbackIcon ? (
+              <Image
+                src={faviconUrl}
+                alt="" // Decorative, title is on the link
+                width={iconPx}
+                height={iconPx}
+                className="bookmark-item__favicon-image object-contain"
+                onError={() => setShowFallbackIcon(true)}
+              />
+            ) : (
+              <LinkIconLucide className={cn("bookmark-item__icon", fallbackIconDynamicClasses)} />
+            )}
           </div>
         )}
         <div className="bookmark-item__info">
-          <span className={titleContainerClasses}>
-            <span className={titleClasses} style={titleLines > 2 ? { WebkitLineClamp: titleLines, display: '-webkit-box', WebkitBoxOrient: 'vertical', overflow: 'hidden'} : {}}>
-              {link.title}
+          {titleLines !== 0 && (
+            <span className={titleContainerClasses}>
+              <span 
+                className={titleClasses} 
+                style={(titleLines > 2 || titleLines === -1) && displayMode !== 'cloud' ? { WebkitLineClamp: titleLines === -1 ? 'none' : titleLines, display: '-webkit-box', WebkitBoxOrient: 'vertical', overflow: 'hidden'} : {}}
+              >
+                {link.title}
+              </span>
             </span>
-          </span>
+          )}
           {(displayMode === 'detailedList') && (
              <span className="bookmark-item__url">{link.url}</span>
           )}
@@ -126,7 +177,7 @@ export function LinkCard({
       </a>
       <div className={cn(
           "bookmark-item__actions",
-          !isLayoutEditing && "opacity-0 group-hover/bookmark-item:opacity-100"
+           isLayoutEditing ? "opacity-100" : "opacity-0 group-hover/bookmark-item:opacity-100"
         )}
       >
         <Button

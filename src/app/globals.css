@@ -212,48 +212,50 @@
   }
 
   .bookmark-item {
-    @apply relative transition-all duration-200 ease-in-out;
+    @apply relative transition-all duration-200 ease-in-out flex items-center; /* Ensure flex for all items */
   }
   .bookmark-item_mode_cloud {
-    @apply bg-[hsl(var(--link-card-background))] text-[hsl(var(--link-card-foreground))] flex items-center; 
+    @apply bg-[hsl(var(--link-card-background))] text-[hsl(var(--link-card-foreground))]; 
     max-width: 100%;
     margin: 0.15em;
-    border: 1px solid hsl(var(--foreground) / 0.1); /* Updated border color */
+    border: 1px solid hsl(var(--foreground) / 0.1);
     border-radius: 2px; 
     padding: 1px .5em; 
   }
   .bookmark-item_mode_cloud:hover {
      @apply shadow-md border-[hsl(var(--primary)/0.7)];
   }
-  .bookmark-item_mode_icons { /* Similar to cloud but might have different padding/margin or icon sizing logic */
-    @apply bg-[hsl(var(--link-card-background))] text-[hsl(var(--link-card-foreground))] flex flex-col items-center justify-center p-2 m-1;
+
+  .bookmark-item_mode_icons {
+    @apply bg-[hsl(var(--link-card-background))] text-[hsl(var(--link-card-foreground))] flex-col items-center justify-center p-2 m-1;
     border: 1px solid hsl(var(--border));
     border-radius: var(--radius);
-    width: 80px; /* Example fixed size for icon mode */
-    height: 80px; /* Example fixed size for icon mode */
+    width: 80px; 
+    height: 80px;
   }
    .bookmark-item_mode_icons:hover {
      @apply shadow-lg border-primary;
    }
-  .bookmark-item_mode_icons .bookmark-item__icon-wrapper { @apply mb-1; }
+  .bookmark-item_mode_icons .bookmark-item__icon-wrapper { @apply mb-1; } /* Removed mr-2 as it's flex-col */
   .bookmark-item_mode_icons .bookmark-item__title { @apply text-center text-xs; }
   .bookmark-item_mode_icons .bookmark-item__url { @apply hidden; }
+  .bookmark-item_mode_icons .bookmark-item__link { @apply flex-col items-center justify-center; } /* Ensure link itself is flex-col for icon mode */
 
 
   .bookmark-item_mode_list {
-    @apply flex items-center w-full p-2 border-b border-border/50 hover:bg-accent/10;
+    @apply w-full p-2 border-b border-border/50 hover:bg-accent/10; /* flex items-center is on .bookmark-item */
   }
   .bookmark-item_mode_list .bookmark-item__icon-wrapper { @apply mr-2; }
 
   .bookmark-item_mode_detailed-list {
-    @apply flex items-start w-full p-2 border-b border-border/50 hover:bg-accent/10;
+    @apply w-full p-2 border-b border-border/50 hover:bg-accent/10 items-start; /* flex is on .bookmark-item, items-start for this mode */
   }
   .bookmark-item_mode_detailed-list .bookmark-item__icon-wrapper { @apply mr-2 mt-1; }
   .bookmark-item_mode_detailed-list .bookmark-item__info { @apply flex flex-col; }
 
 
   .bookmark-item__link {
-    @apply flex items-center text-sm no-underline w-full; 
+    @apply flex items-center text-sm no-underline w-full flex-grow; /* flex-grow to take available space */
   }
   .bookmark-item_mode_list .bookmark-item__link,
   .bookmark-item_mode_detailed-list .bookmark-item__link {
@@ -261,28 +263,38 @@
   }
 
   .bookmark-item__icon-wrapper {
-    @apply mr-2 flex-shrink-0;
+    @apply flex-shrink-0 flex items-center justify-center; /* General wrapper for icon/image */
+    /* Default margin-right for non-icon modes */
+    &:not(:closest(.bookmark-item_mode_icons) > *) {
+        @apply mr-2;
+    }
   }
-  .bookmark-item__icon { /* Default small size */
-    @apply h-4 w-4 text-primary;
+  .bookmark-item__icon { /* For Lucide Icon fallback */
+    @apply text-primary; /* Specific Lucide icon classes will set size */
   }
+  .bookmark-item__favicon-image {
+    /* Next/Image handles sizing via props, add other styles if needed e.g. rounded corners */
+  }
+
   .bookmark-item__info {
     @apply overflow-hidden flex-grow;
   }
   .bookmark-item__title-container {
-    @apply flex items-center;
+    /* Removed flex items-center, handled by parent or specific modes */
   }
   .bookmark-item__title {
-    @apply font-medium truncate;
+    @apply font-medium; /* Truncation/line-clamp handled by JS based on titleLines */
   }
   .bookmark-item__url { 
     @apply text-xs text-muted-foreground truncate mt-0.5;
   }
   .bookmark-item__actions {
-    @apply ml-2 flex-shrink-0 flex items-center space-x-1 opacity-0 group-hover/bookmark-item:opacity-100 transition-opacity;
+    @apply ml-auto flex-shrink-0 flex items-center space-x-1 transition-opacity pl-1; /* Use ml-auto and pl-1 for spacing */
   }
+  
+  /* Ensure actions are visible during layout editing for all modes */
   .is-layout-editing .bookmark-item__actions { 
-    /* @apply opacity-100; */
+    @apply opacity-100;
   }
 
 
@@ -441,13 +453,33 @@
    .calendar-widget__event-item:not(.absolute) { 
     @apply cursor-pointer;
   }
+  /* Light mode event text */
   .calendar-widget__event-item strong, 
   .calendar-widget__event-item span {
-    @apply text-accent-foreground; 
+    @apply text-[hsl(var(--accent-foreground))]; /* Uses accent-foreground from theme (light text on dark accent) */
+  }
+  /* Dark mode event text */
+  .dark .calendar-widget__event-item strong,
+  .dark .calendar-widget__event-item span {
+    /* In dark mode, --accent is darker, --accent-foreground is light. We want dark text on light accent bg.
+       So, we use a color that's typically dark. --foreground is a good general choice for dark text in dark mode.
+       Or, explicitly use a darker variant of the accent color itself.
+    */
+     @apply text-[hsl(var(--accent-foreground))]; /* For dark mode, this is light text, typically on dark accent. */
+                                                 /* If the accent background becomes light in dark mode, this needs adjustment. */
+                                                 /* Assuming accent-bg is dark, so foreground text is light */
+  }
+  /* Override for light mode when accent is light teal, text should be dark */
+  :root:not(.dark) .calendar-widget__event-item strong,
+  :root:not(.dark) .calendar-widget__event-item span {
+    @apply text-primary; /* Dark teal text on light teal background */
+  }
+  .dark .calendar-widget__event-item {
+    @apply bg-accent/20; /* Darker accent with more transparency */
   }
   .dark .calendar-widget__event-item strong,
   .dark .calendar-widget__event-item span {
-     @apply text-accent;
+    @apply text-accent-foreground; /* Should be light text for dark accent bg */
   }
 
 
@@ -474,3 +506,24 @@
   }
 
 }
+
+/* Tailwind CSS line-clamp utilities */
+.line-clamp-1 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+}
+.line-clamp-2 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.line-clamp-3 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+/* Add more if needed, or use inline style for dynamic line-clamp */
