@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
@@ -14,14 +13,14 @@ import { NoteEditDialog } from '@/components/NoteEditDialog';
 import { WidgetTitleDialog } from '@/components/CategoryDialog'; 
 import { CalendarIcsDialog } from '@/components/CalendarIcsDialog';
 import { CalendarIcsWidget } from '@/components/CalendarIcsWidget';
-import { AppWindow, FolderPlus, PlusSquare, Bookmark, StickyNote, ListChecks, CalendarDays, UploadCloud, DownloadCloud, LayoutDashboard, Edit } from 'lucide-react';
+import { AppWindow, FolderPlus, PlusSquare, Bookmark, StickyNote, ListChecks, CalendarDays, UploadCloud, DownloadCloud, LayoutDashboard, Edit, GripVertical } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger,
   DropdownMenuSeparator,
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from '@/lib/utils';
 
@@ -499,7 +498,22 @@ export default function HomePage() {
   };
 
   const handleToggleLayoutEditing = () => {
-    setIsLayoutEditing(prev => !prev);
+    setIsLayoutEditing(prev => {
+        const newIsLayoutEditing = !prev;
+        if (newIsLayoutEditing) { // Entering edit mode
+            const currentCollapseStates: Record<string, boolean> = {};
+            widgets.forEach(w => {
+                currentCollapseStates[w.id] = w.isCollapsed ?? false;
+            });
+            setPreDragCollapseStates(currentCollapseStates);
+            setWidgets(prevWidgets =>
+                prevWidgets.map(w => ({ ...w, isCollapsed: true }))
+            );
+        } else { // Exiting edit mode
+            restoreWidgetCollapseStates();
+        }
+        return newIsLayoutEditing;
+    });
   };
 
   // Widget Drag and Drop Handlers
@@ -523,18 +537,19 @@ export default function HomePage() {
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', widgetId);
     setDraggedWidgetId(widgetId);
-    setDragOverWidgetId(null);
+    setDragOverWidgetId(null); // Reset this on new drag start
 
-    const currentCollapseStates: Record<string, boolean> = {};
-    widgets.forEach(w => {
-      currentCollapseStates[w.id] = w.isCollapsed ?? false;
-    });
-    setPreDragCollapseStates(currentCollapseStates);
-
-    // Collapse all widgets to make drag targets smaller and reordering easier
-    setWidgets(prevWidgets =>
-      prevWidgets.map(w => ({ ...w, isCollapsed: true }))
-    );
+    // Ensure all widgets are collapsed if not already handled by toggle
+    if (!preDragCollapseStates) { // If drag started without explicitly clicking "Edit Layout" first
+        const currentCollapseStates: Record<string, boolean> = {};
+        widgets.forEach(w => {
+            currentCollapseStates[w.id] = w.isCollapsed ?? false;
+        });
+        setPreDragCollapseStates(currentCollapseStates);
+         setWidgets(prevWidgets =>
+            prevWidgets.map(w => ({ ...w, isCollapsed: true }))
+        );
+    }
   };
 
   const handleWidgetDragOver = (e: React.DragEvent<HTMLDivElement>, widgetId: string) => {
@@ -547,9 +562,10 @@ export default function HomePage() {
 
   const handleWidgetDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
     if (!isLayoutEditing) return;
-    const relatedTarget = e.relatedTarget as HTMLElement;
+    // Check if the mouse is leaving to an element outside of the current drag target
+    const relatedTarget = e.relatedTarget as Node;
     if (relatedTarget && e.currentTarget.contains(relatedTarget)) {
-      return;
+        return; // Still inside a child, don't clear dragOverWidgetId
     }
     setDragOverWidgetId(null);
   };
@@ -557,14 +573,18 @@ export default function HomePage() {
   const handleWidgetDrop = (e: React.DragEvent<HTMLDivElement>, targetWidgetId: string) => {
     if (!isLayoutEditing || !draggedWidgetId) return;
     e.preventDefault();
+    e.stopPropagation(); 
+
     const sourceWidgetId = e.dataTransfer.getData('text/plain') || draggedWidgetId;
-
-    restoreWidgetCollapseStates(); // Restore collapse states before reordering
-
-    setDragOverWidgetId(null);
-    setDraggedWidgetId(null);
+    
+    setDragOverWidgetId(null); // Clear highlight
+    // draggedWidgetId is cleared in handleWidgetDragEnd
 
     if (!sourceWidgetId || sourceWidgetId === targetWidgetId) {
+      if (isLayoutEditing && preDragCollapseStates) {
+          setWidgets(prevWidgets => prevWidgets.map(w => ({ ...w, isCollapsed: true })));
+      }
+      setDraggedWidgetId(null); // Also clear draggedWidgetId here
       return;
     }
 
@@ -579,15 +599,22 @@ export default function HomePage() {
       const reorderedWidgets = Array.from(currentWidgets);
       const [draggedItem] = reorderedWidgets.splice(sourceIndex, 1);
       reorderedWidgets.splice(targetIndex, 0, draggedItem);
+      
+      if (isLayoutEditing && preDragCollapseStates) {
+          return reorderedWidgets.map(w => ({...w, isCollapsed: true}));
+      }
       return reorderedWidgets;
     });
+    setDraggedWidgetId(null); // Clear after successful drop and reorder
   };
 
   const handleWidgetDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
-    if (!isLayoutEditing) return;
-    if (draggedWidgetId) { 
+    if (isLayoutEditing && preDragCollapseStates) {
+        setWidgets(prevWidgets => prevWidgets.map(w => ({ ...w, isCollapsed: true })));
+    } else if (!isLayoutEditing) { 
         restoreWidgetCollapseStates();
     }
+
     setDraggedWidgetId(null);
     setDragOverWidgetId(null);
   };
@@ -595,28 +622,38 @@ export default function HomePage() {
   const handleWidgetContainerDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     if (!isLayoutEditing || !draggedWidgetId) return;
     e.preventDefault(); 
+    // If dragging over the container but not over a specific widget, clear dragOverWidgetId
+    const targetElement = e.target as HTMLElement;
+    if (!targetElement.closest('.page-section__widget')) {
+        setDragOverWidgetId(null); 
+    }
   };
   
   const handleWidgetContainerDrop = (e: React.DragEvent<HTMLDivElement>) => {
     if (!isLayoutEditing || !draggedWidgetId) return;
     e.preventDefault();
     const sourceWidgetId = e.dataTransfer.getData('text/plain') || draggedWidgetId;
-  
-    restoreWidgetCollapseStates();
-
-    // Check if the drop is happening on a widget itself (which should be handled by widget's onDrop)
-    // If closest returns null, it means it's dropped on the container padding.
+    
     const targetElement = e.target as HTMLElement;
+    // If dropped on a specific widget, its onDrop should handle it.
+    // This onDrop is for the container itself (dropping at the end).
     if (targetElement.closest('.page-section__widget')) { 
-        if (dragOverWidgetId) return; // If dragOverWidgetId is set, it means we're over a specific widget target
+        if (dragOverWidgetId) {
+             if (isLayoutEditing && preDragCollapseStates) { 
+                setWidgets(prevWidgets => prevWidgets.map(w => ({ ...w, isCollapsed: true })));
+             }
+             // Don't clear draggedWidgetId here yet, let the specific widget's drop handle it
+             // setDragOverWidgetId(null); // Already handled by widget's onDrop or dragLeave
+             return;
+        }
     }
-
-    setDraggedWidgetId(null);
-    setDragOverWidgetId(null);
   
-    if (!sourceWidgetId) return;
+    if (!sourceWidgetId) {
+      setDraggedWidgetId(null);
+      setDragOverWidgetId(null);
+      return;
+    }
   
-    // Move the dragged widget to the end of the list
     setWidgets(currentWidgets => {
       const sourceIndex = currentWidgets.findIndex(w => w.id === sourceWidgetId);
       if (sourceIndex === -1) return currentWidgets;
@@ -624,8 +661,16 @@ export default function HomePage() {
       const reorderedWidgets = Array.from(currentWidgets);
       const [draggedItem] = reorderedWidgets.splice(sourceIndex, 1);
       reorderedWidgets.push(draggedItem); 
+
+      if (isLayoutEditing && preDragCollapseStates) {
+          return reorderedWidgets.map(w => ({...w, isCollapsed: true}));
+      }
       return reorderedWidgets;
     });
+
+    // Clear drag states after processing the drop
+    setDraggedWidgetId(null);
+    setDragOverWidgetId(null);
   };
 
 
@@ -679,7 +724,7 @@ export default function HomePage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 min-h-screen">
+    <div className={cn("container mx-auto px-4 py-8 min-h-screen", isLayoutEditing ? "is-layout-editing" : "")}>
       <header className="mb-8">
         <div className="flex items-center gap-3 mb-2">
           <AppWindow className="h-10 w-10 text-primary" />
@@ -738,7 +783,7 @@ export default function HomePage() {
         renderEmptyState()
       ) : (
         <div 
-          className="space-y-8"
+          className="space-y-8" 
           onDragOver={isLayoutEditing ? handleWidgetContainerDragOver : undefined}
           onDrop={isLayoutEditing ? handleWidgetContainerDrop : undefined}
         >
