@@ -187,6 +187,7 @@ export function EmbedWidget({
               <div 
                 className="widget__body"
                 onClick={handleBodyClick}
+                onKeyDown={handleBodyKeyDown}
                 role={!embedUrl && !isLayoutEditing ? "button" : undefined}
                 tabIndex={!embedUrl && !isLayoutEditing ? 0 : undefined}
                 aria-label={embedUrl ? `${widget.title} embedded content` : `设置 ${widget.title} 的嵌入源`}
@@ -197,7 +198,7 @@ export function EmbedWidget({
                     <p className="text-lg font-medium text-foreground mb-2">嵌入内容为空</p>
                     <p className="text-sm text-muted-foreground mb-4">编辑以设置嵌入网址或图片链接。</p>
                     <Button onClick={(e) => { e.stopPropagation(); onOpenEditDialog(widget.id); }}>
-                      <Link2 className="mr-2 h-4 w-4" /> 设置嵌入源
+                      <Link2 className="mr-2 h-4 w-4" /> 嵌入代码，自适应图片，网址，代码
                     </Button>
                   </div>
                 ) : embedType === 'iframe' ? (
@@ -237,3 +238,4 @@ export function EmbedWidget({
     </div>
   );
 }
+
