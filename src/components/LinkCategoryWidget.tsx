@@ -4,11 +4,12 @@
 import type { LinkCollectionAppWidget, LinkItem } from '@/types';
 import { LinkGrid } from './LinkGrid';
 import { Button } from '@/components/ui/button';
-import { Edit3, MoreVertical, PlusCircle, Trash2, Bookmark, ChevronDown, ChevronUp, GripVertical, SlidersHorizontal } from 'lucide-react'; 
+import { Edit3, MoreVertical, PlusCircle, Trash2, Bookmark, ChevronDown, ChevronUp, GripVertical, SlidersHorizontal, ArrowDownAZ } from 'lucide-react'; 
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -24,6 +25,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 import type React from 'react';
+import { useToast } from "@/hooks/use-toast";
+
 
 interface WidgetDragProps {
   onWidgetDragStart: (e: React.DragEvent<HTMLDivElement>, widgetId: string) => void;
@@ -40,7 +43,7 @@ interface LinkCollectionWidgetProps extends WidgetDragProps {
   widget: LinkCollectionAppWidget;
   onOpenLinkDialog: (widgetId: string, link?: LinkItem) => void;
   onOpenWidgetTitleDialog: (widgetId: string) => void;
-  onOpenLinkDisplaySettingsDialog: (widgetId: string) => void; // Added
+  onOpenLinkDisplaySettingsDialog: (widgetId: string) => void; 
   onDeleteWidget: (widgetId: string) => void;
   onEditLink: (widgetId: string, linkId: string) => void;
   onDeleteLink: (widgetId: string, linkId: string) => void;
@@ -53,7 +56,7 @@ export function LinkCollectionWidget({
   widget,
   onOpenLinkDialog,
   onOpenWidgetTitleDialog,
-  onOpenLinkDisplaySettingsDialog, // Added
+  onOpenLinkDisplaySettingsDialog, 
   onDeleteWidget,
   onEditLink,
   onDeleteLink,
@@ -69,6 +72,7 @@ export function LinkCollectionWidget({
   dragOverWidgetId,
   isLayoutEditing,
 }: LinkCollectionWidgetProps) {
+  const { toast } = useToast();
   
   const handleEditLink = (linkId: string) => {
     onEditLink(widget.id, linkId);
@@ -78,8 +82,16 @@ export function LinkCollectionWidget({
     onDeleteLink(widget.id, linkId);
   };
 
-  const handleLinksReordered = (newLinks: LinkItem[]) => {
+  const handleLocalLinksReordered = (newLinks: LinkItem[]) => {
     onLinksReordered(widget.id, newLinks);
+  };
+
+  const handleSortLinksByName = () => {
+    const sortedLinks = [...widget.data.links].sort((a, b) =>
+      a.title.localeCompare(b.title, undefined, { sensitivity: 'base' })
+    );
+    onLinksReordered(widget.id, sortedLinks);
+    toast({ title: "书签已排序", description: "书签已按名称 (A-Z) 排序。" });
   };
   
   return ( 
@@ -134,10 +146,15 @@ export function LinkCollectionWidget({
                     <Edit3 className="mr-2 h-4 w-4" />
                     <span>编辑合集标题</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onOpenLinkDisplaySettingsDialog(widget.id); }}> {/* Added */}
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onOpenLinkDisplaySettingsDialog(widget.id); }}> 
                     <SlidersHorizontal className="mr-2 h-4 w-4" />
                     <span>显示设置</span>
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleSortLinksByName(); }}>
+                    <ArrowDownAZ className="mr-2 h-4 w-4" />
+                    <span>书签排序 (A-Z)</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                        <DropdownMenuItem 
@@ -175,10 +192,10 @@ export function LinkCollectionWidget({
               <div className="widget__body">
                 <LinkGrid
                   links={widget.data.links}
-                  displaySettings={widget.data.displaySettings} // Added
+                  displaySettings={widget.data.displaySettings} 
                   onEdit={handleEditLink}
                   onDelete={handleDeleteLink}
-                  onLinksReordered={handleLinksReordered}
+                  onLinksReordered={handleLocalLinksReordered}
                   isLayoutEditing={isLayoutEditing}
                 />
               </div>
