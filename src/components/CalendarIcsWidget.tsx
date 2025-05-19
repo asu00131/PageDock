@@ -57,8 +57,6 @@ const parseIcalTime = (icalTime: ICAL.Time, event: ICAL.Event): Date => {
   try {
     let jsDate = icalTime.toJSDate();
     if (icalTime.isDate) {
-      // For all-day events, ical.js might parse them as UTC midnight.
-      // We want to treat them as local date at midnight.
       jsDate = new Date(jsDate.getUTCFullYear(), jsDate.getUTCMonth(), jsDate.getUTCDate());
       return startOfDay(jsDate); 
     }
@@ -66,14 +64,14 @@ const parseIcalTime = (icalTime: ICAL.Time, event: ICAL.Event): Date => {
   } catch (e) {
     console.warn("Failed to parse date directly, attempting fallback for event:", event.summary, icalTime.toString(), e);
     const dateStringOnly = icalTime.toString().split('T')[0];
-    if (dateStringOnly.length === 8) { // YYYYMMDD
+    if (dateStringOnly.length === 8) { 
         const year = parseInt(dateStringOnly.substring(0, 4), 10);
         const month = parseInt(dateStringOnly.substring(4, 6), 10) - 1; 
         const day = parseInt(dateStringOnly.substring(6, 8), 10);
         if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
           return startOfDay(new Date(year, month, day));
         }
-    } else if (dateStringOnly.includes('-')) { // YYYY-MM-DD
+    } else if (dateStringOnly.includes('-')) { 
         const parsed = parseISO(dateStringOnly);
         if (isValid(parsed)) return startOfDay(parsed);
     }
@@ -133,7 +131,6 @@ export function CalendarIcsWidget({
     }
 
     if (!widget.data.icsUrl) {
-      // If it's localized but no URL, keep existing localized events unless forced to clear
       if (widget.data.isLocalized && widget.data.localizedEvents && !forceFetchAndStore) {
          setEvents(widget.data.localizedEvents.map(e => ({...e, startDate: new Date(e.startDate), endDate: new Date(e.endDate) })));
       } else {
@@ -181,15 +178,15 @@ export function CalendarIcsWidget({
           }).sort((a,b) => compareAsc(a.startDate, b.startDate));
 
           setEvents(parsedEvents);
-          if (widget.data.isLocalized || forceFetchAndStore) { // If we force a fetch for a localized calendar, we should update it.
+          if (widget.data.isLocalized || forceFetchAndStore) { 
             onUpdateLocalizedEvents(widget.id, parsedEvents);
           }
 
         } catch (parseErr) {
           console.error("Error parsing ICS data:", parseErr);
           setError("解析日历数据失败。请确保 ICS 格式正确。");
-          if (!widget.data.isLocalized) setEvents([]); // Only clear non-localized if parse fails
-           else if (forceFetchAndStore) onUpdateLocalizedEvents(widget.id, []); // If forced fetch for localized fails, clear stored
+          if (!widget.data.isLocalized) setEvents([]);
+           else if (forceFetchAndStore) onUpdateLocalizedEvents(widget.id, []);
         }
       })
       .catch(err => {
@@ -207,7 +204,7 @@ export function CalendarIcsWidget({
     if (isClientMounted && !isCollapsed) {
       fetchAndParseIcs(forceFetchRef.current);
     }
-    forceFetchRef.current = false; // Reset after the effect runs
+    forceFetchRef.current = false; 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [widget.data.icsUrl, widget.data.isLocalized, widget.data.localizedEvents, isCollapsed, isClientMounted, fetchAndParseIcs]);
 
@@ -313,6 +310,14 @@ export function CalendarIcsWidget({
         }
         return newEventsArray;
     });
+    
+    const newEventDate = startOfDay(updatedEventData.startDate);
+    setSelectedDate(newEventDate);
+    setDisplayDate(newEventDate);
+    if (currentView === 'month') {
+        setCurrentMonth(newEventDate);
+    }
+
     handleCloseEventDetailDialog();
   };
 
@@ -592,7 +597,7 @@ export function CalendarIcsWidget({
                     <div key={`week-daycol-${day.toISOString()}`}
                          className={`relative calendar-widget__day-column !min-h-[${hours.length * hourSlotHeight}px] !p-0 !border-b-0 ${isSameDay(day, startOfDay(new Date())) ? 'border-primary border-l-0 border-t-0 border-b-0 !border-r-2' : ''}`}
                          onClick={(e) => {
-                            if (e.target === e.currentTarget) {
+                            if (e.target === e.currentTarget) { // Only trigger if clicking the column itself, not an event inside
                                 setSelectedDate(day); setDisplayDate(day); setCurrentView('day');
                             }
                          }}
@@ -810,7 +815,6 @@ export function CalendarIcsWidget({
                             ))}
                         </div>
                          <div className="flex items-center space-x-1">
-                             <Button variant="outline" size="sm" onClick={(e) => {e.stopPropagation(); goToToday();}}>今天</Button>
                             <Button
                                 variant="outline"
                                 size="sm"
@@ -913,3 +917,5 @@ export function CalendarIcsWidget({
     </div>
   );
 }
+
+    
