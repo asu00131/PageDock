@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { TodoListAppWidget, TodoItem } from '@/types';
@@ -37,7 +38,7 @@ interface WidgetDragProps {
   onWidgetDragEnd: (e: React.DragEvent<HTMLDivElement>) => void;
   draggedWidgetId: string | null;
   dragOverWidgetId: string | null;
-  isLayoutEditing?: boolean; // This is the GLOBAL layout editing state from HomePage
+  isLayoutEditing?: boolean; 
 }
 
 interface TodoListWidgetProps extends WidgetDragProps {
@@ -73,7 +74,7 @@ export function TodoListWidget({
   onWidgetDragEnd,
   draggedWidgetId,
   dragOverWidgetId,
-  isLayoutEditing, // Global layout editing state
+  isLayoutEditing, 
 }: TodoListWidgetProps) {
   const [newItemText, setNewItemText] = useState('');
   
@@ -92,12 +93,11 @@ export function TodoListWidget({
 
   const displayedItems = widget.data.showCompleted ? widget.data.items : widget.data.items.filter(item => !item.completed);
 
-  // Todo item dragging is enabled if global layout editing is active.
   const canItemsBeSorted = isLayoutEditing; 
 
   const handleTodoItemDragStart = (e: React.DragEvent<HTMLDivElement>, id: string) => {
     if (!canItemsBeSorted) { e.preventDefault(); return; }
-    e.stopPropagation(); // Prevent widget drag start
+    e.stopPropagation(); 
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', id);
     setDraggedTodoItemId(id);
@@ -178,8 +178,6 @@ export function TodoListWidget({
     onReorderItems(widget.id, reorderedItems);
   };
 
-  // Widget itself is draggable only if global layout editing is on.
-  // Item dragging within the widget is also controlled by global layout editing.
   const isWidgetItselfDraggable = isLayoutEditing;
 
   return (
@@ -193,8 +191,6 @@ export function TodoListWidget({
       draggable={isWidgetItselfDraggable}
       onDragStart={(e) => {
         if (isWidgetItselfDraggable) {
-          // Check if the drag target is an inner draggable item (like a todo item handle)
-          // If so, let that item's drag handler take precedence by not starting widget drag.
           if (e.target instanceof HTMLElement && e.target.closest('.todo-item__drag-handle')) {
             e.preventDefault();
             return;
@@ -232,7 +228,7 @@ export function TodoListWidget({
               {!isCollapsed && (
                 <div className="flex items-center space-x-2 mr-2">
                   <Label htmlFor={`show-completed-${widget.id}`} className="widget-header__control-label text-sm">
-                    {widget.data.showCompleted ? "隐藏已完成" : "显示已完成"}
+                    {widget.data.showCompleted ? "显示已完成" : "隐藏已完成"}
                   </Label>
                   <Switch
                     id={`show-completed-${widget.id}`}
@@ -320,7 +316,7 @@ export function TodoListWidget({
                         onDragEndHandler={handleTodoItemDragEnd}
                         isDragging={draggedTodoItemId === item.id}
                         isDragOver={dragOverTodoItemId === item.id && draggedTodoItemId !== item.id}
-                        isLayoutEditing={canItemsBeSorted} // Pass down item sortability status
+                        isLayoutEditing={canItemsBeSorted} 
                       />
                     </li>
                   ))}
@@ -348,3 +344,4 @@ export function TodoListWidget({
     </div>
   );
 }
+
