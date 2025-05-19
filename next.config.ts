@@ -2,6 +2,7 @@
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
+  output: 'export', // 这行代码启用静态导出
   /* config options here */
   typescript: {
     ignoreBuildErrors: true,
