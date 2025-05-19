@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { NoteAppWidget } from '@/types';
@@ -24,6 +25,8 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
 import type React from 'react';
+import { useState, useEffect } from 'react';
+import { Textarea } from '@/components/ui/textarea';
 
 interface WidgetDragProps {
   onWidgetDragStart: (e: React.DragEvent<HTMLDivElement>, widgetId: string) => void;
@@ -33,12 +36,13 @@ interface WidgetDragProps {
   onWidgetDragEnd: (e: React.DragEvent<HTMLDivElement>) => void;
   draggedWidgetId: string | null;
   dragOverWidgetId: string | null;
-  isLayoutEditing?: boolean; // This is the GLOBAL layout editing state from HomePage
+  isLayoutEditing?: boolean; 
 }
 
 interface NoteWidgetProps extends WidgetDragProps {
   widget: NoteAppWidget;
   onOpenEditDialog: (widgetId: string) => void;
+  onUpdateContent: (widgetId: string, newContent: string) => void;
   onDeleteWidget: (widgetId: string) => void;
   isCollapsed?: boolean;
   onToggleCollapse: (widgetId: string) => void;
@@ -47,6 +51,7 @@ interface NoteWidgetProps extends WidgetDragProps {
 export function NoteWidget({
   widget,
   onOpenEditDialog,
+  onUpdateContent,
   onDeleteWidget,
   isCollapsed,
   onToggleCollapse,
@@ -57,35 +62,61 @@ export function NoteWidget({
   onWidgetDragEnd,
   draggedWidgetId,
   dragOverWidgetId,
-  isLayoutEditing, // Global layout editing state
+  isLayoutEditing, 
 }: NoteWidgetProps) {
-  
-  const handleBodyClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (isLayoutEditing) {
-      e.stopPropagation(); // Prevent opening edit dialog if in layout editing mode
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedContent, setEditedContent] = useState(widget.data.content);
+
+  useEffect(() => {
+    if (!isEditing) {
+      setEditedContent(widget.data.content);
+    }
+  }, [widget.data.content, isEditing]);
+
+  const handleDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isLayoutEditing || isEditing) return;
+    if (e.target instanceof HTMLElement && (e.target.closest('a, button'))) {
       return;
     }
-    if (e.target instanceof HTMLElement && (e.target.closest('a') || e.target.closest('button') || e.target.closest('[role="button"]'))) {
-      return;
-    }
-    e.stopPropagation(); 
-    onOpenEditDialog(widget.id);
+    e.stopPropagation(); // Important to prevent widget body click if any
+    setIsEditing(true);
+  };
+
+  const handleSave = () => {
+    onUpdateContent(widget.id, editedContent);
+    setIsEditing(false);
+  };
+
+  const handleCancelEdit = () => {
+    setEditedContent(widget.data.content); 
+    setIsEditing(false);
   };
   
-  const handleBodyKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (isLayoutEditing) {
-      e.stopPropagation(); // Prevent opening edit dialog if in layout editing mode
-      return;
-    }
-    if (e.key === 'Enter' || e.key === ' ') {
-      if (e.target instanceof HTMLElement && (e.target.closest('a') || e.target.closest('button') || e.target.closest('[role="button"]'))) {
-        return;
-      }
-      e.preventDefault();
+  const handleBodyClickOrKeyDown = (e: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>) => {
+    if (isEditing || isLayoutEditing) {
       e.stopPropagation();
-      onOpenEditDialog(widget.id);
+      return;
+    }
+    if (e.target instanceof HTMLElement && (e.target.closest('a, button, textarea') || e.target.closest('[role="button"]'))) {
+      return;
+    }
+    
+    let shouldTrigger = false;
+    if (e.type === 'click') {
+        shouldTrigger = true;
+    } else if (e.type === 'keydown' && ( (e as React.KeyboardEvent).key === 'Enter' || (e as React.KeyboardEvent).key === ' ')) {
+        shouldTrigger = true;
+        e.preventDefault();
+    }
+
+    if (shouldTrigger) {
+        e.stopPropagation();
+        if (!widget.data.content) { // Only open full dialog if content is empty
+            onOpenEditDialog(widget.id);
+        }
     }
   };
+
 
   const isWidgetItselfDraggable = isLayoutEditing;
 
@@ -179,15 +210,42 @@ export function NoteWidget({
           {!isCollapsed && (
             <div className="widget__box" id={`widget-body-${widget.id}`}>
               <div 
-                className="widget__body"
-                onClick={handleBodyClick}
-                role={isLayoutEditing ? undefined : "button"}
-                tabIndex={isLayoutEditing ? undefined : 0}
-                onKeyDown={handleBodyKeyDown}
-                aria-label={widget.data.content ? `笔记内容：${widget.title}，点击编辑` : `空笔记：${widget.title}，点击开始写作`}
+                className="widget__body relative" // Added relative for button positioning
+                onClick={handleBodyClickOrKeyDown}
+                onKeyDown={handleBodyClickOrKeyDown}
+                role={!widget.data.content && !isLayoutEditing && !isEditing ? "button" : undefined}
+                tabIndex={!widget.data.content && !isLayoutEditing && !isEditing ? 0 : undefined}
+                aria-label={widget.data.content 
+                    ? `笔记内容：${widget.title}。双击编辑。` 
+                    : `空笔记：${widget.title}，点击开始写作`}
               >
-                {widget.data.content ? (
-                   <div className="note-widget__content">
+                {isEditing ? (
+                  <>
+                    <Textarea
+                      value={editedContent}
+                      onChange={(e) => setEditedContent(e.target.value)}
+                      className="w-full min-h-[150px] p-2 border border-input focus:ring-1 focus:ring-ring bg-background text-foreground rounded-md text-sm"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        e.stopPropagation(); // Prevent widget drag/collapse while typing
+                        if (e.ctrlKey && e.key === 'Enter') {
+                           handleSave();
+                        } else if (e.key === 'Escape') {
+                           handleCancelEdit();
+                        }
+                      }}
+                    />
+                    <div className="absolute bottom-3 right-3 flex space-x-2">
+                      <Button size="sm" onClick={(e) => {e.stopPropagation(); handleSave();}}>完成</Button>
+                      <Button size="sm" variant="outline" onClick={(e) => {e.stopPropagation(); handleCancelEdit();}}>取消</Button>
+                    </div>
+                  </>
+                ) : widget.data.content ? (
+                   <div 
+                      className="note-widget__content cursor-text" 
+                      onDoubleClick={handleDoubleClick}
+                      onClick={(e) => e.stopPropagation()} // Prevent body click opening dialog
+                    >
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{widget.data.content}</ReactMarkdown>
                    </div>
                 ) : (
@@ -205,3 +263,4 @@ export function NoteWidget({
     </div>
   );
 }
+

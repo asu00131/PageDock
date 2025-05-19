@@ -444,6 +444,20 @@ export default function HomePage() {
     );
   };
 
+  const handleUpdateNoteContent = (widgetId: string, newContent: string) => {
+    setWidgets(prevWidgets =>
+      prevWidgets.map(widget => {
+        if (isNoteWidget(widget) && widget.id === widgetId) {
+          return {
+            ...widget,
+            data: { ...widget.data, content: newContent },
+          };
+        }
+        return widget;
+      })
+    );
+  };
+
   const handleSubmitCalendarIcs = (widgetId: string, title: string, icsUrl: string) => {
     setWidgets(prevWidgets =>
       prevWidgets.map(widget => {
@@ -736,10 +750,10 @@ export default function HomePage() {
 
   const handleWidgetDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
     if (isLayoutEditing) {
+        // Keep widgets collapsed during layout editing session, until "Done Editing" is clicked.
         setWidgets(prevWidgets => prevWidgets.map(w => ({ ...w, isCollapsed: true })));
-    } else if (preDragCollapseStates) { 
-        restoreWidgetCollapseStates();
     }
+    // Do not restore collapse states here; only when exiting layout editing mode.
     setDraggedWidgetId(null);
     setDragOverWidgetId(null);
   };
@@ -760,7 +774,9 @@ export default function HomePage() {
     
     const targetElement = e.target as HTMLElement;
     if (targetElement.closest('.page-section__widget')) { 
-        if (dragOverWidgetId) {
+        // If dropping onto another widget, that widget's drop handler will manage it.
+        // We only handle drops onto the general container space here (if it's not over another widget).
+        if (dragOverWidgetId) { // dragOverWidgetId would be set if over another widget
              if (isLayoutEditing) { 
                 setWidgets(prevWidgets => prevWidgets.map(w => ({ ...w, isCollapsed: true })));
              }
@@ -774,6 +790,7 @@ export default function HomePage() {
       return;
     }
   
+    // Logic to move the widget to the end of the list if dropped on the container itself
     setWidgets(currentWidgets => {
       const sourceIndex = currentWidgets.findIndex(w => w.id === sourceWidgetId);
       if (sourceIndex === -1) return currentWidgets;
@@ -946,6 +963,7 @@ export default function HomePage() {
                   key={widget.id}
                   widget={widget}
                   onOpenEditDialog={() => handleOpenNoteEditDialog(widget.id)}
+                  onUpdateContent={handleUpdateNoteContent}
                   onDeleteWidget={handleDeleteWidget}
                   isCollapsed={widget.isCollapsed}
                   onToggleCollapse={handleToggleWidgetCollapse}
@@ -1064,3 +1082,4 @@ export default function HomePage() {
     </div>
   );
 }
+
