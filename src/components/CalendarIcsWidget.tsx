@@ -58,23 +58,25 @@ const parseIcalTime = (icalTime: ICAL.Time, event: ICAL.Event): Date => {
     let jsDate = icalTime.toJSDate();
     if (icalTime.isDate) {
       jsDate = new Date(jsDate.getUTCFullYear(), jsDate.getUTCMonth(), jsDate.getUTCDate());
-      return startOfDay(jsDate); 
+      return startOfDay(jsDate);
     }
     return jsDate;
   } catch (e) {
     console.warn("Failed to parse date directly, attempting fallback for event:", event.summary, icalTime.toString(), e);
     const dateStringOnly = icalTime.toString().split('T')[0];
-    if (dateStringOnly.length === 8) { 
+    if (dateStringOnly.length === 8) {
         const year = parseInt(dateStringOnly.substring(0, 4), 10);
-        const month = parseInt(dateStringOnly.substring(4, 6), 10) - 1; 
+        const month = parseInt(dateStringOnly.substring(4, 6), 10) - 1;
         const day = parseInt(dateStringOnly.substring(6, 8), 10);
         if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
           return startOfDay(new Date(year, month, day));
         }
-    } else if (dateStringOnly.includes('-')) { 
+    } else if (dateStringOnly.includes('-')) {
         const parsed = parseISO(dateStringOnly);
         if (isValid(parsed)) return startOfDay(parsed);
     }
+    // Fallback to current day if all parsing fails, to avoid crashing
+    console.error("Completely failed to parse date for event, defaulting to now:", event.summary, icalTime.toString());
     return startOfDay(new Date());
   }
 };
@@ -99,7 +101,7 @@ export function CalendarIcsWidget({
 }: CalendarIcsWidgetProps) {
   const [isClientMounted, setIsClientMounted] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
-  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [events, setEvents] = useState<CalendarEvent[]>([]); // Local display events
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentMonth, setCurrentMonth] = useState<Date | undefined>(undefined);
@@ -115,30 +117,18 @@ export function CalendarIcsWidget({
   useEffect(() => {
     setIsClientMounted(true);
     const today = startOfDay(new Date());
-    setSelectedDate(today);
-    setCurrentMonth(today);
-    setDisplayDate(today);
+    if (!displayDate) setDisplayDate(today);
+    if (!currentMonth) setCurrentMonth(today);
+    if (!selectedDate) setSelectedDate(today);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
 
-  const fetchAndParseIcs = useCallback((forceFetchAndStore = false) => {
-    forceFetchRef.current = forceFetchAndStore;
-    if (widget.data.isLocalized && widget.data.localizedEvents && widget.data.localizedEvents.length > 0 && !forceFetchAndStore) {
-      setEvents(widget.data.localizedEvents.map(e => ({...e, startDate: new Date(e.startDate), endDate: new Date(e.endDate) })));
-      setIsLoading(false);
-      setError(null);
-      return;
-    }
-
+  const fetchAndParseIcs = useCallback((storeFetchedEvents: boolean) => {
     if (!widget.data.icsUrl) {
-      if (widget.data.isLocalized && widget.data.localizedEvents && !forceFetchAndStore) {
-         setEvents(widget.data.localizedEvents.map(e => ({...e, startDate: new Date(e.startDate), endDate: new Date(e.endDate) })));
-      } else {
-         setEvents([]);
-         if (widget.data.isLocalized) onUpdateLocalizedEvents(widget.id, []);
-      }
-      setError(null);
+      setEvents(widget.data.localizedEvents?.map(e => ({...e, startDate: new Date(e.startDate), endDate: new Date(e.endDate)})) || []);
       setIsLoading(false);
+      setError(null);
       return;
     }
 
@@ -161,9 +151,9 @@ export function CalendarIcsWidget({
             const startDate = parseIcalTime(event.startDate, event);
             let endDate = parseIcalTime(event.endDate, event);
 
-             if (event.startDate.isDate) { 
+             if (event.startDate.isDate) {
                  if (compareAsc(endDate, startDate) <= 0) {
-                    endDate = startOfDay(addDays(startDate,1)); 
+                    endDate = startOfDay(addDays(startDate,1));
                  }
             }
 
@@ -172,41 +162,85 @@ export function CalendarIcsWidget({
               summary: event.summary || '无标题',
               startDate: startDate,
               endDate: endDate,
-              isAllDay: event.startDate.isDate, 
+              isAllDay: event.startDate.isDate,
               description: event.description || undefined,
             };
           }).sort((a,b) => compareAsc(a.startDate, b.startDate));
 
-          setEvents(parsedEvents);
-          if (widget.data.isLocalized || forceFetchAndStore) { 
+          setEvents(parsedEvents); // Update local display immediately
+
+          if (storeFetchedEvents) {
             onUpdateLocalizedEvents(widget.id, parsedEvents);
           }
 
         } catch (parseErr) {
           console.error("Error parsing ICS data:", parseErr);
           setError("解析日历数据失败。请确保 ICS 格式正确。");
-          if (!widget.data.isLocalized) setEvents([]);
-           else if (forceFetchAndStore) onUpdateLocalizedEvents(widget.id, []);
+          if (storeFetchedEvents) onUpdateLocalizedEvents(widget.id, []); // Clear stored if parsing fails during store attempt
+          else setEvents([]); // Clear local display if not storing
         }
       })
       .catch(err => {
         console.error("Error fetching or parsing ICS:", err);
         setError(err.message || "加载日历数据失败。请检查链接和网络，并确认服务器支持跨域请求(CORS)。");
-        if (!widget.data.isLocalized) setEvents([]);
-        else if (forceFetchAndStore) onUpdateLocalizedEvents(widget.id, []);
+        if (storeFetchedEvents) onUpdateLocalizedEvents(widget.id, []);
+        else setEvents([]);
       })
       .finally(() => setIsLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [widget.id, widget.data.icsUrl, widget.data.isLocalized, onUpdateLocalizedEvents]);
+  }, [widget.id, widget.data.icsUrl, onUpdateLocalizedEvents]);
 
 
   useEffect(() => {
-    if (isClientMounted && !isCollapsed) {
-      fetchAndParseIcs(forceFetchRef.current);
+    if (!isClientMounted || isCollapsed) {
+      if (isCollapsed) {
+        setIsLoading(false);
+        setError(null);
+      }
+      return;
     }
-    forceFetchRef.current = false; 
+
+    const localEventsFromProps = widget.data.localizedEvents?.map(e => ({
+      ...e,
+      startDate: new Date(e.startDate),
+      endDate: new Date(e.endDate)
+    })) || [];
+    const hasLocalEventsInProps = localEventsFromProps.length > 0;
+
+    if (forceFetchRef.current) {
+      if (widget.data.icsUrl) {
+        fetchAndParseIcs(true); // Fetch and store (as refresh implies updating local store if applicable)
+      } else {
+        setEvents(localEventsFromProps); // No URL to fetch, use existing local if any
+        setIsLoading(false);
+        setError(null);
+      }
+      forceFetchRef.current = false;
+    } else if (hasLocalEventsInProps) {
+      setEvents(localEventsFromProps); // Prioritize displaying events from props
+      setIsLoading(false);
+      setError(null);
+    } else if (widget.data.isLocalized && widget.data.icsUrl) {
+      // Initial localization: "Localize" checked, URL present, but no local events yet in props
+      fetchAndParseIcs(true); // Fetch and store
+    } else if (!widget.data.isLocalized && widget.data.icsUrl) {
+      // "Localize" not checked, URL present: Fetch for live display only
+      fetchAndParseIcs(false); // Fetch, do not store
+    } else {
+      // No URL, no local events in props, not set to localize from URL initially
+      setEvents([]);
+      setIsLoading(false);
+      setError(null);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [widget.data.icsUrl, widget.data.isLocalized, widget.data.localizedEvents, isCollapsed, isClientMounted, fetchAndParseIcs]);
+  }, [
+    widget.data.icsUrl,
+    widget.data.isLocalized,
+    widget.data.localizedEvents,
+    isCollapsed,
+    isClientMounted,
+    fetchAndParseIcs, // fetchAndParseIcs is memoized
+  ]);
 
 
   const eventDays = useMemo(() => events.map(event => startOfDay(event.startDate)), [events]);
@@ -221,9 +255,9 @@ export function CalendarIcsWidget({
       const eventEnd = event.endDate;
       return compareAsc(eventStart, targetDayEnd) < 0 && compareAsc(eventEnd, targetDayStart) > 0;
     }).sort((a, b) => {
-      if (a.isAllDay && !b.isAllDay) return -1; 
+      if (a.isAllDay && !b.isAllDay) return -1;
       if (!a.isAllDay && b.isAllDay) return 1;
-      return compareAsc(a.startDate, b.startDate); 
+      return compareAsc(a.startDate, b.startDate);
     });
   }, [events]);
 
@@ -234,14 +268,14 @@ export function CalendarIcsWidget({
 
   const weekRange = useMemo(() => {
     if (!displayDate || !isValid(displayDate)) return { start: new Date(), end: new Date()};
-    const start = startOfWeek(displayDate, { weekStartsOn: 1 }); 
+    const start = startOfWeek(displayDate, { weekStartsOn: 1 });
     const end = endOfWeek(displayDate, { weekStartsOn: 1 });
     return { start, end };
   }, [displayDate]);
 
   const eventsForListView = useMemo(() => {
     const today = startOfDay(new Date());
-    const thirtyDaysLater = endOfWeek(addDays(today, 30)); 
+    const thirtyDaysLater = endOfWeek(addDays(today, 30));
     return events.filter(event => {
       const eventStartsTodayOrLater = compareAsc(event.startDate, today) >= 0;
       const eventEndsTodayOrLater = event.endDate && compareAsc(event.endDate, today) >=0;
@@ -260,9 +294,9 @@ export function CalendarIcsWidget({
     if (e.target instanceof HTMLElement && (e.target.closest('button, a') || e.target.closest('.rdp-nav_button') || e.target.closest('.view-switcher') || e.target.closest('[role="button"]'))) {
       return;
     }
-    e.stopPropagation(); 
+    e.stopPropagation();
     if (!widget.data.icsUrl && !(widget.data.isLocalized && widget.data.localizedEvents && widget.data.localizedEvents.length > 0)) {
-        onOpenEditDialog(widget.id); 
+        onOpenEditDialog(widget.id);
     }
   };
 
@@ -276,9 +310,9 @@ export function CalendarIcsWidget({
         return;
       }
       e.preventDefault();
-      e.stopPropagation(); 
+      e.stopPropagation();
       if (!widget.data.icsUrl && !(widget.data.isLocalized && widget.data.localizedEvents && widget.data.localizedEvents.length > 0)) {
-        onOpenEditDialog(widget.id); 
+        onOpenEditDialog(widget.id);
       }
     }
   };
@@ -294,41 +328,38 @@ export function CalendarIcsWidget({
   };
 
   const handleSubmitEventDetail = (updatedEventData: CalendarEvent) => {
-     setEvents(prevEvents => {
-        const eventExists = prevEvents.some(e => e.id === updatedEventData.id);
-        let newEventsArray;
-        if (eventExists) {
-            newEventsArray = prevEvents.map(event =>
-                event.id === updatedEventData.id ? { ...event, ...updatedEventData } : event
-            );
-        } else {
-            newEventsArray = [...prevEvents, updatedEventData];
-        }
-        newEventsArray.sort((a,b) => compareAsc(a.startDate, b.startDate));
-        if (widget.data.isLocalized) {
-          onUpdateLocalizedEvents(widget.id, newEventsArray);
-        }
-        return newEventsArray;
-    });
-    
-    const newEventDate = startOfDay(updatedEventData.startDate);
+    const currentStoredEvents = widget.data.localizedEvents || [];
+    const eventExistsInStorage = 'id' in updatedEventData && updatedEventData.id && currentStoredEvents.some(e => e.id === updatedEventData.id);
+
+    let newStoredEventsArray;
+    if (eventExistsInStorage) {
+        newStoredEventsArray = currentStoredEvents.map(event =>
+            event.id === updatedEventData.id ? updatedEventData : event
+        );
+    } else {
+        const eventToAdd = { ...updatedEventData, id: updatedEventData.id || crypto.randomUUID() };
+        newStoredEventsArray = [...currentStoredEvents, eventToAdd];
+    }
+
+    const newStoredEventsArraySorted = newStoredEventsArray.sort((a,b) => compareAsc(new Date(a.startDate), new Date(b.startDate)));
+    onUpdateLocalizedEvents(widget.id, newStoredEventsArraySorted);
+
+    // UI Navigation - this makes the view jump to the event's date.
+    // The actual event list will update when the widget re-renders with new props.
+    const newEventDate = startOfDay(new Date(updatedEventData.startDate));
     setSelectedDate(newEventDate);
     setDisplayDate(newEventDate);
     if (currentView === 'month') {
         setCurrentMonth(newEventDate);
     }
-
     handleCloseEventDetailDialog();
   };
 
   const handleDeleteEvent = (eventId: string) => {
-    setEvents(prevEvents => {
-      const newEventsArray = prevEvents.filter(event => event.id !== eventId);
-      if (widget.data.isLocalized) {
-        onUpdateLocalizedEvents(widget.id, newEventsArray);
-      }
-      return newEventsArray;
-    });
+    const currentStoredEvents = widget.data.localizedEvents || [];
+    const newStoredEventsArray = currentStoredEvents.filter(event => event.id !== eventId);
+    onUpdateLocalizedEvents(widget.id, newStoredEventsArray);
+
     if (editingEvent && 'id' in editingEvent && editingEvent.id === eventId) {
       handleCloseEventDetailDialog();
     }
@@ -338,11 +369,30 @@ export function CalendarIcsWidget({
     const todayAnchor = startOfDay(new Date());
     setSelectedDate(todayAnchor);
     setDisplayDate(todayAnchor);
-    setCurrentMonth(todayAnchor); 
+    setCurrentMonth(todayAnchor);
   };
 
   const handleRefresh = () => {
-    fetchAndParseIcs(true); 
+    forceFetchRef.current = true;
+    // Re-trigger the main data loading useEffect by slightly changing a dependency it watches,
+    // or by directly calling fetch if appropriate. Here, we let the useEffect handle it via forceFetchRef.
+    // A common way is to make useEffect depend on a "refreshTrigger" state that you toggle.
+    // For now, the existing useEffect logic with forceFetchRef should cover this.
+    // To be absolutely sure useEffect re-evaluates, we can temporarily change a prop it depends on if needed,
+    // but ideally, the change in forceFetchRef and subsequent re-evaluation of conditions within useEffect is enough.
+    // If not, we might need a more explicit trigger.
+    // For now, let's assume the current useEffect structure is sufficient.
+    // Re-setting a state that useEffect depends on can also trigger it.
+    // Example: setEvents([]); setIsLoading(true); // This will trigger the useEffect to re-evaluate.
+    // The useEffect already depends on widget.data.localizedEvents.
+    // The fetchAndParseIcs itself will call onUpdateLocalizedEvents if storeFetchedEvents is true.
+    if (widget.data.icsUrl) {
+        fetchAndParseIcs(true); // Fetch and store on refresh
+    } else {
+        // No URL, "refresh" means ensure local events are shown
+        setEvents(widget.data.localizedEvents?.map(e => ({...e, startDate: new Date(e.startDate), endDate: new Date(e.endDate)})) || []);
+        setIsLoading(false);
+    }
   };
 
 
@@ -365,9 +415,9 @@ export function CalendarIcsWidget({
     } else if (context === 'day-timeline') {
         baseItemClasses = cn(
           "calendar-widget__event-item group/event-item !p-1.5 text-xs",
-          event.isAllDay ? "relative" : "absolute" 
+          event.isAllDay ? "relative" : "absolute"
         );
-        actionButtonSizeClasses = "h-5 w-5 p-0.5"; 
+        actionButtonSizeClasses = "h-5 w-5 p-0.5";
         actionIconSizeClasses = "h-3 w-3";
     }
 
@@ -384,19 +434,19 @@ export function CalendarIcsWidget({
     >
       <div className="flex-grow overflow-hidden mr-1">
         <strong className={titleClasses} title={event.summary}>{event.summary}</strong>
-        {context === 'list' && ( 
+        {context === 'list' && (
             <span className={timeClasses}>
                 {format(event.startDate, 'PPP')}
                 {!event.isAllDay && ` ${format(event.startDate, 'p')} - ${format(event.endDate, 'p')}`}
                 {event.isAllDay && ` (全天)`}
             </span>
         )}
-        {(context === 'day-detail' || context === 'day-timeline') && ( 
+        {(context === 'day-detail' || (context === 'day-timeline' && event.isAllDay)) && ( // Show time only for all-day in timeline header
           <span className={timeClasses}>
             {!event.isAllDay ? `${format(event.startDate, 'HH:mm')} - ${format(event.endDate, 'HH:mm')}` : "(全天)"}
           </span>
         )}
-         {context === 'week-column' && ( 
+         {context === 'week-column' && (
           <span className={timeClasses}>
             {!event.isAllDay ? `${format(event.startDate, 'p')}` : "(全天)"}
           </span>
@@ -407,31 +457,33 @@ export function CalendarIcsWidget({
           <FilePenLine className={actionIconSizeClasses} />
           <span className="sr-only">查看/编辑事件</span>
         </Button>
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button variant="ghost" size="icon" className={`${actionButtonSizeClasses} hover:bg-destructive/10 hover:text-destructive`} onClick={(e) => e.stopPropagation()}>
-              <Trash2 className={actionIconSizeClasses}/>
-              <span className="sr-only">删除事件</span>
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent onClick={(e) => e.stopPropagation()}>
-            <AlertDialogHeader>
-              <AlertDialogTitle>确认删除</AlertDialogTitle>
-              <AlertDialogDescription>
-                {`您确定要删除事件 “${event.summary}” 吗？此操作为本地操作，无法撤销。`}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>取消</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={() => handleDeleteEvent(event.id)}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                删除
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        { widget.data.isLocalized || !widget.data.icsUrl ? ( // Allow delete for localized or manual-only calendars
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="ghost" size="icon" className={`${actionButtonSizeClasses} hover:bg-destructive/10 hover:text-destructive`} onClick={(e) => e.stopPropagation()}>
+                <Trash2 className={actionIconSizeClasses}/>
+                <span className="sr-only">删除事件</span>
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+              <AlertDialogHeader>
+                <AlertDialogTitle>确认删除</AlertDialogTitle>
+                <AlertDialogDescription>
+                  {`您确定要删除事件 “${event.summary}” 吗？此操作无法撤销。`}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>取消</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => handleDeleteEvent(event.id)}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  删除
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        ) : null }
       </div>
     </li>
   );
@@ -449,14 +501,14 @@ export function CalendarIcsWidget({
   );
 
 
-  const hourSlotHeight = 60; 
+  const hourSlotHeight = 60;
   const getTimelineEventStyle = (event: CalendarEvent): React.CSSProperties => {
-    if (event.isAllDay) return { position: 'relative' }; 
+    if (event.isAllDay) return { position: 'relative' };
 
     const startHour = getHours(event.startDate);
     const startMinute = getMinutes(event.startDate);
     let durationMinutes = differenceInMinutes(event.endDate, event.startDate);
-    if (durationMinutes <=0) durationMinutes = 30; 
+    if (durationMinutes <=0) durationMinutes = 30;
 
     const top = (startHour + startMinute / 60) * hourSlotHeight;
     const height = (durationMinutes / 60) * hourSlotHeight;
@@ -464,16 +516,16 @@ export function CalendarIcsWidget({
     return {
       position: 'absolute',
       top: `${top}px`,
-      height: `${Math.max(height, 20)}px`, 
-      left: '0.25rem', 
+      height: `${Math.max(height, 20)}px`,
+      left: '0.25rem',
       right: '0.25rem',
-      zIndex: 10, 
+      zIndex: 10,
     };
   };
 
   const renderDayTimelineView = () => {
     if (!displayDate || !isValid(displayDate)) return <p className="p-4 text-center text-muted-foreground">选择一个日期以查看日程。</p>;
-    
+
     const dayEvents = getEventsForDay(displayDate);
     const allDayEvents = dayEvents.filter(e => e.isAllDay);
     const timedEvents = dayEvents.filter(e => !e.isAllDay);
@@ -517,7 +569,7 @@ export function CalendarIcsWidget({
                 </div>
               ))}
               <div className="calendar-widget__event-column">
-                <ul className="relative h-full"> 
+                <ul className="relative h-full">
                   {timedEvents.map(event => renderEventItem(event, 'day-timeline'))}
                 </ul>
               </div>
@@ -583,9 +635,9 @@ export function CalendarIcsWidget({
             ))}
         </div>
 
-        <ScrollArea className="h-[500px] w-full"> 
+        <ScrollArea className="h-[500px] w-full">
             <div className="relative grid grid-cols-[auto_repeat(7,1fr)] gap-px bg-border border-l">
-                <div className="sticky left-0 z-10 bg-card calendar-widget__time-axis pt-1"> 
+                <div className="sticky left-0 z-10 bg-card calendar-widget__time-axis pt-1">
                     {hours.map(hour => (
                         <div key={`week-timeslot-label-${hour}`} className="flex items-center justify-end border-r" style={{ height: `${hourSlotHeight}px` }}>
                             {format(setHours(setMinutes(new Date(),0), hour), 'HH:mm')}
@@ -610,7 +662,7 @@ export function CalendarIcsWidget({
                                 className="calendar-widget__time-slot" style={{ height: `${hourSlotHeight}px` }}>
                             </div>
                         ))}
-                        <ul className="absolute inset-0"> 
+                        <ul className="absolute inset-0">
                             {timedEventsByDay[format(day, 'yyyy-MM-dd')].map(event => renderEventItem(event, 'day-timeline'))}
                         </ul>
                     </div>
@@ -664,7 +716,7 @@ export function CalendarIcsWidget({
         data-testid="calendar-ics-widget-main"
         className={cn(
             "page-section__widget",
-            isLayoutEditing && "is-layout-editing", 
+            isLayoutEditing && "is-layout-editing",
             draggedWidgetId === widget.id && "opacity-50 cursor-grabbing",
             dragOverWidgetId === widget.id && draggedWidgetId !== widget.id && "ring-2 ring-primary ring-offset-2 rounded-lg"
         )}
@@ -701,7 +753,7 @@ export function CalendarIcsWidget({
               {isCollapsed ? <ChevronDown className="widget-header__chevron" /> : <ChevronUp className="widget-header__chevron" />}
             </div>
             <div className="widget-header__controls">
-              {(!isCollapsed && (widget.data.icsUrl || (widget.data.isLocalized && widget.data.localizedEvents && widget.data.localizedEvents.length > 0))) && (
+              {(!isCollapsed && (widget.data.icsUrl || (widget.data.localizedEvents && widget.data.localizedEvents.length > 0))) && (
                 <Button variant="ghost" size="icon" className="widget-header__control h-7 w-7" onClick={(e) => {e.stopPropagation(); handleRefresh();}} title="刷新日历数据">
                     <RotateCcw className="widget-header__feather-icon h-4 w-4" />
                     <span className="sr-only">刷新日历</span>
@@ -727,8 +779,8 @@ export function CalendarIcsWidget({
                      const newEventStart = selectedDate && isValid(selectedDate) ? selectedDate : startOfDay(new Date());
                      const newEvent: Omit<CalendarEvent, 'id'> = {
                        summary: "新事件",
-                       startDate: setMinutes(setHours(newEventStart, getHours(new Date())),0), 
-                       endDate: setMinutes(setHours(newEventStart, getHours(new Date()) + 1),0), 
+                       startDate: setMinutes(setHours(newEventStart, getHours(new Date())),0),
+                       endDate: setMinutes(setHours(newEventStart, getHours(new Date()) + 1),0),
                        isAllDay: false,
                        description: ""
                      };
@@ -775,9 +827,9 @@ export function CalendarIcsWidget({
                 className="widget__body"
                 onClick={handleBodyClick}
                 onKeyDown={handleBodyKeyDown}
-                role={!widget.data.icsUrl && !(widget.data.isLocalized && widget.data.localizedEvents && widget.data.localizedEvents.length > 0) && !isLayoutEditing ? "button" : undefined}
-                tabIndex={!widget.data.icsUrl && !(widget.data.isLocalized && widget.data.localizedEvents && widget.data.localizedEvents.length > 0) && !isLayoutEditing ? 0 : undefined}
-                aria-label={(!widget.data.icsUrl && !(widget.data.isLocalized && widget.data.localizedEvents && widget.data.localizedEvents.length > 0)) ? "设置日历链接" : `${widget.title} 日历区域`}
+                role={!widget.data.icsUrl && !(widget.data.localizedEvents && widget.data.localizedEvents.length > 0) && !isLayoutEditing ? "button" : undefined}
+                tabIndex={!widget.data.icsUrl && !(widget.data.localizedEvents && widget.data.localizedEvents.length > 0) && !isLayoutEditing ? 0 : undefined}
+                aria-label={(!widget.data.icsUrl && !(widget.data.localizedEvents && widget.data.localizedEvents.length > 0)) ? "设置日历链接" : `${widget.title} 日历区域`}
               >
                 {isLoading && <p className="p-4 text-center text-muted-foreground">正在加载日历...</p>}
                 {error &&
@@ -786,7 +838,7 @@ export function CalendarIcsWidget({
                     <p>{error}</p>
                   </div>
                 }
-                {!isLoading && !error && (widget.data.icsUrl || (widget.data.isLocalized && widget.data.localizedEvents && widget.data.localizedEvents.length > 0)) && (
+                {!isLoading && !error && (widget.data.icsUrl || (widget.data.localizedEvents && widget.data.localizedEvents.length > 0)) && (
                   <>
                     <div className="calendar-widget__toolbar view-switcher">
                         <div className="flex items-center space-x-1">
@@ -799,11 +851,9 @@ export function CalendarIcsWidget({
                                     e.stopPropagation();
                                     setCurrentView(view);
                                     const targetDay = (selectedDate && isValid(selectedDate)) ? selectedDate : startOfDay(new Date());
-                                    if (view === 'day') {
+                                    if (view === 'day' || view === 'week') {
                                         setDisplayDate(targetDay);
                                         if(!selectedDate || !isValid(selectedDate)) setSelectedDate(targetDay);
-                                    } else if (view === 'week') {
-                                        setDisplayDate(targetDay);
                                     } else if (view === 'month') {
                                         setCurrentMonth(targetDay);
                                         if(!selectedDate || !isValid(selectedDate)) setSelectedDate(targetDay);
@@ -846,7 +896,7 @@ export function CalendarIcsWidget({
                             setSelectedDate(day);
                             if (day && isValid(day)) {
                                 setDisplayDate(startOfDay(day));
-                                setCurrentMonth(startOfDay(day)); 
+                                setCurrentMonth(startOfDay(day));
                             }
                           }}
                           month={currentMonth}
@@ -857,12 +907,12 @@ export function CalendarIcsWidget({
                                 if (isValid(dayInNewMonth) && dayInNewMonth.getMonth() === month.getMonth()) {
                                      setSelectedDate(startOfDay(dayInNewMonth));
                                      setDisplayDate(startOfDay(dayInNewMonth));
-                                } else { 
+                                } else {
                                      const firstOfNewMonth = startOfDay(new Date(month.getFullYear(), month.getMonth(), 1));
                                      setSelectedDate(firstOfNewMonth);
                                      setDisplayDate(firstOfNewMonth);
                                 }
-                            } else if (!selectedDate || !isValid(selectedDate)) { 
+                            } else if (!selectedDate || !isValid(selectedDate)) {
                                 const firstOfNewMonth = startOfDay(new Date(month.getFullYear(), month.getMonth(), 1));
                                 setSelectedDate(firstOfNewMonth);
                                 setDisplayDate(firstOfNewMonth);
@@ -871,7 +921,7 @@ export function CalendarIcsWidget({
                           }}
                           className="rounded-md calendar-widget"
                           modifiers={{ eventDay: eventDays.map(d => startOfDay(d)) }}
-                          modifiersClassNames={{ eventDay: 'bg-primary/20 rounded-full !text-primary-foreground dark:!text-primary' }} 
+                          modifiersClassNames={{ eventDay: 'bg-primary/20 rounded-full !text-primary-foreground dark:!text-primary' }}
                           footer={selectedDate && isValid(selectedDate) && eventsForSelectedDay.length > 0 ?
                             renderEventsList(eventsForSelectedDay, `${format(selectedDate, 'PPP')} 的事件`, `${format(selectedDate, 'PPP')} 无事件。`, 'day-detail')
                             : selectedDate && isValid(selectedDate) ? <p className="calendar-widget__no-events p-3 border-t text-muted-foreground">{`${format(selectedDate, 'PPP')} 无事件。`}</p> : null
@@ -890,7 +940,7 @@ export function CalendarIcsWidget({
                     )}
                   </>
                 )}
-                {!isLoading && !error && !widget.data.icsUrl && !(widget.data.isLocalized && widget.data.localizedEvents && widget.data.localizedEvents.length > 0) && (
+                {!isLoading && !error && !widget.data.icsUrl && !(widget.data.localizedEvents && widget.data.localizedEvents.length > 0) && (
                    <div
                     className="calendar-widget__empty-prompt"
                   >
@@ -917,5 +967,3 @@ export function CalendarIcsWidget({
     </div>
   );
 }
-
-    
