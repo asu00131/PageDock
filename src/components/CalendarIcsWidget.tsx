@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { CalendarIcsAppWidget, CalendarEvent } from '@/types';
@@ -307,9 +308,7 @@ export function CalendarIcsWidget({
         actionButtonSizeClasses = "h-5 w-5 p-0.5";
         actionIconSizeClasses = "h-3 w-3";
     } else if (context === 'list' || context === 'day-detail') {
-       // Use existing classes for list and day-detail for better visibility
-       // Ensure text color contrasts with accent/10 background
-       titleClasses = "truncate block font-semibold text-primary dark:text-primary"; // primary on light bg, or specific dark mode adjustment
+       titleClasses = "truncate block font-semibold text-primary dark:text-primary"; 
        timeClasses = "text-xs block text-primary/90 dark:text-primary/80";
     }
     
@@ -377,7 +376,8 @@ export function CalendarIcsWidget({
         </AlertDialog>
       </div>
     </li>
-  )};
+  );
+  }
 
   const renderEventsList = (eventsToRender: CalendarEvent[], title?: string, noEventsMessage?: string, context?: 'list' | 'day-detail') => (
     <div className="calendar-widget__event-list">
@@ -729,7 +729,7 @@ export function CalendarIcsWidget({
                                 onClick={(e) => { e.stopPropagation(); goToToday(); }}
                                 className="text-foreground hover:text-primary"
                             >
-                                今天
+                               今天
                             </Button>
                             <Button
                                 variant="outline"
@@ -812,10 +812,7 @@ export function CalendarIcsWidget({
                   >
                     <CalendarIcon className="w-10 h-10 text-muted-foreground mb-3"/>
                     <p className="text-lg font-medium text-foreground mb-2">日历为空</p>
-                    <p className="text-sm text-muted-foreground mb-4">要显示事件，请链接一个 ICS 日历 URL。</p>
-                    <Button onClick={(e) => { e.stopPropagation(); onOpenEditDialog(widget.id); }}>
-                      <Link2 className="mr-2 h-4 w-4" /> 设置 ICS 日历链接
-                    </Button>
+                    <p className="text-sm text-muted-foreground mb-4">要显示事件，请链接一个 ICS 日历 URL。 您可以从菜单中“编辑日历链接”进行设置。</p>
                   </div>
                 )}
               </div>
