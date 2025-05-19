@@ -25,6 +25,8 @@ export interface TodoListWidgetData {
 // Data specific to a Calendar ICS widget
 export interface CalendarIcsWidgetData {
   icsUrl: string;
+  isLocalized?: boolean; // New flag
+  localizedEvents?: CalendarEvent[]; // New field to store events if localized
 }
 
 export interface CalendarEvent {

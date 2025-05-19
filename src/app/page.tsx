@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import type { AppWidget, LinkCollectionAppWidget, NoteAppWidget, TodoListAppWidget, CalendarIcsAppWidget, EmbedAppWidget, LinkItem, TodoItem, WidgetType, LinkCollectionDisplaySettings, EmbedWidgetData, IframeEmbedData, ImageEmbedData, CodeEmbedData } from '@/types';
+import type { AppWidget, LinkCollectionAppWidget, NoteAppWidget, TodoListAppWidget, CalendarIcsAppWidget, EmbedAppWidget, LinkItem, TodoItem, WidgetType, LinkCollectionDisplaySettings, EmbedWidgetData, IframeEmbedData, ImageEmbedData, CodeEmbedData, CalendarEvent } from '@/types';
 import { isLinkCollectionWidget, isNoteWidget, isTodoListWidget, isCalendarIcsWidget, isEmbedWidget } from '@/types';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Button } from '@/components/ui/button';
@@ -58,7 +58,10 @@ function isValidAppWidget(obj: any): obj is AppWidget {
           typeof item?.id === 'string' && typeof item?.text === 'string' && typeof item?.completed === 'boolean'
         );
     case 'calendarIcs':
-      return obj.data && typeof obj.data.icsUrl === 'string';
+      const calData = obj.data as Partial<CalendarIcsAppWidget['data']>;
+      return calData && typeof calData.icsUrl === 'string' &&
+             (typeof calData.isLocalized === 'boolean' || typeof calData.isLocalized === 'undefined') &&
+             (Array.isArray(calData.localizedEvents) || typeof calData.localizedEvents === 'undefined');
     case 'embed':
       if (!obj.data || typeof obj.data.embedType !== 'string') return false;
       const embedData = obj.data as EmbedWidgetData;
@@ -192,6 +195,16 @@ export default function HomePage() {
           titleLines: -1,
         };
         modified = true;
+      }
+      if (isCalendarIcsWidget(w)) {
+          if (typeof w.data.isLocalized === 'undefined') {
+              w.data.isLocalized = false;
+              modified = true;
+          }
+          if (typeof w.data.localizedEvents === 'undefined') {
+              w.data.localizedEvents = [];
+              modified = true;
+          }
       }
       if (isEmbedWidget(w)) {
         const embedData = w.data as EmbedWidgetData; // Temporary cast for logic
@@ -405,7 +418,7 @@ export default function HomePage() {
           id: baseId,
           type: 'calendarIcs',
           title: '新日历',
-          data: { icsUrl: '' },
+          data: { icsUrl: '', isLocalized: false, localizedEvents: [] },
           isCollapsed: false,
         } as CalendarIcsAppWidget;
         setWidgets(prev => [...prev, newWidget]);
@@ -458,20 +471,54 @@ export default function HomePage() {
     );
   };
 
-  const handleSubmitCalendarIcs = (widgetId: string, title: string, icsUrl: string) => {
+  const handleSubmitCalendarIcs = (widgetId: string, title: string, icsUrl: string, localizeData?: boolean) => {
     setWidgets(prevWidgets =>
       prevWidgets.map(widget => {
         if (isCalendarIcsWidget(widget) && widget.id === widgetId) {
+          const wasLocalized = widget.data.isLocalized;
+          const newIsLocalized = localizeData ?? false;
           return {
             ...widget,
             title, 
-            data: { ...widget.data, icsUrl },
+            data: { 
+              ...widget.data, 
+              icsUrl,
+              isLocalized: newIsLocalized,
+              // If changing localization status, clear existing localized events to trigger re-fetch/clear
+              localizedEvents: wasLocalized !== newIsLocalized ? [] : widget.data.localizedEvents, 
+            },
           };
         }
         return widget;
       })
     );
   };
+
+  const handleUpdateCalendarLocalizedEvents = (widgetId: string, events: CalendarEvent[]) => {
+    setWidgets(prevWidgets =>
+      prevWidgets.map(widget => {
+        if (isCalendarIcsWidget(widget) && widget.id === widgetId) {
+          // Ensure Date objects are correctly handled by stringifying and parsing if necessary,
+          // though useLocalStorage should handle basic Date objects.
+          // For this example, we assume events are already in a serializable format or useLocalStorage handles it.
+          return {
+            ...widget,
+            data: {
+              ...widget.data,
+              localizedEvents: events.map(e => ({
+                ...e,
+                // Ensure dates are proper Date objects, might need conversion if coming from JSON-like state
+                startDate: new Date(e.startDate), 
+                endDate: new Date(e.endDate),
+              })),
+            }
+          };
+        }
+        return widget;
+      })
+    );
+  };
+
 
   const handleSubmitEmbedDialog = (widgetId: string, title: string, data: EmbedWidgetData) => {
      setWidgets(prevWidgets =>
@@ -648,20 +695,23 @@ export default function HomePage() {
     setIsLayoutEditing(prev => {
         const newIsLayoutEditing = !prev;
         if (newIsLayoutEditing) {
+            // Entering layout editing mode
             const currentCollapseStates: Record<string, boolean> = {};
             widgets.forEach(w => {
                 currentCollapseStates[w.id] = w.isCollapsed ?? false;
             });
             setPreDragCollapseStates(currentCollapseStates);
+            // Collapse all widgets
             setWidgets(prevWidgets =>
                 prevWidgets.map(w => ({ ...w, isCollapsed: true }))
             );
         } else {
+            // Exiting layout editing mode
             restoreWidgetCollapseStates();
         }
         return newIsLayoutEditing;
     });
-  };
+};
 
   const restoreWidgetCollapseStates = () => {
     if (preDragCollapseStates) {
@@ -685,16 +735,23 @@ export default function HomePage() {
     setDraggedWidgetId(widgetId);
     setDragOverWidgetId(null);
 
+    // Ensure widgets are collapsed if not already (e.g., if layout editing was enabled programmatically)
     if (!preDragCollapseStates) { 
         const currentCollapseStates: Record<string, boolean> = {};
         widgets.forEach(w => {
             currentCollapseStates[w.id] = w.isCollapsed ?? false;
         });
         setPreDragCollapseStates(currentCollapseStates);
+        setWidgets(prevWidgets =>
+            prevWidgets.map(w => ({ ...w, isCollapsed: true }))
+        );
+    } else {
+         // If preDragCollapseStates exists, means we are already in edit mode and widgets should be collapsed.
+         // This re-collapses them in case any were expanded by other means during edit mode.
+        setWidgets(prevWidgets =>
+            prevWidgets.map(w => ({ ...w, isCollapsed: true }))
+        );
     }
-    setWidgets(prevWidgets =>
-        prevWidgets.map(w => ({ ...w, isCollapsed: true }))
-    );
   };
 
   const handleWidgetDragOver = (e: React.DragEvent<HTMLDivElement>, widgetId: string) => {
@@ -707,8 +764,10 @@ export default function HomePage() {
 
   const handleWidgetDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
     if (!isLayoutEditing) return;
+    // Check if the mouse is leaving the currentTarget and not entering a child element
     const relatedTarget = e.relatedTarget as Node;
     if (relatedTarget && e.currentTarget.contains(relatedTarget)) {
+        // The mouse is still inside the widget or one of its children
         return; 
     }
     setDragOverWidgetId(null);
@@ -717,13 +776,14 @@ export default function HomePage() {
   const handleWidgetDrop = (e: React.DragEvent<HTMLDivElement>, targetWidgetId: string) => {
     if (!isLayoutEditing || !draggedWidgetId) return;
     e.preventDefault();
-    e.stopPropagation(); 
+    e.stopPropagation(); // Prevent drop from bubbling to container if over a widget
 
     const sourceWidgetId = e.dataTransfer.getData('text/plain') || draggedWidgetId;
     
-    setDragOverWidgetId(null);
+    setDragOverWidgetId(null); // Clear visual cue
 
     if (!sourceWidgetId || sourceWidgetId === targetWidgetId) {
+      // If dropped on itself or no source, ensure widgets remain collapsed if in edit mode
       if (isLayoutEditing && preDragCollapseStates) { 
           setWidgets(prevWidgets => prevWidgets.map(w => ({ ...w, isCollapsed: true })));
       }
@@ -736,19 +796,23 @@ export default function HomePage() {
       const targetIndex = currentWidgets.findIndex(w => w.id === targetWidgetId);
 
       if (sourceIndex === -1 || targetIndex === -1) {
-        return currentWidgets;
+        return currentWidgets; // Should not happen if IDs are correct
       }
 
       const reorderedWidgets = Array.from(currentWidgets);
       const [draggedItem] = reorderedWidgets.splice(sourceIndex, 1);
       reorderedWidgets.splice(targetIndex, 0, draggedItem);
       
+      // Ensure all widgets remain collapsed during layout editing
       return reorderedWidgets.map(w => ({...w, isCollapsed: true}));
     });
-    setDraggedWidgetId(null); 
+    setDraggedWidgetId(null); // Clear dragged widget ID after drop
   };
 
+
   const handleWidgetDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
+    // Only manage collapse state related to layout editing mode.
+    // If not in layout editing mode, individual widget collapse is handled by onToggleCollapse
     if (isLayoutEditing) {
         // Keep widgets collapsed during layout editing session, until "Done Editing" is clicked.
         setWidgets(prevWidgets => prevWidgets.map(w => ({ ...w, isCollapsed: true })));
@@ -758,25 +822,31 @@ export default function HomePage() {
     setDragOverWidgetId(null);
   };
   
+  // Handler for drag over the main container (space between widgets)
   const handleWidgetContainerDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     if (!isLayoutEditing || !draggedWidgetId) return;
-    e.preventDefault(); 
+    e.preventDefault(); // Necessary to allow drop
+    // If dragging over the container itself (not over another widget), clear dragOverWidgetId
+    // This ensures no specific widget is highlighted as a drop target
     const targetElement = e.target as HTMLElement;
     if (!targetElement.closest('.page-section__widget')) {
         setDragOverWidgetId(null); 
     }
   };
   
+  // Handler for drop on the main container (space between widgets)
   const handleWidgetContainerDrop = (e: React.DragEvent<HTMLDivElement>) => {
     if (!isLayoutEditing || !draggedWidgetId) return;
     e.preventDefault();
     const sourceWidgetId = e.dataTransfer.getData('text/plain') || draggedWidgetId;
     
+    // Check if the drop target is actually another widget; if so, its drop handler will take over.
     const targetElement = e.target as HTMLElement;
     if (targetElement.closest('.page-section__widget')) { 
         // If dropping onto another widget, that widget's drop handler will manage it.
         // We only handle drops onto the general container space here (if it's not over another widget).
         if (dragOverWidgetId) { // dragOverWidgetId would be set if over another widget
+             // Keep widgets collapsed
              if (isLayoutEditing) { 
                 setWidgets(prevWidgets => prevWidgets.map(w => ({ ...w, isCollapsed: true })));
              }
@@ -793,12 +863,12 @@ export default function HomePage() {
     // Logic to move the widget to the end of the list if dropped on the container itself
     setWidgets(currentWidgets => {
       const sourceIndex = currentWidgets.findIndex(w => w.id === sourceWidgetId);
-      if (sourceIndex === -1) return currentWidgets;
+      if (sourceIndex === -1) return currentWidgets; // Should not happen
   
       const reorderedWidgets = Array.from(currentWidgets);
       const [draggedItem] = reorderedWidgets.splice(sourceIndex, 1);
-      reorderedWidgets.push(draggedItem); 
-
+      reorderedWidgets.push(draggedItem); // Add to the end
+      // Ensure all widgets remain collapsed
       return reorderedWidgets.map(w => ({...w, isCollapsed: true}));
     });
     setDraggedWidgetId(null);
@@ -998,6 +1068,7 @@ export default function HomePage() {
                   onDeleteWidget={handleDeleteWidget}
                   isCollapsed={widget.isCollapsed}
                   onToggleCollapse={handleToggleWidgetCollapse}
+                  onUpdateLocalizedEvents={handleUpdateCalendarLocalizedEvents}
                   {...widgetDragProps}
                 />
               );

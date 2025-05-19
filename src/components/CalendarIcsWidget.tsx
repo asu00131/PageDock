@@ -3,7 +3,7 @@
 
 import type { CalendarIcsAppWidget, CalendarEvent } from '@/types';
 import { Button } from '@/components/ui/button';
-import { Calendar as CalendarIcon, Edit3, MoreVertical, Trash2, ChevronDown, ChevronUp, AlertTriangle, Link2, FilePenLine, RotateCcw, ChevronLeft, ChevronRight, PlusCircle, GripVertical } from 'lucide-react';
+import { Calendar as CalendarIconLucide, Edit3, MoreVertical, Trash2, ChevronDown, ChevronUp, AlertTriangle, Link2, FilePenLine, RotateCcw, ChevronLeft, ChevronRight, PlusCircle, GripVertical } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,7 +38,7 @@ interface WidgetDragProps {
   onWidgetDragEnd: (e: React.DragEvent<HTMLDivElement>) => void;
   draggedWidgetId: string | null;
   dragOverWidgetId: string | null;
-  isLayoutEditing?: boolean; // This is the GLOBAL layout editing state from HomePage
+  isLayoutEditing?: boolean; 
 }
 
 interface CalendarIcsWidgetProps extends WidgetDragProps {
@@ -48,6 +48,7 @@ interface CalendarIcsWidgetProps extends WidgetDragProps {
   onDeleteWidget: (widgetId: string) => void;
   isCollapsed?: boolean;
   onToggleCollapse: (widgetId: string) => void;
+  onUpdateLocalizedEvents: (widgetId: string, events: CalendarEvent[]) => void;
 }
 
 type CalendarViewMode = 'day' | 'week' | 'month' | 'list';
@@ -81,6 +82,7 @@ export function CalendarIcsWidget({
   onDeleteWidget,
   isCollapsed,
   onToggleCollapse,
+  onUpdateLocalizedEvents,
   onWidgetDragStart,
   onWidgetDragOver,
   onWidgetDragLeave,
@@ -88,7 +90,7 @@ export function CalendarIcsWidget({
   onWidgetDragEnd,
   draggedWidgetId,
   dragOverWidgetId,
-  isLayoutEditing, // Global layout editing state
+  isLayoutEditing, 
 }: CalendarIcsWidgetProps) {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(startOfDay(new Date()));
   const [events, setEvents] = useState<CalendarEvent[]>([]);
@@ -103,11 +105,21 @@ export function CalendarIcsWidget({
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | Omit<CalendarEvent, 'id'> | undefined>(undefined);
 
 
-  const fetchAndParseIcs = useCallback(() => {
+  const fetchAndParseIcs = useCallback((forceFetchAndStore = false) => {
+    if (widget.data.isLocalized && widget.data.localizedEvents && widget.data.localizedEvents.length > 0 && !forceFetchAndStore) {
+      setEvents(widget.data.localizedEvents.map(e => ({...e, startDate: new Date(e.startDate), endDate: new Date(e.endDate) })));
+      setIsLoading(false);
+      setError(null);
+      return;
+    }
+
     if (!widget.data.icsUrl) {
       setEvents([]);
       setError(null);
       setIsLoading(false);
+      if (widget.data.isLocalized) { // Clear stored events if URL is removed and was localized
+        onUpdateLocalizedEvents(widget.id, []);
+      }
       return;
     }
 
@@ -145,27 +157,43 @@ export function CalendarIcsWidget({
               description: event.description || undefined,
             };
           }).sort((a,b) => compareAsc(a.startDate, b.startDate));
+          
           setEvents(parsedEvents);
+          if (widget.data.isLocalized) {
+            onUpdateLocalizedEvents(widget.id, parsedEvents);
+          }
+
         } catch (parseErr) {
           console.error("Error parsing ICS data:", parseErr);
           setError("解析日历数据失败。请确保 ICS 格式正确。");
           setEvents([]);
+           if (widget.data.isLocalized) { // Clear if parsing fails for a localized calendar
+            onUpdateLocalizedEvents(widget.id, []);
+          }
         }
       })
       .catch(err => {
         console.error("Error fetching or parsing ICS:", err);
         setError(err.message || "加载日历数据失败。请检查链接和网络。");
         setEvents([]);
+        if (widget.data.isLocalized) { // Clear if fetching fails for a localized calendar
+          onUpdateLocalizedEvents(widget.id, []);
+        }
       })
       .finally(() => setIsLoading(false));
-  }, [widget.data.icsUrl]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [widget.id, widget.data.icsUrl, widget.data.isLocalized, widget.data.localizedEvents, onUpdateLocalizedEvents]);
 
   useEffect(() => {
+    // Initial fetch or load from localizedEvents
     if (!isCollapsed) {
+      // If localized and has events, they are already set by fetchAndParseIcs initial call logic.
+      // If not localized, or localized but needs initial fetch, fetchAndParseIcs handles it.
       fetchAndParseIcs();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [widget.data.icsUrl, isCollapsed]);
+  }, [widget.data.icsUrl, widget.data.isLocalized, isCollapsed, fetchAndParseIcs]); // Added fetchAndParseIcs dependency
+
 
   const eventDays = useMemo(() => events.map(event => startOfDay(event.startDate)), [events]);
 
@@ -220,7 +248,7 @@ export function CalendarIcsWidget({
       return;
     }
     e.stopPropagation();
-    if (!widget.data.icsUrl) {
+    if (!widget.data.icsUrl && !(widget.data.isLocalized && widget.data.localizedEvents && widget.data.localizedEvents.length > 0)) {
         onOpenEditDialog(widget.id);
     }
   };
@@ -236,7 +264,7 @@ export function CalendarIcsWidget({
       }
       e.preventDefault();
       e.stopPropagation();
-      if (!widget.data.icsUrl) {
+      if (!widget.data.icsUrl && !(widget.data.isLocalized && widget.data.localizedEvents && widget.data.localizedEvents.length > 0)) {
         onOpenEditDialog(widget.id);
       }
     }
@@ -255,20 +283,32 @@ export function CalendarIcsWidget({
   const handleSubmitEventDetail = (updatedEventData: CalendarEvent) => {
      setEvents(prevEvents => {
         const eventExists = prevEvents.some(e => e.id === updatedEventData.id);
+        let newEventsArray;
         if (eventExists) {
-            return prevEvents.map(event =>
+            newEventsArray = prevEvents.map(event =>
                 event.id === updatedEventData.id ? { ...event, ...updatedEventData } : event
-            ).sort((a,b) => compareAsc(a.startDate, b.startDate));
+            );
         } else {
             const newEventWithId = { ...updatedEventData, id: updatedEventData.id || crypto.randomUUID()};
-            return [...prevEvents, newEventWithId].sort((a,b) => compareAsc(a.startDate, b.startDate));
+            newEventsArray = [...prevEvents, newEventWithId];
         }
+        newEventsArray.sort((a,b) => compareAsc(a.startDate, b.startDate));
+        if (widget.data.isLocalized) {
+          onUpdateLocalizedEvents(widget.id, newEventsArray);
+        }
+        return newEventsArray;
     });
     handleCloseEventDetailDialog();
   };
 
   const handleDeleteEvent = (eventId: string) => {
-    setEvents(prevEvents => prevEvents.filter(event => event.id !== eventId));
+    setEvents(prevEvents => {
+      const newEventsArray = prevEvents.filter(event => event.id !== eventId);
+      if (widget.data.isLocalized) {
+        onUpdateLocalizedEvents(widget.id, newEventsArray);
+      }
+      return newEventsArray;
+    });
     if (editingEvent && 'id' in editingEvent && editingEvent.id === eventId) {
       handleCloseEventDetailDialog();
     }
@@ -279,10 +319,15 @@ export function CalendarIcsWidget({
     setSelectedDate(todayAnchor);
     setDisplayDate(todayAnchor);
     setCurrentMonth(todayAnchor);
-    if (currentView !== 'day') {
-      setCurrentView('day'); 
-    }
+    // if (currentView !== 'day') { // Optionally switch view
+    //   setCurrentView('day'); 
+    // }
   };
+
+  const handleRefresh = () => {
+    fetchAndParseIcs(true); // forceFetchAndStore = true
+  };
+
 
   const renderEventItem = (event: CalendarEvent, context?: 'week-column' | 'list' | 'day-detail' | 'day-timeline') => {
     let baseItemClasses = "calendar-widget__event-item group/event-item";
@@ -569,7 +614,7 @@ export function CalendarIcsWidget({
         data-testid="calendar-ics-widget-main"
         className={cn(
             "page-section__widget",
-            isLayoutEditing && "is-layout-editing",
+            isLayoutEditing && "is-layout-editing", // Global class for layout editing
             draggedWidgetId === widget.id && "opacity-50 cursor-grabbing",
             dragOverWidgetId === widget.id && draggedWidgetId !== widget.id && "ring-2 ring-primary ring-offset-2 rounded-lg"
         )}
@@ -581,10 +626,10 @@ export function CalendarIcsWidget({
               e.preventDefault();
             }
           }}
-        onDragOver={(e) => { if (isLayoutEditing) onWidgetDragOver(e, widget.id);}}
-        onDrop={(e) => { if (isLayoutEditing) onWidgetDrop(e, widget.id);}}
-        onDragLeave={(e) => { if (isLayoutEditing) onWidgetDragLeave(e);}}
-        onDragEnd={(e) => { if (isLayoutEditing) onWidgetDragEnd(e);}}
+        onDragOver={(e) => { if (isLayoutEditing) onWidgetDragOver(e, widget.id);}} // Ensure isLayoutEditing check
+        onDrop={(e) => { if (isLayoutEditing) onWidgetDrop(e, widget.id);}} // Ensure isLayoutEditing check
+        onDragLeave={(e) => { if (isLayoutEditing) onWidgetDragLeave(e);}} // Ensure isLayoutEditing check
+        onDragEnd={(e) => { if (isLayoutEditing) onWidgetDragEnd(e);}} // Ensure isLayoutEditing check
     >
       <article className="widget calendar-widget group/widget">
         <div className="widget__container">
@@ -601,13 +646,13 @@ export function CalendarIcsWidget({
               aria-expanded={!isCollapsed}
               aria-controls={`widget-body-${widget.id}`}
             >
-              <CalendarIcon className="widget-header__feather-icon h-5 w-5 mr-2" />
+              <CalendarIconLucide className="widget-header__feather-icon h-5 w-5 mr-2" />
               <span className="widget-header__text text-lg font-semibold">{widget.title}</span>
               {isCollapsed ? <ChevronDown className="widget-header__chevron" /> : <ChevronUp className="widget-header__chevron" />}
             </div>
             <div className="widget-header__controls">
-              {!isCollapsed && widget.data.icsUrl && (
-                <Button variant="ghost" size="icon" className="widget-header__control h-7 w-7" onClick={(e) => {e.stopPropagation(); fetchAndParseIcs();}} title="刷新日历数据">
+              {(!isCollapsed && (widget.data.icsUrl || (widget.data.isLocalized && widget.data.localizedEvents && widget.data.localizedEvents.length > 0))) && (
+                <Button variant="ghost" size="icon" className="widget-header__control h-7 w-7" onClick={(e) => {e.stopPropagation(); handleRefresh();}} title="刷新日历数据">
                     <RotateCcw className="widget-header__feather-icon h-4 w-4" />
                     <span className="sr-only">刷新日历</span>
                 </Button>
@@ -680,21 +725,18 @@ export function CalendarIcsWidget({
                 className="widget__body"
                 onClick={handleBodyClick}
                 onKeyDown={handleBodyKeyDown}
-                role={!widget.data.icsUrl && !isLayoutEditing ? "button" : undefined}
-                tabIndex={!widget.data.icsUrl && !isLayoutEditing ? 0 : undefined}
-                aria-label={!widget.data.icsUrl ? "设置日历链接" : `${widget.title} 日历区域`}
+                role={!widget.data.icsUrl && !(widget.data.isLocalized && widget.data.localizedEvents && widget.data.localizedEvents.length > 0) && !isLayoutEditing ? "button" : undefined}
+                tabIndex={!widget.data.icsUrl && !(widget.data.isLocalized && widget.data.localizedEvents && widget.data.localizedEvents.length > 0) && !isLayoutEditing ? 0 : undefined}
+                aria-label={(!widget.data.icsUrl && !(widget.data.isLocalized && widget.data.localizedEvents && widget.data.localizedEvents.length > 0)) ? "设置日历链接" : `${widget.title} 日历区域`}
               >
                 {isLoading && <p className="p-4 text-center text-muted-foreground">正在加载日历...</p>}
                 {error &&
                   <div className="p-4 text-center text-destructive flex flex-col items-center">
                     <AlertTriangle className="w-8 h-8 mb-2"/>
                     <p>{error}</p>
-                    <Button variant="link" onClick={(e) => { e.stopPropagation(); onOpenEditDialog(widget.id); }} className="mt-2">
-                      编辑日历链接
-                    </Button>
                   </div>
                 }
-                {!isLoading && !error && widget.data.icsUrl && (
+                {!isLoading && !error && (widget.data.icsUrl || (widget.data.isLocalized && widget.data.localizedEvents && widget.data.localizedEvents.length > 0)) && (
                   <>
                     <div className="calendar-widget__toolbar view-switcher">
                         <div className="flex items-center space-x-1">
@@ -722,8 +764,8 @@ export function CalendarIcsWidget({
                                 </Button>
                             ))}
                         </div>
-                        <div className="flex items-center space-x-1">
-                            <Button
+                         <div className="flex items-center space-x-1">
+                             <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={(e) => { e.stopPropagation(); goToToday(); }}
@@ -806,13 +848,13 @@ export function CalendarIcsWidget({
                     )}
                   </>
                 )}
-                {!widget.data.icsUrl && !isLoading && !error && (
+                {!isLoading && !error && !widget.data.icsUrl && !(widget.data.isLocalized && widget.data.localizedEvents && widget.data.localizedEvents.length > 0) && (
                    <div
                     className="calendar-widget__empty-prompt"
                   >
-                    <CalendarIcon className="w-10 h-10 text-muted-foreground mb-3"/>
+                    <CalendarIconLucide className="w-10 h-10 text-muted-foreground mb-3"/>
                     <p className="text-lg font-medium text-foreground mb-2">日历为空</p>
-                    <p className="text-sm text-muted-foreground mb-4">要显示事件，请链接一个 ICS 日历 URL。 您可以从菜单中“编辑日历链接”进行设置。</p>
+                    <p className="text-sm text-muted-foreground mb-4">要显示事件，请链接一个 ICS 日历 URL 或本地化数据。 您可以从菜单中“编辑日历链接”进行设置。</p>
                   </div>
                 )}
               </div>
