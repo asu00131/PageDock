@@ -22,9 +22,9 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Calendar } from "@/components/ui/calendar";
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import ICAL from 'ical.js';
-import { format, isSameDay, startOfDay, addDays, subDays, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isWithinInterval, compareAsc, getHours, getMinutes, differenceInMinutes, setHours, setMinutes, setSeconds, setMilliseconds, isValid } from 'date-fns';
+import { format, isSameDay, startOfDay, addDays, subDays, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isWithinInterval, compareAsc, getHours, getMinutes, differenceInMinutes, setHours, setMinutes, setSeconds, setMilliseconds, isValid, parseISO } from 'date-fns';
 import { EventDetailDialog } from './EventDetailDialog';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
@@ -60,23 +60,23 @@ const parseIcalTime = (icalTime: ICAL.Time, event: ICAL.Event): Date => {
       // For all-day events, ical.js might parse them as UTC midnight.
       // We want to treat them as local date at midnight.
       jsDate = new Date(jsDate.getUTCFullYear(), jsDate.getUTCMonth(), jsDate.getUTCDate());
-      return startOfDay(jsDate); // Ensure it's the start of the local day
+      return startOfDay(jsDate); 
     }
-    // For specific time events, ical.js usually handles timezones correctly if present in ICS.
-    // If not, it might interpret as local or UTC based on ICS. We trust its output for timed events.
     return jsDate;
   } catch (e) {
     console.warn("Failed to parse date directly, attempting fallback for event:", event.summary, icalTime.toString(), e);
-    // Fallback for dates that might not be fully spec-compliant, e.g., just YYYYMMDD
     const dateStringOnly = icalTime.toString().split('T')[0];
-    const year = parseInt(dateStringOnly.substring(0, 4), 10);
-    const month = parseInt(dateStringOnly.substring(4, 6), 10) - 1; // JS months are 0-indexed
-    const day = parseInt(dateStringOnly.substring(6, 8), 10);
-
-    if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
-      return startOfDay(new Date(year, month, day));
+    if (dateStringOnly.length === 8) { // YYYYMMDD
+        const year = parseInt(dateStringOnly.substring(0, 4), 10);
+        const month = parseInt(dateStringOnly.substring(4, 6), 10) - 1; 
+        const day = parseInt(dateStringOnly.substring(6, 8), 10);
+        if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
+          return startOfDay(new Date(year, month, day));
+        }
+    } else if (dateStringOnly.includes('-')) { // YYYY-MM-DD
+        const parsed = parseISO(dateStringOnly);
+        if (isValid(parsed)) return startOfDay(parsed);
     }
-    // If all else fails, return start of current day to prevent crashing, though data will be wrong.
     return startOfDay(new Date());
   }
 };
@@ -111,6 +111,8 @@ export function CalendarIcsWidget({
 
   const [isEventDetailDialogOpen, setIsEventDetailDialogOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | Omit<CalendarEvent, 'id'> | undefined>(undefined);
+  const forceFetchRef = useRef(false);
+
 
   useEffect(() => {
     setIsClientMounted(true);
@@ -122,6 +124,7 @@ export function CalendarIcsWidget({
 
 
   const fetchAndParseIcs = useCallback((forceFetchAndStore = false) => {
+    forceFetchRef.current = forceFetchAndStore;
     if (widget.data.isLocalized && widget.data.localizedEvents && widget.data.localizedEvents.length > 0 && !forceFetchAndStore) {
       setEvents(widget.data.localizedEvents.map(e => ({...e, startDate: new Date(e.startDate), endDate: new Date(e.endDate) })));
       setIsLoading(false);
@@ -130,18 +133,21 @@ export function CalendarIcsWidget({
     }
 
     if (!widget.data.icsUrl) {
-      setEvents([]);
+      // If it's localized but no URL, keep existing localized events unless forced to clear
+      if (widget.data.isLocalized && widget.data.localizedEvents && !forceFetchAndStore) {
+         setEvents(widget.data.localizedEvents.map(e => ({...e, startDate: new Date(e.startDate), endDate: new Date(e.endDate) })));
+      } else {
+         setEvents([]);
+         if (widget.data.isLocalized) onUpdateLocalizedEvents(widget.id, []);
+      }
       setError(null);
       setIsLoading(false);
-      if (widget.data.isLocalized) { 
-        onUpdateLocalizedEvents(widget.id, []);
-      }
       return;
     }
 
     setIsLoading(true);
     setError(null);
-    fetch(widget.data.icsUrl) // Removed proxy path
+    fetch(widget.data.icsUrl)
       .then(response => {
         if (!response.ok) {
           throw new Error(`获取 ICS 数据失败 (状态: ${response.status}). 请检查链接和网络连接，并确保 ICS 服务器允许跨域请求。`);
@@ -158,12 +164,9 @@ export function CalendarIcsWidget({
             const startDate = parseIcalTime(event.startDate, event);
             let endDate = parseIcalTime(event.endDate, event);
 
-             if (event.startDate.isDate) { // All-day event
-                 // For all-day events, if endDate is same as startDate or earlier, it means it's a single all-day event.
-                 // Standard practice is for endDate to be the start of the *next* day for rendering purposes if it's an exclusive end.
-                 // If ical.js parsed it as start of the same day, adjust to span one full day.
+             if (event.startDate.isDate) { 
                  if (compareAsc(endDate, startDate) <= 0) {
-                    endDate = startOfDay(addDays(startDate,1)); // Make it span the full day
+                    endDate = startOfDay(addDays(startDate,1)); 
                  }
             }
 
@@ -172,43 +175,41 @@ export function CalendarIcsWidget({
               summary: event.summary || '无标题',
               startDate: startDate,
               endDate: endDate,
-              isAllDay: event.startDate.isDate, // isDate property correctly indicates all-day
+              isAllDay: event.startDate.isDate, 
               description: event.description || undefined,
             };
           }).sort((a,b) => compareAsc(a.startDate, b.startDate));
 
           setEvents(parsedEvents);
-          if (widget.data.isLocalized) {
+          if (widget.data.isLocalized || forceFetchAndStore) { // If we force a fetch for a localized calendar, we should update it.
             onUpdateLocalizedEvents(widget.id, parsedEvents);
           }
 
         } catch (parseErr) {
           console.error("Error parsing ICS data:", parseErr);
           setError("解析日历数据失败。请确保 ICS 格式正确。");
-          setEvents([]);
-           if (widget.data.isLocalized) {
-            onUpdateLocalizedEvents(widget.id, []);
-          }
+          if (!widget.data.isLocalized) setEvents([]); // Only clear non-localized if parse fails
+           else if (forceFetchAndStore) onUpdateLocalizedEvents(widget.id, []); // If forced fetch for localized fails, clear stored
         }
       })
       .catch(err => {
         console.error("Error fetching or parsing ICS:", err);
         setError(err.message || "加载日历数据失败。请检查链接和网络，并确认服务器支持跨域请求(CORS)。");
-        setEvents([]);
-        if (widget.data.isLocalized) {
-          onUpdateLocalizedEvents(widget.id, []);
-        }
+        if (!widget.data.isLocalized) setEvents([]);
+        else if (forceFetchAndStore) onUpdateLocalizedEvents(widget.id, []);
       })
       .finally(() => setIsLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [widget.id, widget.data.icsUrl, widget.data.isLocalized, widget.data.localizedEvents, onUpdateLocalizedEvents]);
+  }, [widget.id, widget.data.icsUrl, widget.data.isLocalized, onUpdateLocalizedEvents]);
+
 
   useEffect(() => {
-    if (isClientMounted && !isCollapsed) { // Ensure client is mounted before fetching
-      fetchAndParseIcs();
+    if (isClientMounted && !isCollapsed) {
+      fetchAndParseIcs(forceFetchRef.current);
     }
+    forceFetchRef.current = false; // Reset after the effect runs
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [widget.data.icsUrl, widget.data.isLocalized, isCollapsed, isClientMounted, fetchAndParseIcs]);
+  }, [widget.data.icsUrl, widget.data.isLocalized, widget.data.localizedEvents, isCollapsed, isClientMounted, fetchAndParseIcs]);
 
 
   const eventDays = useMemo(() => events.map(event => startOfDay(event.startDate)), [events]);
@@ -221,14 +222,11 @@ export function CalendarIcsWidget({
     return events.filter(event => {
       const eventStart = event.startDate;
       const eventEnd = event.endDate;
-      // Check if the event interval overlaps with the target day
-      // For all-day events, endDate is exclusive (start of next day)
-      // For timed events, endDate can be on the same day or later
       return compareAsc(eventStart, targetDayEnd) < 0 && compareAsc(eventEnd, targetDayStart) > 0;
     }).sort((a, b) => {
-      if (a.isAllDay && !b.isAllDay) return -1; // All-day events first
+      if (a.isAllDay && !b.isAllDay) return -1; 
       if (!a.isAllDay && b.isAllDay) return 1;
-      return compareAsc(a.startDate, b.startDate); // Then sort by start time
+      return compareAsc(a.startDate, b.startDate); 
     });
   }, [events]);
 
@@ -238,28 +236,21 @@ export function CalendarIcsWidget({
   }, [selectedDate, getEventsForDay]);
 
   const weekRange = useMemo(() => {
-    if (!displayDate || !isValid(displayDate)) return { start: new Date(), end: new Date()}; // Should be guarded by !isClientMounted check
-    const start = startOfWeek(displayDate, { weekStartsOn: 1 }); // Monday as start of week
+    if (!displayDate || !isValid(displayDate)) return { start: new Date(), end: new Date()};
+    const start = startOfWeek(displayDate, { weekStartsOn: 1 }); 
     const end = endOfWeek(displayDate, { weekStartsOn: 1 });
     return { start, end };
   }, [displayDate]);
 
   const eventsForListView = useMemo(() => {
     const today = startOfDay(new Date());
-    const thirtyDaysLater = endOfWeek(addDays(today, 30)); // Show events in the upcoming ~month
+    const thirtyDaysLater = endOfWeek(addDays(today, 30)); 
     return events.filter(event => {
-      // Event starts today or later AND ends today or later (for ongoing/future events)
       const eventStartsTodayOrLater = compareAsc(event.startDate, today) >= 0;
       const eventEndsTodayOrLater = event.endDate && compareAsc(event.endDate, today) >=0;
-      
-      // Event is within the future 30-day range
       const eventIsWithinFutureRange = isWithinInterval(event.startDate, { start: today, end: thirtyDaysLater });
-
-      // Event spans across today (started in past, ends today or in future)
       const eventSpansAcrossToday = compareAsc(event.startDate, today) < 0 && event.endDate && compareAsc(event.endDate, today) > 0;
-
       return eventIsWithinFutureRange || (eventStartsTodayOrLater && eventEndsTodayOrLater) || eventSpansAcrossToday;
-
     }).sort((a, b) => compareAsc(a.startDate, b.startDate));
   }, [events]);
 
@@ -269,13 +260,12 @@ export function CalendarIcsWidget({
        e.stopPropagation();
        return;
     }
-    // Allow clicks on buttons, links, and interactive calendar parts
     if (e.target instanceof HTMLElement && (e.target.closest('button, a') || e.target.closest('.rdp-nav_button') || e.target.closest('.view-switcher') || e.target.closest('[role="button"]'))) {
       return;
     }
-    e.stopPropagation(); // Stop propagation for general body clicks to prevent unwanted actions
+    e.stopPropagation(); 
     if (!widget.data.icsUrl && !(widget.data.isLocalized && widget.data.localizedEvents && widget.data.localizedEvents.length > 0)) {
-        onOpenEditDialog(widget.id); // Open dialog if no URL and no localized data
+        onOpenEditDialog(widget.id); 
     }
   };
 
@@ -285,14 +275,13 @@ export function CalendarIcsWidget({
       return;
     }
     if (e.key === 'Enter' || e.key === ' ') {
-       // Allow keydown on buttons, links, and interactive calendar parts
        if (e.target instanceof HTMLElement && (e.target.closest('button, a') || e.target.closest('.rdp-nav_button') || e.target.closest('.view-switcher') || e.target.closest('[role="button"]'))) {
         return;
       }
       e.preventDefault();
-      e.stopPropagation(); // Stop propagation for general body keydowns
+      e.stopPropagation(); 
       if (!widget.data.icsUrl && !(widget.data.isLocalized && widget.data.localizedEvents && widget.data.localizedEvents.length > 0)) {
-        onOpenEditDialog(widget.id); // Open dialog if no URL and no localized data
+        onOpenEditDialog(widget.id); 
       }
     }
   };
@@ -316,11 +305,9 @@ export function CalendarIcsWidget({
                 event.id === updatedEventData.id ? { ...event, ...updatedEventData } : event
             );
         } else {
-            // For new events, ensure a unique ID if not already provided (though crypto.randomUUID should be in Omit type)
-            const newEventWithId = { ...updatedEventData, id: updatedEventData.id || crypto.randomUUID()};
-            newEventsArray = [...prevEvents, newEventWithId];
+            newEventsArray = [...prevEvents, updatedEventData];
         }
-        newEventsArray.sort((a,b) => compareAsc(a.startDate, b.startDate)); // Re-sort
+        newEventsArray.sort((a,b) => compareAsc(a.startDate, b.startDate));
         if (widget.data.isLocalized) {
           onUpdateLocalizedEvents(widget.id, newEventsArray);
         }
@@ -337,7 +324,6 @@ export function CalendarIcsWidget({
       }
       return newEventsArray;
     });
-    // If the deleted event was being edited, close the dialog
     if (editingEvent && 'id' in editingEvent && editingEvent.id === eventId) {
       handleCloseEventDetailDialog();
     }
@@ -347,27 +333,22 @@ export function CalendarIcsWidget({
     const todayAnchor = startOfDay(new Date());
     setSelectedDate(todayAnchor);
     setDisplayDate(todayAnchor);
-    setCurrentMonth(todayAnchor); // Also reset month view to current month
+    setCurrentMonth(todayAnchor); 
   };
 
   const handleRefresh = () => {
-    fetchAndParseIcs(true); // forceFetchAndStore = true
+    fetchAndParseIcs(true); 
   };
 
 
   const renderEventItem = (event: CalendarEvent, context?: 'week-column' | 'list' | 'day-detail' | 'day-timeline') => {
     let baseItemClasses = "calendar-widget__event-item group/event-item";
-    // Default text color, overridden by specific contexts or dark mode adjustments in CSS
     let titleClasses = "truncate block";
     let timeClasses = "text-xs block";
 
-
-    if (context === 'list' || context === 'day-detail' ) {
-       // Specific styling for list and day-detail might be slightly different if needed
-    } else if (context === 'week-column' || context === 'day-timeline') {
+    if (context === 'week-column' || context === 'day-timeline') {
       titleClasses = cn(titleClasses, "font-semibold");
     }
-
 
     let actionButtonSizeClasses = "h-7 w-7 p-1";
     let actionIconSizeClasses = "h-4 w-4";
@@ -379,9 +360,9 @@ export function CalendarIcsWidget({
     } else if (context === 'day-timeline') {
         baseItemClasses = cn(
           "calendar-widget__event-item group/event-item !p-1.5 text-xs",
-          event.isAllDay ? "relative" : "absolute" // Absolute for timed, relative for all-day in timeline
+          event.isAllDay ? "relative" : "absolute" 
         );
-        actionButtonSizeClasses = "h-5 w-5 p-0.5"; // Smaller buttons for timeline
+        actionButtonSizeClasses = "h-5 w-5 p-0.5"; 
         actionIconSizeClasses = "h-3 w-3";
     }
 
@@ -398,21 +379,19 @@ export function CalendarIcsWidget({
     >
       <div className="flex-grow overflow-hidden mr-1">
         <strong className={titleClasses} title={event.summary}>{event.summary}</strong>
-
-        {/* Time display logic based on context */}
-        {context === 'list' && ( // List view: Full date and time
+        {context === 'list' && ( 
             <span className={timeClasses}>
                 {format(event.startDate, 'PPP')}
                 {!event.isAllDay && ` ${format(event.startDate, 'p')} - ${format(event.endDate, 'p')}`}
                 {event.isAllDay && ` (全天)`}
             </span>
         )}
-        {(context === 'day-detail' || context === 'day-timeline') && ( // Day detail / timeline: Time only or "All day"
+        {(context === 'day-detail' || context === 'day-timeline') && ( 
           <span className={timeClasses}>
             {!event.isAllDay ? `${format(event.startDate, 'HH:mm')} - ${format(event.endDate, 'HH:mm')}` : "(全天)"}
           </span>
         )}
-         {context === 'week-column' && ( // Week column: Start time only or "All day" (concise)
+         {context === 'week-column' && ( 
           <span className={timeClasses}>
             {!event.isAllDay ? `${format(event.startDate, 'p')}` : "(全天)"}
           </span>
@@ -465,17 +444,14 @@ export function CalendarIcsWidget({
   );
 
 
-  // Timeline specific calculations
-  const hourSlotHeight = 60; // pixels per hour
+  const hourSlotHeight = 60; 
   const getTimelineEventStyle = (event: CalendarEvent): React.CSSProperties => {
-    if (event.isAllDay) return { position: 'relative' }; // All-day events rendered differently, not absolutely positioned in timeline
+    if (event.isAllDay) return { position: 'relative' }; 
 
     const startHour = getHours(event.startDate);
     const startMinute = getMinutes(event.startDate);
-
-    // Ensure endDate is after startDate for duration calculation
     let durationMinutes = differenceInMinutes(event.endDate, event.startDate);
-    if (durationMinutes <=0) durationMinutes = 30; // Default to 30 min if duration is zero or negative
+    if (durationMinutes <=0) durationMinutes = 30; 
 
     const top = (startHour + startMinute / 60) * hourSlotHeight;
     const height = (durationMinutes / 60) * hourSlotHeight;
@@ -483,10 +459,10 @@ export function CalendarIcsWidget({
     return {
       position: 'absolute',
       top: `${top}px`,
-      height: `${Math.max(height, 20)}px`, // Minimum height for very short events
-      left: '0.25rem', // Small offset from the time axis
+      height: `${Math.max(height, 20)}px`, 
+      left: '0.25rem', 
       right: '0.25rem',
-      zIndex: 10, // Ensure events are above hour lines
+      zIndex: 10, 
     };
   };
 
@@ -496,11 +472,10 @@ export function CalendarIcsWidget({
     const dayEvents = getEventsForDay(displayDate);
     const allDayEvents = dayEvents.filter(e => e.isAllDay);
     const timedEvents = dayEvents.filter(e => !e.isAllDay);
-    const hours = Array.from({ length: 24 }, (_, i) => i); // 0-23 for 24-hour format
+    const hours = Array.from({ length: 24 }, (_, i) => i);
 
     return (
       <div className="p-2">
-        {/* Day Navigation and Title */}
         <div className="flex justify-between items-center mb-2">
           <Button variant="ghost" size="icon" onClick={(e)=>{e.stopPropagation(); const newDay = subDays(displayDate,1); setDisplayDate(newDay); setSelectedDate(newDay);}}><ChevronLeft className="h-5 w-5" /></Button>
           <h3
@@ -513,7 +488,6 @@ export function CalendarIcsWidget({
           <Button variant="ghost" size="icon" onClick={(e)=>{e.stopPropagation(); const newDay = addDays(displayDate,1); setDisplayDate(newDay); setSelectedDate(newDay);}}><ChevronRight className="h-5 w-5" /></Button>
         </div>
 
-        {/* All-day events section */}
         {allDayEvents.length > 0 && (
           <div className="mb-3 border-b pb-2">
             <h4 className="text-sm font-semibold mb-1 text-foreground">全天事件</h4>
@@ -523,29 +497,22 @@ export function CalendarIcsWidget({
           </div>
         )}
 
-        {/* Timeline for timed events */}
-        <ScrollArea className="h-[500px] w-full"> {/* Adjust height as needed */}
+        <ScrollArea className="h-[500px] w-full">
           <div className="calendar-widget__day-timeline-container flex">
-            {/* Time Axis */}
-            <div className="calendar-widget__time-axis pt-1"> {/* pt-1 to align with potential padding in event column slots */}
+            <div className="calendar-widget__time-axis pt-1">
               {hours.map(hour => (
                 <div key={`time-label-${hour}`} className="flex items-center justify-end" style={{ height: `${hourSlotHeight}px` }}>
                   {format(setHours(setMinutes(new Date(),0), hour), 'HH:mm')}
                 </div>
               ))}
             </div>
-
-            {/* Event Grid */}
-            <div className="relative flex-grow"> {/* This will contain hour slots and events */}
-              {/* Background hour slots */}
+            <div className="relative flex-grow">
               {hours.map(hour => (
                 <div key={`timeslot-bg-${hour}`} className="calendar-widget__time-slot" style={{ height: `${hourSlotHeight}px` }}>
-                  {/* This div is just for the horizontal line */}
                 </div>
               ))}
-              {/* Events container absolutely positioned over the slots */}
               <div className="calendar-widget__event-column">
-                <ul className="relative h-full"> {/* Ensure ul takes full height for positioning */}
+                <ul className="relative h-full"> 
                   {timedEvents.map(event => renderEventItem(event, 'day-timeline'))}
                 </ul>
               </div>
@@ -554,7 +521,6 @@ export function CalendarIcsWidget({
           <ScrollBar orientation="vertical" />
         </ScrollArea>
 
-        {/* Empty state for the day */}
         {allDayEvents.length === 0 && timedEvents.length === 0 && (
             <p className="text-muted-foreground text-center py-10">{`${isValid(displayDate) ? format(displayDate, 'PPP') : ''} 无事件。`}</p>
         )}
@@ -567,7 +533,7 @@ export function CalendarIcsWidget({
     if (!displayDate || !isValid(displayDate)) return <p className="p-4 text-center text-muted-foreground">选择一个日期以查看日程。</p>;
 
     const daysOfWeek = eachDayOfInterval(weekRange);
-    const hours = Array.from({ length: 24 }, (_, i) => i); // 0-23 for 24-hour format
+    const hours = Array.from({ length: 24 }, (_, i) => i);
     const allDayEventsByDay: Record<string, CalendarEvent[]> = {};
     const timedEventsByDay: Record<string, CalendarEvent[]> = {};
 
@@ -580,7 +546,6 @@ export function CalendarIcsWidget({
 
     return (
       <div className="p-2">
-        {/* Week Navigation and Title */}
         <div className="flex justify-between items-center mb-2">
           <Button variant="ghost" size="icon" onClick={(e)=>{e.stopPropagation(); setDisplayDate(prev => prev ? subWeeks(prev, 1) : new Date())}}><ChevronLeft className="h-5 w-5" /></Button>
           <h3
@@ -593,11 +558,8 @@ export function CalendarIcsWidget({
           <Button variant="ghost" size="icon" onClick={(e)=>{e.stopPropagation(); setDisplayDate(prev => prev ? addWeeks(prev, 1) : new Date())}}><ChevronRight className="h-5 w-5" /></Button>
         </div>
 
-        {/* All-day events row */}
         <div className="grid grid-cols-[auto_repeat(7,1fr)] gap-px bg-border border-t border-l">
-            {/* Header for "all-day" slot */}
             <div className="calendar-widget__time-axis p-1 border-b border-r text-xs font-semibold text-muted-foreground flex items-center justify-center">全天</div>
-            {/* Day headers for all-day events */}
             {daysOfWeek.map(day => (
                 <div key={`allday-header-${day.toISOString()}`}
                      className={`calendar-widget__day-column !min-h-[auto] p-1 border-b ${isSameDay(day, startOfDay(new Date())) ? 'border-primary border-2' : ''} ${isSameDay(day, displayDate || new Date()) && currentView === 'day' ? 'bg-accent/20' : ''}`}
@@ -611,16 +573,14 @@ export function CalendarIcsWidget({
                         <ul className="space-y-0.5 mt-1">
                             {allDayEventsByDay[format(day, 'yyyy-MM-dd')].map(event => renderEventItem(event, 'week-column'))}
                         </ul>
-                    ) : (<div className="h-4"></div>) /* Placeholder for empty all-day slots */}
+                    ) : (<div className="h-4"></div>) }
                 </div>
             ))}
         </div>
 
-        {/* Timed events grid */}
-        <ScrollArea className="h-[500px] w-full"> {/* Adjust height as needed */}
-            <div className="relative grid grid-cols-[auto_repeat(7,1fr)] gap-px bg-border border-l"> {/* Main grid for time axis + 7 days */}
-                {/* Time Axis - sticky for scrolling would be ideal but complex with pure Tailwind grid */}
-                <div className="sticky left-0 z-10 bg-card calendar-widget__time-axis pt-1"> {/* pt-1 to align with event column padding */}
+        <ScrollArea className="h-[500px] w-full"> 
+            <div className="relative grid grid-cols-[auto_repeat(7,1fr)] gap-px bg-border border-l">
+                <div className="sticky left-0 z-10 bg-card calendar-widget__time-axis pt-1"> 
                     {hours.map(hour => (
                         <div key={`week-timeslot-label-${hour}`} className="flex items-center justify-end border-r" style={{ height: `${hourSlotHeight}px` }}>
                             {format(setHours(setMinutes(new Date(),0), hour), 'HH:mm')}
@@ -628,12 +588,10 @@ export function CalendarIcsWidget({
                     ))}
                 </div>
 
-                {/* Day Columns for Timed Events */}
                 {daysOfWeek.map(day => (
                     <div key={`week-daycol-${day.toISOString()}`}
-                         className={`relative calendar-widget__day-column !min-h-[${hours.length * hourSlotHeight}px] !p-0 !border-b-0 ${isSameDay(day, startOfDay(new Date())) ? 'border-primary border-l-0 border-t-0 border-b-0 !border-r-2' : ''}`} // Highlight today
+                         className={`relative calendar-widget__day-column !min-h-[${hours.length * hourSlotHeight}px] !p-0 !border-b-0 ${isSameDay(day, startOfDay(new Date())) ? 'border-primary border-l-0 border-t-0 border-b-0 !border-r-2' : ''}`}
                          onClick={(e) => {
-                            // If clicking on the background grid of a day column (not an event itself)
                             if (e.target === e.currentTarget) {
                                 setSelectedDate(day); setDisplayDate(day); setCurrentView('day');
                             }
@@ -642,14 +600,12 @@ export function CalendarIcsWidget({
                          onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) { e.preventDefault(); setSelectedDate(day); setDisplayDate(day); setCurrentView('day');}}}
                          aria-label={`查看 ${format(day, 'MMMM d, yyyy')} 的日程`}
                     >
-                        {/* Background hour slots for this day */}
                         {hours.map(hour => (
                             <div key={`week-day-${format(day, 'yyyy-MM-dd')}-timeslot-line-${hour}`}
                                 className="calendar-widget__time-slot" style={{ height: `${hourSlotHeight}px` }}>
                             </div>
                         ))}
-                        {/* Events for this day, absolutely positioned */}
-                        <ul className="absolute inset-0"> {/* Takes full space of the day column for event positioning */}
+                        <ul className="absolute inset-0"> 
                             {timedEventsByDay[format(day, 'yyyy-MM-dd')].map(event => renderEventItem(event, 'day-timeline'))}
                         </ul>
                     </div>
@@ -681,7 +637,6 @@ export function CalendarIcsWidget({
                 <span className="widget-header__text text-lg font-semibold">{widget.title}</span>
                 {isCollapsed ? <ChevronDown className="widget-header__chevron" /> : <ChevronUp className="widget-header__chevron" />}
               </div>
-               {/* Placeholder for controls to maintain layout consistency */}
               <div className="widget-header__controls h-7"></div>
             </header>
             {!isCollapsed && (
@@ -697,7 +652,6 @@ export function CalendarIcsWidget({
     );
   }
 
-
   const isWidgetItselfDraggable = isLayoutEditing;
 
   return (
@@ -705,7 +659,7 @@ export function CalendarIcsWidget({
         data-testid="calendar-ics-widget-main"
         className={cn(
             "page-section__widget",
-            isLayoutEditing && "is-layout-editing", // Added conditional class
+            isLayoutEditing && "is-layout-editing", 
             draggedWidgetId === widget.id && "opacity-50 cursor-grabbing",
             dragOverWidgetId === widget.id && draggedWidgetId !== widget.id && "ring-2 ring-primary ring-offset-2 rounded-lg"
         )}
@@ -768,8 +722,8 @@ export function CalendarIcsWidget({
                      const newEventStart = selectedDate && isValid(selectedDate) ? selectedDate : startOfDay(new Date());
                      const newEvent: Omit<CalendarEvent, 'id'> = {
                        summary: "新事件",
-                       startDate: setMinutes(setHours(newEventStart, getHours(new Date())),0), // Default to current hour, 0 minutes
-                       endDate: setMinutes(setHours(newEventStart, getHours(new Date()) + 1),0), // Default to one hour later
+                       startDate: setMinutes(setHours(newEventStart, getHours(new Date())),0), 
+                       endDate: setMinutes(setHours(newEventStart, getHours(new Date()) + 1),0), 
                        isAllDay: false,
                        description: ""
                      };
@@ -856,6 +810,7 @@ export function CalendarIcsWidget({
                             ))}
                         </div>
                          <div className="flex items-center space-x-1">
+                             <Button variant="outline" size="sm" onClick={(e) => {e.stopPropagation(); goToToday();}}>今天</Button>
                             <Button
                                 variant="outline"
                                 size="sm"
@@ -887,25 +842,23 @@ export function CalendarIcsWidget({
                             setSelectedDate(day);
                             if (day && isValid(day)) {
                                 setDisplayDate(startOfDay(day));
-                                setCurrentMonth(startOfDay(day)); // Keep month in sync with selected day
+                                setCurrentMonth(startOfDay(day)); 
                             }
                           }}
                           month={currentMonth}
                           onMonthChange={(month) => {
                             if (isValid(month)) setCurrentMonth(month);
-                            // Optionally adjust selectedDate if it's outside the new month
                             if (selectedDate && isValid(selectedDate) && (selectedDate.getMonth() !== month.getMonth() || selectedDate.getFullYear() !== month.getFullYear())) {
                                 const dayInNewMonth = new Date(month.getFullYear(), month.getMonth(), selectedDate.getDate());
-                                // Check if the day is valid in the new month (e.g. Feb 30th is not)
                                 if (isValid(dayInNewMonth) && dayInNewMonth.getMonth() === month.getMonth()) {
                                      setSelectedDate(startOfDay(dayInNewMonth));
                                      setDisplayDate(startOfDay(dayInNewMonth));
-                                } else { // Select first day of new month if original day doesn't exist
+                                } else { 
                                      const firstOfNewMonth = startOfDay(new Date(month.getFullYear(), month.getMonth(), 1));
                                      setSelectedDate(firstOfNewMonth);
                                      setDisplayDate(firstOfNewMonth);
                                 }
-                            } else if (!selectedDate || !isValid(selectedDate)) { // If no date selected, select first of new month
+                            } else if (!selectedDate || !isValid(selectedDate)) { 
                                 const firstOfNewMonth = startOfDay(new Date(month.getFullYear(), month.getMonth(), 1));
                                 setSelectedDate(firstOfNewMonth);
                                 setDisplayDate(firstOfNewMonth);
@@ -914,7 +867,7 @@ export function CalendarIcsWidget({
                           }}
                           className="rounded-md calendar-widget"
                           modifiers={{ eventDay: eventDays.map(d => startOfDay(d)) }}
-                          modifiersClassNames={{ eventDay: 'bg-primary/20 rounded-full !text-primary-foreground dark:!text-primary' }} // Ensure proper styling for event days
+                          modifiersClassNames={{ eventDay: 'bg-primary/20 rounded-full !text-primary-foreground dark:!text-primary' }} 
                           footer={selectedDate && isValid(selectedDate) && eventsForSelectedDay.length > 0 ?
                             renderEventsList(eventsForSelectedDay, `${format(selectedDate, 'PPP')} 的事件`, `${format(selectedDate, 'PPP')} 无事件。`, 'day-detail')
                             : selectedDate && isValid(selectedDate) ? <p className="calendar-widget__no-events p-3 border-t text-muted-foreground">{`${format(selectedDate, 'PPP')} 无事件。`}</p> : null

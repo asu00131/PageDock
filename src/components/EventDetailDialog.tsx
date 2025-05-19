@@ -26,7 +26,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useEffect } from 'react';
-import { format, parse } from 'date-fns';
+import { format, parse, startOfDay, addDays, compareAsc } from 'date-fns';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CalendarIcon, Trash2 } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
@@ -35,11 +35,11 @@ import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
-  AlertDialogContent as EventAlertDialogContent, // Renamed to avoid conflict
-  AlertDialogDescription as EventAlertDialogDescription, // Renamed
-  AlertDialogFooter as EventAlertDialogFooter, // Renamed
-  AlertDialogHeader as EventAlertDialogHeader, // Renamed
-  AlertDialogTitle as EventAlertDialogTitle, // Renamed
+  AlertDialogContent as EventAlertDialogContent,
+  AlertDialogDescription as EventAlertDialogDescription,
+  AlertDialogFooter as EventAlertDialogFooter,
+  AlertDialogHeader as EventAlertDialogHeader,
+  AlertDialogTitle as EventAlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
@@ -61,16 +61,17 @@ const eventDetailSchema = z.object({
   message: "非全天事件需要开始和结束时间。",
   path: ["startTime"], 
 }).refine(data => {
-    if (data.endDate < data.startDate) {
-        return false;
+    if (data.isAllDay) {
+      // For all-day events, startDate must be before or same as endDate
+      return compareAsc(startOfDay(data.startDate), startOfDay(data.endDate)) <= 0;
     }
-    if (data.endDate.getTime() === data.startDate.getTime() && data.startTime && data.endTime && data.endTime <= data.startTime && !data.isAllDay) {
-        return false;
-    }
-    return true;
+    // For timed events
+    const combinedStart = parse(`${format(data.startDate, 'yyyy-MM-dd')} ${data.startTime}`, 'yyyy-MM-dd HH:mm', new Date());
+    const combinedEnd = parse(`${format(data.endDate, 'yyyy-MM-dd')} ${data.endTime}`, 'yyyy-MM-dd HH:mm', new Date());
+    return combinedEnd > combinedStart;
 }, {
     message: "结束日期/时间必须在开始日期/时间之后。",
-    path: ["endDate"],
+    path: ["endDate"], // Or path: ["endTime"] if more specific
 });
 
 
@@ -94,7 +95,10 @@ export function EventDetailDialog({ isOpen, onClose, onSubmit, event, widgetId, 
       summary: event.summary || '',
       description: event.description || '',
       startDate: event.startDate ? new Date(event.startDate) : new Date(),
-      endDate: event.endDate ? new Date(event.endDate) : new Date(),
+      // For all-day events, the user-selected endDate is inclusive. If it's May 10th, they pick May 10th.
+      // But for storage, the actual end date is exclusive (May 11th 00:00).
+      // So for display in the picker, we might need to subtract a day if it's an all-day event.
+      endDate: event.endDate ? (event.isAllDay ? addDays(new Date(event.endDate), -1) : new Date(event.endDate) ) : new Date(),
       startTime: event.startDate && !event.isAllDay ? format(new Date(event.startDate), 'HH:mm') : "09:00",
       endTime: event.endDate && !event.isAllDay ? format(new Date(event.endDate), 'HH:mm') : "10:00",
       isAllDay: event.isAllDay || false,
@@ -104,11 +108,12 @@ export function EventDetailDialog({ isOpen, onClose, onSubmit, event, widgetId, 
 
   useEffect(() => {
     if (isOpen) {
+      const initialEndDate = event.endDate ? (event.isAllDay ? addDays(new Date(event.endDate), -1) : new Date(event.endDate) ) : new Date();
       form.reset({
         summary: event.summary || '',
         description: event.description || '',
         startDate: event.startDate ? new Date(event.startDate) : new Date(),
-        endDate: event.endDate ? new Date(event.endDate) : new Date(),
+        endDate: initialEndDate,
         startTime: event.startDate && !event.isAllDay ? format(new Date(event.startDate), 'HH:mm') : "09:00",
         endTime: event.endDate && !event.isAllDay ? format(new Date(event.endDate), 'HH:mm') : "10:00",
         isAllDay: event.isAllDay || false,
@@ -117,8 +122,18 @@ export function EventDetailDialog({ isOpen, onClose, onSubmit, event, widgetId, 
   }, [event, form, isOpen]);
 
   const handleSubmitData = (data: EventDetailFormData) => {
-    const combinedStartDate = data.isAllDay ? data.startDate : parse(`${format(data.startDate, 'yyyy-MM-dd')} ${data.startTime}`, 'yyyy-MM-dd HH:mm', new Date());
-    const combinedEndDate = data.isAllDay ? data.endDate : parse(`${format(data.endDate, 'yyyy-MM-dd')} ${data.endTime}`, 'yyyy-MM-dd HH:mm', new Date());
+    let combinedStartDate: Date;
+    let combinedEndDate: Date;
+
+    if (data.isAllDay) {
+      combinedStartDate = startOfDay(data.startDate);
+      // The endDate selected by the user for an all-day event is the *last day* of the event.
+      // For storage, the endDate should be exclusive (start of the day *after* the last day).
+      combinedEndDate = startOfDay(addDays(data.endDate, 1));
+    } else {
+      combinedStartDate = parse(`${format(data.startDate, 'yyyy-MM-dd')} ${data.startTime}`, 'yyyy-MM-dd HH:mm', new Date());
+      combinedEndDate = parse(`${format(data.endDate, 'yyyy-MM-dd')} ${data.endTime}`, 'yyyy-MM-dd HH:mm', new Date());
+    }
 
     const finalEventData: CalendarEvent = {
       ...event, 
@@ -136,7 +151,6 @@ export function EventDetailDialog({ isOpen, onClose, onSubmit, event, widgetId, 
     if ('id' in event && event.id) {
       onDeleteEvent(event.id);
     }
-    // onClose(); 
   };
 
 
@@ -147,7 +161,7 @@ export function EventDetailDialog({ isOpen, onClose, onSubmit, event, widgetId, 
           <DialogTitle>{isNewEvent ? '添加新事件' : '事件详情'}</DialogTitle>
           {!isNewEvent && 
             <DialogDescription>
-              查看或编辑事件详情。更改仅保存在当前会话中。
+              查看或编辑事件详情。
             </DialogDescription>
           }
         </DialogHeader>
@@ -197,7 +211,13 @@ export function EventDetailDialog({ isOpen, onClose, onSubmit, event, widgetId, 
                             <Calendar
                                 mode="single"
                                 selected={field.value}
-                                onSelect={field.onChange}
+                                onSelect={(date) => {
+                                  field.onChange(date);
+                                  // If start date changes, ensure end date is not before it
+                                  if (date && compareAsc(form.getValues("endDate"), date) < 0) {
+                                    form.setValue("endDate", date);
+                                  }
+                                }}
                                 disabled={(date) => date < new Date("1900-01-01")}
                                 initialFocus
                             />
@@ -287,7 +307,14 @@ export function EventDetailDialog({ isOpen, onClose, onSubmit, event, widgetId, 
                     <FormControl>
                         <Checkbox
                         checked={field.value}
-                        onCheckedChange={field.onChange}
+                        onCheckedChange={(checked) => {
+                            field.onChange(checked);
+                            if (checked) {
+                                // Optionally reset times or handle them
+                                // form.setValue("startTime", "");
+                                // form.setValue("endTime", "");
+                            }
+                        }}
                         />
                     </FormControl>
                     <FormLabel className="font-normal">
@@ -315,7 +342,7 @@ export function EventDetailDialog({ isOpen, onClose, onSubmit, event, widgetId, 
                 {!isNewEvent && 'id' in event && event.id && (
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button type="button" variant="destructive" className="mr-auto" onClick={(e) => e.stopPropagation()}>
+                       <Button type="button" variant="destructive" className="mr-auto" onClick={(e) => {e.stopPropagation();}}>
                         <Trash2 className="mr-2 h-4 w-4" /> 删除
                       </Button>
                     </AlertDialogTrigger>
@@ -351,5 +378,3 @@ export function EventDetailDialog({ isOpen, onClose, onSubmit, event, widgetId, 
     </Dialog>
   );
 }
-
-    
