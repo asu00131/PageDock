@@ -21,11 +21,10 @@ export function LinkGrid({ widgetId, links, displaySettings, onEdit, onDelete, o
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
   const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
 
-  const { displayMode, visibleLinksCount } = displaySettings;
   const DATA_TRANSFER_KEY = 'application/pagedock-link';
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, id: string) => {
-    if (!isLayoutEditing) { e.preventDefault(); return; }
+    if (!isLayoutEditing) { e.preventDefault(); return; } // This guard is correct, only draggable items can start a drag
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData(DATA_TRANSFER_KEY, JSON.stringify({ widgetId: widgetId, linkId: id }));
     setDraggedItemId(id);
@@ -33,7 +32,8 @@ export function LinkGrid({ widgetId, links, displaySettings, onEdit, onDelete, o
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>, id: string) => {
-    if (!isLayoutEditing) return;
+    // Any grid can be a target, so we don't check isLayoutEditing here.
+    // We just check if the dragged item is one of ours.
     try {
         const sourceDataString = e.dataTransfer.getData(DATA_TRANSFER_KEY);
         if (!sourceDataString) return; // Not a draggable link from our app
@@ -47,7 +47,6 @@ export function LinkGrid({ widgetId, links, displaySettings, onEdit, onDelete, o
   };
 
   const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-    if (!isLayoutEditing) return;
     const relatedTarget = e.relatedTarget as HTMLElement;
     if (relatedTarget && e.currentTarget.contains(relatedTarget)) {
       return;
@@ -56,7 +55,7 @@ export function LinkGrid({ widgetId, links, displaySettings, onEdit, onDelete, o
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>, targetId: string) => {
-    if (!isLayoutEditing) return;
+    // Any grid can be a drop target.
     e.preventDefault();
     e.stopPropagation();
     
@@ -80,13 +79,12 @@ export function LinkGrid({ widgetId, links, displaySettings, onEdit, onDelete, o
   };
   
   const handleDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
-    if (!isLayoutEditing) return;
     setDraggedItemId(null);
     setDragOverItemId(null);
   };
 
   const handleContainerDragOver = (e: React.DragEvent<HTMLUListElement>) => {
-    if (!isLayoutEditing) return;
+    // Any grid container can be a target.
     try {
         const sourceDataString = e.dataTransfer.getData(DATA_TRANSFER_KEY);
         if (!sourceDataString) return;
@@ -98,7 +96,7 @@ export function LinkGrid({ widgetId, links, displaySettings, onEdit, onDelete, o
   };
 
   const handleContainerDrop = (e: React.DragEvent<HTMLUListElement>) => {
-    if (!isLayoutEditing) return;
+    // Any grid container can be a drop target.
     e.preventDefault();
     e.stopPropagation();
     
