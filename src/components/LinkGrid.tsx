@@ -20,6 +20,8 @@ interface LinkGridProps {
 export function LinkGrid({ widgetId, links, displaySettings, onEdit, onDelete, onMoveLink, isLayoutEditing }: LinkGridProps) {
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
   const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
+  
+  const { displayMode, visibleLinksCount } = displaySettings;
 
   const DATA_TRANSFER_KEY = 'application/pagedock-link';
 
