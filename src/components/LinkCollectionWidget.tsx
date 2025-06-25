@@ -72,6 +72,7 @@ export function LinkCollectionWidget({
   dragOverWidgetId,
   isLayoutEditing, // This is the global layout editing mode from HomePage
 }: LinkCollectionWidgetProps) {
+  const [isItemSortingActive, setIsItemSortingActive] = useState(false);
   
   const handleEditLink = (linkId: string) => {
     onEditLink(widget.id, linkId);
@@ -80,6 +81,13 @@ export function LinkCollectionWidget({
   const handleDeleteLink = (linkId: string) => {
     onDeleteLink(widget.id, linkId);
   };
+
+  const handleToggleItemSorting = () => {
+    setIsItemSortingActive(prev => !prev);
+  };
+  
+  // Items are draggable if either the global layout editing is active OR item sorting for this widget is active
+  const effectiveItemEditing = isLayoutEditing || isItemSortingActive;
   
   const isWidgetItselfDraggable = isLayoutEditing;
 
@@ -88,7 +96,8 @@ export function LinkCollectionWidget({
       data-testid={`link-collection-widget-${widget.id}`}
       className={cn(
         "page-section__widget",
-        isLayoutEditing && "is-layout-editing is-item-sorting", 
+        isLayoutEditing && "is-layout-editing", 
+        isItemSortingActive && "is-item-sorting",
         draggedWidgetId === widget.id && "opacity-50 cursor-grabbing",
         dragOverWidgetId === widget.id && draggedWidgetId !== widget.id && "ring-2 ring-primary ring-offset-2 rounded-lg"
       )}
@@ -147,6 +156,13 @@ export function LinkCollectionWidget({
                     <SlidersHorizontal className="mr-2 h-4 w-4" />
                     <span>显示设置</span>
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleToggleItemSorting(); }}>
+                    {isItemSortingActive 
+                      ? <Check className="mr-2 h-4 w-4" /> 
+                      : <ListOrdered className="mr-2 h-4 w-4" />
+                    }
+                    <span>{isItemSortingActive ? "完成排序" : "书签排序"}</span>
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
@@ -190,7 +206,7 @@ export function LinkCollectionWidget({
                   onDelete={handleDeleteLink}
                   onMoveLink={onMoveLink}
                   widgetId={widget.id}
-                  isLayoutEditing={isLayoutEditing} 
+                  isLayoutEditing={effectiveItemEditing} 
                 />
               </div>
             </div>

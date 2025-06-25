@@ -26,7 +26,8 @@ export function LinkGrid({ widgetId, links, displaySettings, onEdit, onDelete, o
   const DATA_TRANSFER_KEY = 'application/pagedock-link';
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, id: string) => {
-    if (!isLayoutEditing) { e.preventDefault(); return; } // This guard is correct, only draggable items can start a drag
+    // An item can only be dragged if its parent widget is in "sort mode" or global layout edit is on.
+    if (!isLayoutEditing) { e.preventDefault(); return; } 
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData(DATA_TRANSFER_KEY, JSON.stringify({ widgetId: widgetId, linkId: id }));
     setDraggedItemId(id);
@@ -35,7 +36,7 @@ export function LinkGrid({ widgetId, links, displaySettings, onEdit, onDelete, o
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>, id: string) => {
     // Any grid can be a target, so we don't check isLayoutEditing here.
-    // We just check if the dragged item is one of ours.
+    // We just check if a draggable link from our app is being dragged.
     try {
         const sourceDataString = e.dataTransfer.getData(DATA_TRANSFER_KEY);
         if (!sourceDataString) return; // Not a draggable link from our app
@@ -57,7 +58,7 @@ export function LinkGrid({ widgetId, links, displaySettings, onEdit, onDelete, o
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>, targetId: string) => {
-    // Any grid can be a drop target.
+    // Any grid item can be a drop target.
     e.preventDefault();
     e.stopPropagation();
     
@@ -109,6 +110,7 @@ export function LinkGrid({ widgetId, links, displaySettings, onEdit, onDelete, o
       
       const targetElement = e.target as HTMLElement;
       if (targetElement.closest('.bookmark-item')) { 
+        // If the drop is on an item, its handler already took care of it.
         return; 
       }
     
