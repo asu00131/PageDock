@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { LinkCollectionAppWidget, LinkItem } from '@/types';
@@ -46,7 +47,7 @@ interface LinkCollectionWidgetProps extends WidgetDragProps {
   onDeleteWidget: (widgetId: string) => void;
   onEditLink: (widgetId: string, linkId: string) => void;
   onDeleteLink: (widgetId: string, linkId: string) => void;
-  onLinksReordered: (widgetId: string, newLinks: LinkItem[]) => void;
+  onMoveLink: (source: { widgetId: string; linkId: string }, target: { widgetId: string; linkId: string | null }) => void;
   isCollapsed?: boolean;
   onToggleCollapse: (widgetId: string) => void;
 }
@@ -59,7 +60,7 @@ export function LinkCollectionWidget({
   onDeleteWidget,
   onEditLink,
   onDeleteLink,
-  onLinksReordered,
+  onMoveLink,
   isCollapsed,
   onToggleCollapse,
   onWidgetDragStart,
@@ -71,7 +72,6 @@ export function LinkCollectionWidget({
   dragOverWidgetId,
   isLayoutEditing, // This is the global layout editing mode from HomePage
 }: LinkCollectionWidgetProps) {
-  const [isItemSortingActive, setIsItemSortingActive] = useState(false);
   
   const handleEditLink = (linkId: string) => {
     onEditLink(widget.id, linkId);
@@ -81,18 +81,7 @@ export function LinkCollectionWidget({
     onDeleteLink(widget.id, linkId);
   };
 
-  const handleLocalLinksReordered = (newLinks: LinkItem[]) => {
-    onLinksReordered(widget.id, newLinks);
-  };
-
-  const handleToggleItemSorting = () => {
-    setIsItemSortingActive(prev => !prev);
-  };
-  
-  // Widget itself is draggable only if global layout editing is on AND item sorting is OFF.
-  const isWidgetItselfDraggable = isLayoutEditing && !isItemSortingActive;
-  // Items can be sorted if global layout editing is on OR item sorting is on.
-  const canItemsBeSorted = isLayoutEditing || isItemSortingActive;
+  const isWidgetItselfDraggable = isLayoutEditing;
 
   return ( 
     <div 
@@ -158,13 +147,6 @@ export function LinkCollectionWidget({
                     <SlidersHorizontal className="mr-2 h-4 w-4" />
                     <span>显示设置</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleToggleItemSorting(); }}>
-                    {isItemSortingActive 
-                      ? <Check className="mr-2 h-4 w-4" /> 
-                      : <ListOrdered className="mr-2 h-4 w-4" />
-                    }
-                    <span>{isItemSortingActive ? "完成排序" : "书签排序"}</span>
-                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
@@ -206,8 +188,9 @@ export function LinkCollectionWidget({
                   displaySettings={widget.data.displaySettings} 
                   onEdit={handleEditLink}
                   onDelete={handleDeleteLink}
-                  onLinksReordered={handleLocalLinksReordered}
-                  isLayoutEditing={canItemsBeSorted} 
+                  onMoveLink={onMoveLink}
+                  widgetId={widget.id}
+                  isLayoutEditing={isLayoutEditing} 
                 />
               </div>
             </div>
@@ -217,3 +200,4 @@ export function LinkCollectionWidget({
     </div>
   );
 }
+

@@ -8,33 +8,41 @@ import type React from 'react';
 import { cn } from '@/lib/utils';
 
 interface LinkGridProps {
+  widgetId: string;
   links: LinkItem[];
   displaySettings: LinkCollectionDisplaySettings;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
-  onLinksReordered: (newLinks: LinkItem[]) => void;
+  onMoveLink: (source: { widgetId: string; linkId: string }, target: { widgetId: string; linkId: string | null }) => void;
   isLayoutEditing?: boolean;
 }
 
-export function LinkGrid({ links, displaySettings, onEdit, onDelete, onLinksReordered, isLayoutEditing }: LinkGridProps) {
+export function LinkGrid({ widgetId, links, displaySettings, onEdit, onDelete, onMoveLink, isLayoutEditing }: LinkGridProps) {
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
   const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
 
-  const { displayMode, iconSize, visibleLinksCount, titleLines } = displaySettings;
+  const { displayMode, visibleLinksCount } = displaySettings;
+  const DATA_TRANSFER_KEY = 'application/pagedock-link';
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, id: string) => {
     if (!isLayoutEditing) { e.preventDefault(); return; }
     e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', id);
+    e.dataTransfer.setData(DATA_TRANSFER_KEY, JSON.stringify({ widgetId: widgetId, linkId: id }));
     setDraggedItemId(id);
     setDragOverItemId(null); 
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>, id: string) => {
-    if (!isLayoutEditing || !draggedItemId) return;
-    e.preventDefault(); 
-    if (id !== draggedItemId) {
-        setDragOverItemId(id);
+    if (!isLayoutEditing) return;
+    try {
+        const sourceDataString = e.dataTransfer.getData(DATA_TRANSFER_KEY);
+        if (!sourceDataString) return; // Not a draggable link from our app
+        e.preventDefault(); 
+        if (id !== draggedItemId) {
+            setDragOverItemId(id);
+        }
+    } catch (err) {
+        // This can happen if dragging from another window. Ignore.
     }
   };
 
@@ -48,30 +56,27 @@ export function LinkGrid({ links, displaySettings, onEdit, onDelete, onLinksReor
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>, targetId: string) => {
-    if (!isLayoutEditing || !draggedItemId) return;
+    if (!isLayoutEditing) return;
     e.preventDefault();
-    e.stopPropagation(); // Prevent drop event from bubbling to parent widget container
-    const sourceId = e.dataTransfer.getData('text/plain') || draggedItemId;
+    e.stopPropagation();
     
-    setDragOverItemId(null);
-    setDraggedItemId(null);
+    try {
+      const sourceDataString = e.dataTransfer.getData(DATA_TRANSFER_KEY);
+      if (!sourceDataString) return; 
+      const sourceData = JSON.parse(sourceDataString);
 
-    if (!sourceId || sourceId === targetId) {
-      return;
+      if (sourceData.linkId !== targetId) { // Prevent dropping on itself
+        onMoveLink(
+          { widgetId: sourceData.widgetId, linkId: sourceData.linkId },
+          { widgetId: widgetId, linkId: targetId }
+        );
+      }
+    } catch (err) {
+      console.error("Error handling drop:", err);
+    } finally {
+      setDraggedItemId(null);
+      setDragOverItemId(null);
     }
-
-    const sourceIndex = links.findIndex(link => link.id === sourceId);
-    const targetIndex = links.findIndex(link => link.id === targetId);
-
-    if (sourceIndex === -1 || targetIndex === -1) {
-      return;
-    }
-
-    const reorderedLinks = Array.from(links);
-    const [draggedItem] = reorderedLinks.splice(sourceIndex, 1);
-    reorderedLinks.splice(targetIndex, 0, draggedItem);
-
-    onLinksReordered(reorderedLinks);
   };
   
   const handleDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
@@ -81,33 +86,42 @@ export function LinkGrid({ links, displaySettings, onEdit, onDelete, onLinksReor
   };
 
   const handleContainerDragOver = (e: React.DragEvent<HTMLUListElement>) => {
-    if (!isLayoutEditing || !draggedItemId) return;
-    e.preventDefault();
+    if (!isLayoutEditing) return;
+    try {
+        const sourceDataString = e.dataTransfer.getData(DATA_TRANSFER_KEY);
+        if (!sourceDataString) return;
+        e.preventDefault();
+        setDragOverItemId(null); // Clear item highlight when over container
+    } catch (err) {
+        // Ignore errors from external drags
+    }
   };
 
   const handleContainerDrop = (e: React.DragEvent<HTMLUListElement>) => {
-    if (!isLayoutEditing || !draggedItemId) return;
+    if (!isLayoutEditing) return;
     e.preventDefault();
-    const sourceId = e.dataTransfer.getData('text/plain') || draggedItemId;
+    e.stopPropagation();
     
-    setDraggedItemId(null);
-    setDragOverItemId(null);
-
-    if (!sourceId) return;
-
-    const targetElement = e.target as HTMLElement;
-    // Ensure drop is not on an item itself, which is handled by item's onDrop
-    if (targetElement.closest('.bookmark-item')) { 
-      return; 
+    try {
+      const sourceDataString = e.dataTransfer.getData(DATA_TRANSFER_KEY);
+      if (!sourceDataString) return;
+      const sourceData = JSON.parse(sourceDataString);
+      
+      const targetElement = e.target as HTMLElement;
+      if (targetElement.closest('.bookmark-item')) { 
+        return; 
+      }
+    
+      onMoveLink(
+        { widgetId: sourceData.widgetId, linkId: sourceData.linkId },
+        { widgetId: widgetId, linkId: null } // null targetId means append to end
+      );
+    } catch (err) {
+      console.error("Error handling container drop:", err);
+    } finally {
+      setDraggedItemId(null);
+      setDragOverItemId(null);
     }
-    
-    const sourceIndex = links.findIndex(link => link.id === sourceId);
-    if (sourceIndex === -1) return;
-
-    const reorderedLinks = Array.from(links);
-    const [draggedItem] = reorderedLinks.splice(sourceIndex, 1);
-    reorderedLinks.push(draggedItem); // Move to the end of the list
-    onLinksReordered(reorderedLinks);
   };
 
   const getVisibleLinks = () => {
@@ -174,4 +188,3 @@ export function LinkGrid({ links, displaySettings, onEdit, onDelete, onLinksReor
     </ul>
   );
 }
-
