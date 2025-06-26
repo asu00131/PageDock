@@ -368,40 +368,42 @@ export default function HomePage() {
     target: { widgetId: string; linkId: string | null }
   ) => {
     setWidgets(prevWidgets => {
-      // Use a mutable copy for this complex update
-      const tempWidgets = JSON.parse(JSON.stringify(prevWidgets)) as AppWidget[];
       let sourceLink: LinkItem | undefined;
 
-      const sourceWidget = tempWidgets.find(w => w.id === source.widgetId) as LinkCollectionAppWidget | undefined;
-      if (!sourceWidget || !isLinkCollectionWidget(sourceWidget)) return prevWidgets;
-
-      const linkIndex = sourceWidget.data.links.findIndex(l => l.id === source.linkId);
-      if (linkIndex === -1) return prevWidgets;
-
-      // Remove from source
-      [sourceLink] = sourceWidget.data.links.splice(linkIndex, 1);
-      
-      if (!sourceLink) return prevWidgets;
-
-      // Add to target
-      const targetWidget = tempWidgets.find(w => w.id === target.widgetId) as LinkCollectionAppWidget | undefined;
-      if (!targetWidget || !isLinkCollectionWidget(targetWidget)) return prevWidgets;
-      
-      if (target.linkId) {
-        const dropIndex = targetWidget.data.links.findIndex(l => l.id === target.linkId);
-        if (dropIndex !== -1) {
-          // Insert at the specific position
-          targetWidget.data.links.splice(dropIndex, 0, sourceLink);
-        } else {
-          // Fallback, append to end if target link not found (shouldn't happen)
-          targetWidget.data.links.push(sourceLink);
+      // Create a new array of widgets after removing the source link
+      const widgetsAfterRemoval = prevWidgets.map(widget => {
+        if (isLinkCollectionWidget(widget) && widget.id === source.widgetId) {
+          sourceLink = widget.data.links.find(link => link.id === source.linkId);
+          const newLinks = widget.data.links.filter(link => link.id !== source.linkId);
+          return { ...widget, data: { ...widget.data, links: newLinks } };
         }
-      } else {
-        // If target.linkId is null, drop at the end of the widget
-        targetWidget.data.links.push(sourceLink);
+        return widget;
+      });
+
+      // If the source link wasn't found, something is wrong, so return the original state
+      if (!sourceLink) {
+        return prevWidgets;
       }
-      
-      return tempWidgets;
+
+      // Create the final array of widgets by adding the source link to the target
+      const finalWidgets = widgetsAfterRemoval.map(widget => {
+        if (isLinkCollectionWidget(widget) && widget.id === target.widgetId) {
+          const newLinks = [...widget.data.links];
+          const dropIndex = target.linkId
+            ? newLinks.findIndex(link => link.id === target.linkId)
+            : -1;
+
+          if (dropIndex !== -1) {
+            newLinks.splice(dropIndex, 0, sourceLink!);
+          } else {
+            newLinks.push(sourceLink!);
+          }
+          return { ...widget, data: { ...widget.data, links: newLinks } };
+        }
+        return widget;
+      });
+
+      return finalWidgets;
     });
   };
 
@@ -1188,3 +1190,5 @@ export default function HomePage() {
   );
 }
 
+
+    
