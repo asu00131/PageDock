@@ -35,12 +35,11 @@ export function LinkGrid({ widgetId, links, displaySettings, onEdit, onDelete, o
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>, id: string) => {
-    // Any grid can be a target, so we don't check isLayoutEditing here.
-    // We just check if a draggable link from our app is being dragged.
     try {
         const sourceDataString = e.dataTransfer.getData(DATA_TRANSFER_KEY);
         if (!sourceDataString) return; // Not a draggable link from our app
         e.preventDefault(); 
+        e.stopPropagation(); // Stop event from bubbling to parent widget
         if (id !== draggedItemId) {
             setDragOverItemId(id);
         }
@@ -58,7 +57,6 @@ export function LinkGrid({ widgetId, links, displaySettings, onEdit, onDelete, o
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>, targetId: string) => {
-    // Any grid item can be a drop target.
     e.preventDefault();
     e.stopPropagation();
     
@@ -87,11 +85,11 @@ export function LinkGrid({ widgetId, links, displaySettings, onEdit, onDelete, o
   };
 
   const handleContainerDragOver = (e: React.DragEvent<HTMLUListElement>) => {
-    // Any grid container can be a target.
     try {
         const sourceDataString = e.dataTransfer.getData(DATA_TRANSFER_KEY);
         if (!sourceDataString) return;
         e.preventDefault();
+        e.stopPropagation(); // Stop event from bubbling to parent widget
         setDragOverItemId(null); // Clear item highlight when over container
     } catch (err) {
         // Ignore errors from external drags
@@ -99,7 +97,6 @@ export function LinkGrid({ widgetId, links, displaySettings, onEdit, onDelete, o
   };
 
   const handleContainerDrop = (e: React.DragEvent<HTMLUListElement>) => {
-    // Any grid container can be a drop target.
     e.preventDefault();
     e.stopPropagation();
     
