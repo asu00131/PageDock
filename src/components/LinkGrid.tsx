@@ -38,12 +38,12 @@ export function LinkGrid({ widgetId, links, displaySettings, onEdit, onDelete, o
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>, id: string) => {
+    e.stopPropagation(); // prevent parent widget drag
     try {
         const isLinkData = e.dataTransfer.types.includes(DATA_TRANSFER_KEY.toLowerCase());
         if (!isLinkData) return;
         
         e.preventDefault(); 
-        e.stopPropagation(); 
         if (id !== draggedItemId) {
             setDragOverItemId(id);
         }
@@ -90,12 +90,12 @@ export function LinkGrid({ widgetId, links, displaySettings, onEdit, onDelete, o
   };
 
   const handleContainerDragOver = (e: React.DragEvent<HTMLUListElement>) => {
+    e.stopPropagation(); // prevent parent widget drag
     try {
         const isLinkData = e.dataTransfer.types.includes(DATA_TRANSFER_KEY.toLowerCase());
         if (!isLinkData) return;
 
         e.preventDefault();
-        e.stopPropagation();
         setDragOverItemId(null); 
     } catch (err) {
         // Ignore errors from external drags
@@ -112,13 +112,15 @@ export function LinkGrid({ widgetId, links, displaySettings, onEdit, onDelete, o
       const sourceData = JSON.parse(sourceDataString);
       
       const targetElement = e.target as HTMLElement;
+      // If we dropped on an item, its own handler will fire.
+      // This handler is for dropping in the empty space of the list.
       if (targetElement.closest('.bookmark-item')) { 
         return; 
       }
     
       onMoveLink(
         { widgetId: sourceData.widgetId, linkId: sourceData.linkId },
-        { widgetId: widgetId, linkId: null } 
+        { widgetId: widgetId, linkId: null } // null targetId means add to the end
       );
     } catch (err) {
       console.error("Error handling container drop:", err);
@@ -136,26 +138,6 @@ export function LinkGrid({ widgetId, links, displaySettings, onEdit, onDelete, o
 
   const visibleLinks = getVisibleLinks();
 
-  if (visibleLinks.length === 0 && visibleLinksCount !== -1) {
-     return (
-      <div className="flex flex-col items-center justify-center text-center p-10 border-2 border-dashed border-muted rounded-lg min-h-[100px]">
-        <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-layout-grid mb-3 text-muted-foreground"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 12h18"/><path d="M12 3v18"/></svg>
-        <h2 className="text-lg font-semibold text-foreground">暂无链接</h2>
-        <p className="text-muted-foreground mt-1 text-sm">为此合集添加一个链接。</p>
-      </div>
-    );
-  }
-  if (visibleLinksCount === -1) {
-     return (
-      <div className="flex flex-col items-center justify-center text-center p-10 border-2 border-dashed border-muted rounded-lg min-h-[100px]">
-        <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-eye-off mb-3 text-muted-foreground"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
-        <h2 className="text-lg font-semibold text-foreground">链接已隐藏</h2>
-        <p className="text-muted-foreground mt-1 text-sm">通过显示设置更改。</p>
-      </div>
-    );
-  }
-
-
   const listClassName = cn("bookmark-widget__list", {
     "flex flex-wrap": displayMode === 'cloud' || displayMode === 'icons',
     "flex flex-col space-y-1": displayMode === 'list' || displayMode === 'detailedList',
@@ -164,31 +146,63 @@ export function LinkGrid({ widgetId, links, displaySettings, onEdit, onDelete, o
     "bookmark-widget__list_mode_list": displayMode === 'list',
     "bookmark-widget__list_mode_detailed-list": displayMode === 'detailedList',
   });
+  
+  const renderEmptyPrompt = () => (
+    <div className="flex flex-col items-center justify-center text-center p-10 border-2 border-dashed border-muted rounded-lg min-h-[100px] w-full pointer-events-none">
+      <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-layout-grid mb-3 text-muted-foreground"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 12h18"/><path d="M12 3v18"/></svg>
+      <h2 className="text-lg font-semibold text-foreground">暂无链接</h2>
+      <p className="text-muted-foreground mt-1 text-sm">为此合集添加一个链接。</p>
+    </div>
+  );
+
+  const renderHiddenPrompt = () => (
+     <div className="flex flex-col items-center justify-center text-center p-10 border-2 border-dashed border-muted rounded-lg min-h-[100px] w-full">
+      <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-eye-off mb-3 text-muted-foreground"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
+      <h2 className="text-lg font-semibold text-foreground">链接已隐藏</h2>
+      <p className="text-muted-foreground mt-1 text-sm">通过显示设置更改。</p>
+    </div>
+  );
+
+  if (visibleLinksCount === -1) {
+    return renderHiddenPrompt();
+  }
 
   return (
     <ul 
-        className={listClassName}
+        className={cn(
+          listClassName,
+          visibleLinks.length === 0 && "min-h-[120px] w-full items-center justify-center rounded-lg border-2 border-dashed border-muted/50"
+        )}
         onDragOver={handleContainerDragOver}
         onDrop={handleContainerDrop}
     >
-      {visibleLinks.map((link) => (
-        <li key={link.id} className="bookmark-widget__item-wrapper">
-          <LinkCard 
-            link={link} 
-            displaySettings={displaySettings}
-            onEdit={onEdit} 
-            onDelete={onDelete}
-            onDragStartHandler={handleDragStart}
-            onDragOverHandler={handleDragOver}
-            onDropHandler={handleDrop}
-            onDragLeaveHandler={handleDragLeave}
-            onDragEndHandler={handleDragEnd}
-            isDragging={draggedItemId === link.id}
-            isDragOver={dragOverItemId === link.id && draggedItemId !== link.id}
-            isLayoutEditing={isLayoutEditing}
-          />
+      {visibleLinks.length > 0 ? (
+        visibleLinks.map((link) => (
+          <li key={link.id} className="bookmark-widget__item-wrapper">
+            <LinkCard 
+              link={link} 
+              displaySettings={displaySettings}
+              onEdit={onEdit} 
+              onDelete={onDelete}
+              onDragStartHandler={handleDragStart}
+              onDragOverHandler={handleDragOver}
+              onDropHandler={handleDrop}
+              onDragLeaveHandler={handleDragLeave}
+              onDragEndHandler={handleDragEnd}
+              isDragging={draggedItemId === link.id}
+              isDragOver={dragOverItemId === link.id && draggedItemId !== link.id}
+              isLayoutEditing={isLayoutEditing}
+            />
+          </li>
+        ))
+      ) : (
+        <li className="flex justify-center items-center w-full pointer-events-none">
+          <div className="flex flex-col items-center justify-center text-center p-4">
+             <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-layout-grid mb-2 text-muted-foreground"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 12h18"/><path d="M12 3v18"/></svg>
+            <p className="text-muted-foreground text-sm">将书签拖到此处</p>
+          </div>
         </li>
-      ))}
+      )}
     </ul>
   );
 }
