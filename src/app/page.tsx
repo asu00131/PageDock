@@ -534,19 +534,11 @@ export default function HomePage() {
     setWidgets(prevWidgets =>
       prevWidgets.map(widget => {
         if (isCalendarIcsWidget(widget) && widget.id === widgetId) {
-          // Ensure Date objects are correctly handled by stringifying and parsing if necessary,
-          // though useLocalStorage should handle basic Date objects.
-          // For this example, we assume events are already in a serializable format or useLocalStorage handles it.
           return {
             ...widget,
             data: {
               ...widget.data,
-              localizedEvents: events.map(e => ({
-                ...e,
-                // Ensure dates are proper Date objects, might need conversion if coming from JSON-like state
-                startDate: new Date(e.startDate), 
-                endDate: new Date(e.endDate),
-              })),
+              localizedEvents: events,
             }
           };
         }
@@ -1084,7 +1076,7 @@ export default function HomePage() {
                   onOpenWidgetTitleDialog={() => handleOpenWidgetTitleDialog(widget.id)}
                   onDeleteWidget={handleDeleteWidget}
                   onAddItem={handleAddTodoItem}
-                  onToggleItem={handleToggleTodoItem}
+                  onToggleItem={handleToggleItem}
                   onDeleteItem={handleDeleteTodoItem}
                   onUpdateItemText={handleUpdateTodoItemText}
                   onReorderItems={handleReorderTodoItems}
@@ -1103,7 +1095,7 @@ export default function HomePage() {
                   onOpenWidgetTitleDialog={() => handleOpenWidgetTitleDialog(widget.id)}
                   onDeleteWidget={handleDeleteWidget}
                   isCollapsed={widget.isCollapsed}
-                  onToggleCollapse={handleToggleWidgetCollapse}
+                  onToggleCollapse={handleToggleCollapse}
                   onUpdateLocalizedEvents={handleUpdateCalendarLocalizedEvents}
                   {...widgetDragProps}
                 />
@@ -1117,7 +1109,7 @@ export default function HomePage() {
                   onOpenWidgetTitleDialog={() => handleOpenWidgetTitleDialog(widget.id)}
                   onDeleteWidget={handleDeleteWidget}
                   isCollapsed={widget.isCollapsed}
-                  onToggleCollapse={handleToggleWidgetCollapse}
+                  onToggleCollapse={handleToggleCollapse}
                   {...widgetDragProps}
                 />
               );

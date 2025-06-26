@@ -239,7 +239,6 @@ export function CalendarIcsWidget({
     widget.data.localizedEvents,
     isCollapsed,
     isClientMounted,
-    fetchAndParseIcs, // fetchAndParseIcs is memoized
   ]);
 
 
@@ -344,8 +343,6 @@ export function CalendarIcsWidget({
     const newStoredEventsArraySorted = newStoredEventsArray.sort((a,b) => compareAsc(new Date(a.startDate), new Date(b.startDate)));
     onUpdateLocalizedEvents(widget.id, newStoredEventsArraySorted);
 
-    // UI Navigation - this makes the view jump to the event's date.
-    // The actual event list will update when the widget re-renders with new props.
     const newEventDate = startOfDay(new Date(updatedEventData.startDate));
     setSelectedDate(newEventDate);
     setDisplayDate(newEventDate);
@@ -374,22 +371,9 @@ export function CalendarIcsWidget({
 
   const handleRefresh = () => {
     forceFetchRef.current = true;
-    // Re-trigger the main data loading useEffect by slightly changing a dependency it watches,
-    // or by directly calling fetch if appropriate. Here, we let the useEffect handle it via forceFetchRef.
-    // A common way is to make useEffect depend on a "refreshTrigger" state that you toggle.
-    // For now, the existing useEffect logic with forceFetchRef should cover this.
-    // To be absolutely sure useEffect re-evaluates, we can temporarily change a prop it depends on if needed,
-    // but ideally, the change in forceFetchRef and subsequent re-evaluation of conditions within useEffect is enough.
-    // If not, we might need a more explicit trigger.
-    // For now, let's assume the current useEffect structure is sufficient.
-    // Re-setting a state that useEffect depends on can also trigger it.
-    // Example: setEvents([]); setIsLoading(true); // This will trigger the useEffect to re-evaluate.
-    // The useEffect already depends on widget.data.localizedEvents.
-    // The fetchAndParseIcs itself will call onUpdateLocalizedEvents if storeFetchedEvents is true.
     if (widget.data.icsUrl) {
-        fetchAndParseIcs(true); // Fetch and store on refresh
+        fetchAndParseIcs(widget.data.isLocalized);
     } else {
-        // No URL, "refresh" means ensure local events are shown
         setEvents(widget.data.localizedEvents?.map(e => ({...e, startDate: new Date(e.startDate), endDate: new Date(e.endDate)})) || []);
         setIsLoading(false);
     }

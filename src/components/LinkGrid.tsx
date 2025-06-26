@@ -26,8 +26,11 @@ export function LinkGrid({ widgetId, links, displaySettings, onEdit, onDelete, o
   const DATA_TRANSFER_KEY = 'application/pagedock-link';
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, id: string) => {
-    // An item can only be dragged if its parent widget is in "sort mode" or global layout edit is on.
-    if (!isLayoutEditing) { e.preventDefault(); return; } 
+    if (!isLayoutEditing) { 
+      e.preventDefault(); 
+      return; 
+    } 
+    e.stopPropagation();
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData(DATA_TRANSFER_KEY, JSON.stringify({ widgetId: widgetId, linkId: id }));
     setDraggedItemId(id);
@@ -36,10 +39,11 @@ export function LinkGrid({ widgetId, links, displaySettings, onEdit, onDelete, o
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>, id: string) => {
     try {
-        const sourceDataString = e.dataTransfer.getData(DATA_TRANSFER_KEY);
-        if (!sourceDataString) return; // Not a draggable link from our app
+        const isLinkData = e.dataTransfer.types.includes(DATA_TRANSFER_KEY.toLowerCase());
+        if (!isLinkData) return;
+        
         e.preventDefault(); 
-        e.stopPropagation(); // Stop event from bubbling to parent widget
+        e.stopPropagation(); 
         if (id !== draggedItemId) {
             setDragOverItemId(id);
         }
@@ -65,7 +69,7 @@ export function LinkGrid({ widgetId, links, displaySettings, onEdit, onDelete, o
       if (!sourceDataString) return; 
       const sourceData = JSON.parse(sourceDataString);
 
-      if (sourceData.linkId !== targetId) { // Prevent dropping on itself
+      if (sourceData.linkId !== targetId) { 
         onMoveLink(
           { widgetId: sourceData.widgetId, linkId: sourceData.linkId },
           { widgetId: widgetId, linkId: targetId }
@@ -80,17 +84,19 @@ export function LinkGrid({ widgetId, links, displaySettings, onEdit, onDelete, o
   };
   
   const handleDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
+    e.stopPropagation();
     setDraggedItemId(null);
     setDragOverItemId(null);
   };
 
   const handleContainerDragOver = (e: React.DragEvent<HTMLUListElement>) => {
     try {
-        const sourceDataString = e.dataTransfer.getData(DATA_TRANSFER_KEY);
-        if (!sourceDataString) return;
+        const isLinkData = e.dataTransfer.types.includes(DATA_TRANSFER_KEY.toLowerCase());
+        if (!isLinkData) return;
+
         e.preventDefault();
-        e.stopPropagation(); // Stop event from bubbling to parent widget
-        setDragOverItemId(null); // Clear item highlight when over container
+        e.stopPropagation();
+        setDragOverItemId(null); 
     } catch (err) {
         // Ignore errors from external drags
     }
@@ -107,13 +113,12 @@ export function LinkGrid({ widgetId, links, displaySettings, onEdit, onDelete, o
       
       const targetElement = e.target as HTMLElement;
       if (targetElement.closest('.bookmark-item')) { 
-        // If the drop is on an item, its handler already took care of it.
         return; 
       }
     
       onMoveLink(
         { widgetId: sourceData.widgetId, linkId: sourceData.linkId },
-        { widgetId: widgetId, linkId: null } // null targetId means append to end
+        { widgetId: widgetId, linkId: null } 
       );
     } catch (err) {
       console.error("Error handling container drop:", err);
@@ -124,14 +129,14 @@ export function LinkGrid({ widgetId, links, displaySettings, onEdit, onDelete, o
   };
 
   const getVisibleLinks = () => {
-    if (visibleLinksCount === 0) return links; // 0 means show all
-    if (visibleLinksCount === -1) return []; // -1 means show none
+    if (visibleLinksCount === 0) return links;
+    if (visibleLinksCount === -1) return [];
     return links.slice(0, visibleLinksCount);
   };
 
   const visibleLinks = getVisibleLinks();
 
-  if (visibleLinks.length === 0 && visibleLinksCount !== -1) { // Show empty state if no links, unless "None" is selected
+  if (visibleLinks.length === 0 && visibleLinksCount !== -1) {
      return (
       <div className="flex flex-col items-center justify-center text-center p-10 border-2 border-dashed border-muted rounded-lg min-h-[100px]">
         <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-layout-grid mb-3 text-muted-foreground"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 12h18"/><path d="M12 3v18"/></svg>
