@@ -1076,7 +1076,7 @@ export default function HomePage() {
                   onOpenWidgetTitleDialog={() => handleOpenWidgetTitleDialog(widget.id)}
                   onDeleteWidget={handleDeleteWidget}
                   onAddItem={handleAddTodoItem}
-                  onToggleItem={handleToggleItem}
+                  onToggleItem={handleToggleTodoItem}
                   onDeleteItem={handleDeleteTodoItem}
                   onUpdateItemText={handleUpdateTodoItemText}
                   onReorderItems={handleReorderTodoItems}
@@ -1095,7 +1095,7 @@ export default function HomePage() {
                   onOpenWidgetTitleDialog={() => handleOpenWidgetTitleDialog(widget.id)}
                   onDeleteWidget={handleDeleteWidget}
                   isCollapsed={widget.isCollapsed}
-                  onToggleCollapse={handleToggleCollapse}
+                  onToggleCollapse={handleToggleWidgetCollapse}
                   onUpdateLocalizedEvents={handleUpdateCalendarLocalizedEvents}
                   {...widgetDragProps}
                 />
@@ -1109,7 +1109,7 @@ export default function HomePage() {
                   onOpenWidgetTitleDialog={() => handleOpenWidgetTitleDialog(widget.id)}
                   onDeleteWidget={handleDeleteWidget}
                   isCollapsed={widget.isCollapsed}
-                  onToggleCollapse={handleToggleCollapse}
+                  onToggleCollapse={handleToggleWidgetCollapse}
                   {...widgetDragProps}
                 />
               );
@@ -1182,5 +1182,7 @@ export default function HomePage() {
   );
 }
 
+
+    
 
     
