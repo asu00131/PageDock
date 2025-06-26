@@ -454,7 +454,7 @@
     @apply text-center text-muted-foreground py-4 min-h-[200px] flex flex-col justify-center items-center; 
   }
   .calendar-widget__event-list {
-    @apply mt-4 p-3 border-t;
+    @apply py-3;
   }
   .calendar-widget__event-list-title {
     @apply text-sm font-semibold mb-2 text-foreground;

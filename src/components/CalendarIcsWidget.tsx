@@ -294,9 +294,6 @@ export function CalendarIcsWidget({
       return;
     }
     e.stopPropagation();
-    if (!widget.data.icsUrl && !(widget.data.isLocalized && widget.data.localizedEvents && widget.data.localizedEvents.length > 0)) {
-        onOpenEditDialog(widget.id);
-    }
   };
 
   const handleBodyKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -310,9 +307,6 @@ export function CalendarIcsWidget({
       }
       e.preventDefault();
       e.stopPropagation();
-      if (!widget.data.icsUrl && !(widget.data.isLocalized && widget.data.localizedEvents && widget.data.localizedEvents.length > 0)) {
-        onOpenEditDialog(widget.id);
-      }
     }
   };
 
@@ -872,53 +866,67 @@ export function CalendarIcsWidget({
                     </div>
 
                     {currentView === 'month' && currentMonth && isValid(currentMonth) && (
-                      <>
-                        <Calendar
-                          mode="single"
-                          selected={selectedDate}
-                          onSelect={(day) => {
-                            setSelectedDate(day);
-                            if (day && isValid(day)) {
-                                setDisplayDate(startOfDay(day));
-                                setCurrentMonth(startOfDay(day));
-                            }
-                          }}
-                          month={currentMonth}
-                          onMonthChange={(month) => {
-                            if (isValid(month)) setCurrentMonth(month);
-                            if (selectedDate && isValid(selectedDate) && (selectedDate.getMonth() !== month.getMonth() || selectedDate.getFullYear() !== month.getFullYear())) {
-                                const dayInNewMonth = new Date(month.getFullYear(), month.getMonth(), selectedDate.getDate());
-                                if (isValid(dayInNewMonth) && dayInNewMonth.getMonth() === month.getMonth()) {
-                                     setSelectedDate(startOfDay(dayInNewMonth));
-                                     setDisplayDate(startOfDay(dayInNewMonth));
-                                } else {
-                                     const firstOfNewMonth = startOfDay(new Date(month.getFullYear(), month.getMonth(), 1));
-                                     setSelectedDate(firstOfNewMonth);
-                                     setDisplayDate(firstOfNewMonth);
-                                }
-                            } else if (!selectedDate || !isValid(selectedDate)) {
-                                const firstOfNewMonth = startOfDay(new Date(month.getFullYear(), month.getMonth(), 1));
-                                setSelectedDate(firstOfNewMonth);
-                                setDisplayDate(firstOfNewMonth);
-                            }
-
-                          }}
-                          className="rounded-md calendar-widget"
-                          modifiers={{ eventDay: eventDays.map(d => startOfDay(d)) }}
-                          modifiersClassNames={{ eventDay: 'bg-primary/20 rounded-full !text-primary-foreground dark:!text-primary' }}
-                          footer={selectedDate && isValid(selectedDate) && eventsForSelectedDay.length > 0 ?
-                            renderEventsList(eventsForSelectedDay, `${format(selectedDate, 'PPP')} 的事件`, `${format(selectedDate, 'PPP')} 无事件。`, 'day-detail')
-                            : selectedDate && isValid(selectedDate) ? <p className="calendar-widget__no-events p-3 border-t text-muted-foreground">{`${format(selectedDate, 'PPP')} 无事件。`}</p> : null
-                          }
-                        />
-                      </>
+                      <div className="flex flex-col md:flex-row">
+                        <div className="mx-auto md:mx-0">
+                          <Calendar
+                            mode="single"
+                            selected={selectedDate}
+                            onSelect={(day) => {
+                              setSelectedDate(day);
+                              if (day && isValid(day)) {
+                                  setDisplayDate(startOfDay(day));
+                                  setCurrentMonth(startOfDay(day));
+                              }
+                            }}
+                            month={currentMonth}
+                            onMonthChange={(month) => {
+                              if (isValid(month)) setCurrentMonth(month);
+                              if (selectedDate && isValid(selectedDate) && (selectedDate.getMonth() !== month.getMonth() || selectedDate.getFullYear() !== month.getFullYear())) {
+                                  const dayInNewMonth = new Date(month.getFullYear(), month.getMonth(), selectedDate.getDate());
+                                  if (isValid(dayInNewMonth) && dayInNewMonth.getMonth() === month.getMonth()) {
+                                      setSelectedDate(startOfDay(dayInNewMonth));
+                                      setDisplayDate(startOfDay(dayInNewMonth));
+                                  } else {
+                                      const firstOfNewMonth = startOfDay(new Date(month.getFullYear(), month.getMonth(), 1));
+                                      setSelectedDate(firstOfNewMonth);
+                                      setDisplayDate(firstOfNewMonth);
+                                  }
+                              } else if (!selectedDate || !isValid(selectedDate)) {
+                                  const firstOfNewMonth = startOfDay(new Date(month.getFullYear(), month.getMonth(), 1));
+                                  setSelectedDate(firstOfNewMonth);
+                                  setDisplayDate(firstOfNewMonth);
+                              }
+                            }}
+                            className="rounded-md calendar-widget"
+                            modifiers={{ eventDay: eventDays.map(d => startOfDay(d)) }}
+                            modifiersClassNames={{ eventDay: 'bg-primary/20 rounded-full !text-primary-foreground dark:!text-primary' }}
+                          />
+                        </div>
+                        <ScrollArea className="flex-grow mt-4 md:mt-0 md:border-l md:pl-4 border-border min-h-[350px]">
+                          <div className="h-full px-3">
+                              {selectedDate && isValid(selectedDate) ? (
+                                  renderEventsList(
+                                      eventsForSelectedDay,
+                                      `${format(selectedDate, 'PPP')} 的事件`,
+                                      `当天无事件。`,
+                                      'day-detail'
+                                  )
+                              ) : (
+                                  <div className="h-full flex items-center justify-center text-muted-foreground p-4">
+                                      <p>选择一个日期以查看事件</p>
+                                  </div>
+                              )}
+                          </div>
+                          <ScrollBar orientation="vertical" />
+                        </ScrollArea>
+                      </div>
                     )}
 
                     {currentView === 'week' && renderWeekView()}
                     {currentView === 'day' && renderDayTimelineView()}
 
                     {currentView === 'list' && (
-                        <div className="p-2">
+                        <div className="p-2 mt-4 border-t border-border">
                          {renderEventsList(eventsForListView, "未来30天事件", "暂无近期事件。", 'list')}
                         </div>
                     )}
