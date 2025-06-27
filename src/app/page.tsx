@@ -17,7 +17,7 @@ import { CalendarIcsWidget } from '@/components/CalendarIcsWidget';
 import { LinkDisplaySettingsDialog } from '@/components/LinkDisplaySettingsDialog'; 
 import { EmbedWidget } from '@/components/EmbedWidget';
 import { EmbedDialog } from '@/components/EmbedDialog';
-import { AppWindow, FolderPlus, PlusSquare, Bookmark, StickyNote, ListChecks, CalendarDays, UploadCloud, DownloadCloud, LayoutDashboard, Edit, GripVertical, Check, Code2 } from 'lucide-react';
+import { AppWindow, FolderPlus, PlusSquare, Bookmark, StickyNote, ListChecks, CalendarDays, UploadCloud, DownloadCloud, LayoutDashboard, Edit, GripVertical, Check, Code2, ClipboardPaste } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import {
   DropdownMenu,
@@ -775,6 +775,45 @@ export default function HomePage() {
     }
   };
 
+  const handleImportJsonFromClipboard = async () => {
+    if (!navigator.clipboard?.readText) {
+      toast({
+        variant: "destructive",
+        title: "浏览器不支持",
+        description: "您的浏览器不支持从剪贴板读取。",
+      });
+      return;
+    }
+
+    try {
+      const clipboardText = await navigator.clipboard.readText();
+      if (!clipboardText) {
+        toast({
+          variant: "destructive",
+          title: "剪贴板为空",
+          description: "剪贴板中没有内容可供导入。",
+        });
+        return;
+      }
+
+      const importedData = JSON.parse(clipboardText);
+      if (isValidWidgetArray(importedData)) {
+        setWidgets(importedData);
+        toast({ title: "配置已导入", description: "小部件已成功从剪贴板加载。" });
+      } else {
+        throw new Error("无效的文件格式或内容。");
+      }
+    } catch (error) {
+      console.error("Error importing JSON from clipboard:", error);
+      toast({
+        variant: "destructive",
+        title: "导入错误",
+        description: error instanceof Error ? error.message : "无法解析剪贴板中的 JSON。",
+      });
+    }
+  };
+
+
   const handleToggleLayoutEditing = () => {
     setIsLayoutEditing(prev => {
         const newIsLayoutEditing = !prev;
@@ -987,6 +1026,10 @@ export default function HomePage() {
               导入 JSON
             </Button>
             <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".json" style={{ display: 'none' }} />
+            <Button size="lg" variant="outline" disabled>
+                <ClipboardPaste className="mr-2 h-5 w-5" />
+                从剪贴板导入
+            </Button>
             <Button size="lg" variant="outline" onClick={handleExportJson} disabled>
               <DownloadCloud className="mr-2 h-5 w-5" />
               导出 JSON
@@ -1032,6 +1075,10 @@ export default function HomePage() {
             导入 JSON
           </Button>
           <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".json" style={{ display: 'none' }} />
+          <Button size="lg" variant="outline" onClick={handleImportJsonFromClipboard}>
+            <ClipboardPaste className="mr-2 h-5 w-5" />
+            从剪贴板导入
+          </Button>
           <Button size="lg" variant="outline" onClick={handleExportJson} disabled={widgets.length === 0}>
             <DownloadCloud className="mr-2 h-5 w-5" />
             导出 JSON
