@@ -26,6 +26,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from '@/lib/utils';
+import { BulkLinkDialog } from '@/components/BulkLinkDialog';
 
 
 // For migrating old data structures
@@ -90,6 +91,7 @@ export default function HomePage() {
   const [isClientHydratedAndSetup, setIsClientHydratedAndSetup] = useState(false);
   
   const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
+  const [isBulkLinkDialogOpen, setIsBulkLinkDialogOpen] = useState(false);
   const [isWidgetTitleDialogOpen, setIsWidgetTitleDialogOpen] = useState(false);
   const [isNoteEditDialogOpen, setIsNoteEditDialogOpen] = useState(false);
   const [isCalendarIcsDialogOpen, setIsCalendarIcsDialogOpen] = useState(false);
@@ -251,6 +253,16 @@ export default function HomePage() {
     setCurrentLinkCollectionWidgetId(undefined);
   };
 
+  const handleOpenBulkLinkDialog = (widgetId: string) => {
+    setCurrentLinkCollectionWidgetId(widgetId);
+    setIsBulkLinkDialogOpen(true);
+  };
+
+  const handleCloseBulkLinkDialog = () => {
+    setIsBulkLinkDialogOpen(false);
+    setCurrentLinkCollectionWidgetId(undefined);
+  };
+
   const handleOpenWidgetTitleDialog = (widgetId: string) => {
     const widgetToEdit = widgets.find(w => w.id === widgetId);
     if (widgetToEdit) {
@@ -338,6 +350,54 @@ export default function HomePage() {
     );
   };
 
+  const handleSubmitBulkLinks = (urlsString: string) => {
+    if (!currentLinkCollectionWidgetId) return;
+
+    const urls = urlsString.split('\n').map(u => u.trim()).filter(Boolean);
+    if (urls.length === 0) {
+      toast({ variant: "destructive", title: "无有效链接", description: "请输入至少一个有效的网址。" });
+      return;
+    }
+
+    const newLinks: LinkItem[] = [];
+    const invalidUrls: string[] = [];
+
+    for (const url of urls) {
+      try {
+        const urlObject = new URL(url.startsWith('http') ? url : `https://${url}`);
+        const title = urlObject.hostname.replace(/^www\./, '');
+        newLinks.push({ id: crypto.randomUUID(), url: urlObject.href, title });
+      } catch (error) {
+        invalidUrls.push(url);
+      }
+    }
+
+    if (newLinks.length > 0) {
+      setWidgets(prevWidgets =>
+        prevWidgets.map(widget => {
+          if (isLinkCollectionWidget(widget) && widget.id === currentLinkCollectionWidgetId) {
+            return {
+              ...widget,
+              data: {
+                ...widget.data,
+                links: [...newLinks, ...widget.data.links],
+              }
+            };
+          }
+          return widget;
+        })
+      );
+      toast({ title: "书签已添加", description: `成功添加了 ${newLinks.length} 个书签。` });
+    }
+
+    if (invalidUrls.length > 0) {
+      toast({ variant: "destructive", title: "部分链接无效", description: `无法添加以下链接: ${invalidUrls.join(', ')}` });
+    }
+
+    handleCloseBulkLinkDialog();
+  };
+
+
   const handleDeleteLink = (widgetId: string, linkId: string) => {
     setWidgets(prevWidgets =>
       prevWidgets.map(widget => {
@@ -368,42 +428,38 @@ export default function HomePage() {
     target: { widgetId: string; linkId: string | null }
   ) => {
     setWidgets(prevWidgets => {
-      let sourceLink: LinkItem | undefined;
+      const newWidgets = [...prevWidgets];
+      const sourceWidgetIndex = newWidgets.findIndex(w => w.id === source.widgetId);
+      const targetWidgetIndex = newWidgets.findIndex(w => w.id === target.widgetId);
 
-      // Create a new array of widgets after removing the source link
-      const widgetsAfterRemoval = prevWidgets.map(widget => {
-        if (isLinkCollectionWidget(widget) && widget.id === source.widgetId) {
-          sourceLink = widget.data.links.find(link => link.id === source.linkId);
-          const newLinks = widget.data.links.filter(link => link.id !== source.linkId);
-          return { ...widget, data: { ...widget.data, links: newLinks } };
-        }
-        return widget;
-      });
-
-      // If the source link wasn't found, something is wrong, so return the original state
-      if (!sourceLink) {
-        return prevWidgets;
+      if (sourceWidgetIndex === -1 || targetWidgetIndex === -1) {
+        return prevWidgets; 
       }
+      
+      const sourceWidget = newWidgets[sourceWidgetIndex];
+      if (!isLinkCollectionWidget(sourceWidget)) return prevWidgets;
+      
+      const sourceLink = sourceWidget.data.links.find(link => link.id === source.linkId);
+      if (!sourceLink) return prevWidgets;
 
-      // Create the final array of widgets by adding the source link to the target
-      const finalWidgets = widgetsAfterRemoval.map(widget => {
-        if (isLinkCollectionWidget(widget) && widget.id === target.widgetId) {
-          const newLinks = [...widget.data.links];
-          const dropIndex = target.linkId
-            ? newLinks.findIndex(link => link.id === target.linkId)
-            : -1;
-
-          if (dropIndex !== -1) {
-            newLinks.splice(dropIndex, 0, sourceLink!);
-          } else {
-            newLinks.push(sourceLink!);
-          }
-          return { ...widget, data: { ...widget.data, links: newLinks } };
-        }
-        return widget;
-      });
-
-      return finalWidgets;
+      const sourceLinks = sourceWidget.data.links.filter(link => link.id !== source.linkId);
+      newWidgets[sourceWidgetIndex] = { ...sourceWidget, data: { ...sourceWidget.data, links: sourceLinks }};
+      
+      const targetWidget = newWidgets[targetWidgetIndex];
+      if (!isLinkCollectionWidget(targetWidget)) return prevWidgets;
+      
+      const targetLinks = [...targetWidget.data.links];
+      const dropIndex = target.linkId ? targetLinks.findIndex(link => link.id === target.linkId) : -1;
+      
+      if (dropIndex !== -1) {
+        targetLinks.splice(dropIndex, 0, sourceLink);
+      } else {
+        targetLinks.push(sourceLink);
+      }
+      
+      newWidgets[targetWidgetIndex] = { ...targetWidget, data: { ...targetWidget.data, links: targetLinks }};
+      
+      return newWidgets;
     });
   };
 
@@ -1038,6 +1094,7 @@ export default function HomePage() {
                   key={widget.id}
                   widget={widget}
                   onOpenLinkDialog={handleOpenLinkDialog}
+                  onOpenBulkLinkDialog={handleOpenBulkLinkDialog}
                   onOpenWidgetTitleDialog={() => handleOpenWidgetTitleDialog(widget.id)}
                   onOpenLinkDisplaySettingsDialog={() => handleOpenLinkDisplaySettingsDialog(widget.id)}
                   onDeleteWidget={handleDeleteWidget}
@@ -1126,6 +1183,14 @@ export default function HomePage() {
           onSubmit={handleSubmitLink}
           defaultValues={editingLink}
           categoryId={currentLinkCollectionWidgetId} 
+        />
+      )}
+
+      {isBulkLinkDialogOpen && currentLinkCollectionWidgetId && (
+        <BulkLinkDialog
+          isOpen={isBulkLinkDialogOpen}
+          onClose={handleCloseBulkLinkDialog}
+          onSubmit={handleSubmitBulkLinks}
         />
       )}
 

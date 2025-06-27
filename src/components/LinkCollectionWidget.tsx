@@ -4,7 +4,7 @@
 import type { LinkCollectionAppWidget, LinkItem } from '@/types';
 import { LinkGrid } from './LinkGrid';
 import { Button } from '@/components/ui/button';
-import { Edit3, MoreVertical, PlusCircle, Trash2, Bookmark, ChevronDown, ChevronUp, GripVertical, SlidersHorizontal, ListOrdered, Check } from 'lucide-react'; 
+import { Edit3, MoreVertical, PlusCircle, Trash2, Bookmark, ChevronDown, ChevronUp, GripVertical, SlidersHorizontal, ListOrdered, Check, Upload } from 'lucide-react'; 
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,6 +42,7 @@ interface WidgetDragProps {
 interface LinkCollectionWidgetProps extends WidgetDragProps {
   widget: LinkCollectionAppWidget;
   onOpenLinkDialog: (widgetId: string, link?: LinkItem) => void;
+  onOpenBulkLinkDialog: (widgetId: string) => void;
   onOpenWidgetTitleDialog: (widgetId: string) => void;
   onOpenLinkDisplaySettingsDialog: (widgetId: string) => void; 
   onDeleteWidget: (widgetId: string) => void;
@@ -55,6 +56,7 @@ interface LinkCollectionWidgetProps extends WidgetDragProps {
 export function LinkCollectionWidget({
   widget,
   onOpenLinkDialog,
+  onOpenBulkLinkDialog,
   onOpenWidgetTitleDialog,
   onOpenLinkDisplaySettingsDialog, 
   onDeleteWidget,
@@ -103,6 +105,7 @@ export function LinkCollectionWidget({
       )}
       draggable={isWidgetItselfDraggable} 
       onDragStart={(e) => {
+        e.stopPropagation();
         if (isWidgetItselfDraggable) {
           onWidgetDragStart(e, widget.id);
         } else {
@@ -111,10 +114,10 @@ export function LinkCollectionWidget({
       }}
       // These handlers are for when ANOTHER widget is dragged over THIS widget.
       // They should be active if global layout editing is on.
-      onDragOver={(e) => { if (isLayoutEditing) onWidgetDragOver(e, widget.id);}}
-      onDrop={(e) => { if (isLayoutEditing) onWidgetDrop(e, widget.id);}}
-      onDragLeave={(e) => { if (isLayoutEditing) onWidgetDragLeave(e);}}
-      onDragEnd={(e) => { if (isLayoutEditing) onWidgetDragEnd(e);}}
+      onDragOver={(e) => { e.stopPropagation(); if (isLayoutEditing) onWidgetDragOver(e, widget.id);}}
+      onDrop={(e) => { e.stopPropagation(); if (isLayoutEditing) onWidgetDrop(e, widget.id);}}
+      onDragLeave={(e) => { e.stopPropagation(); if (isLayoutEditing) onWidgetDragLeave(e);}}
+      onDragEnd={(e) => { e.stopPropagation(); if (isLayoutEditing) onWidgetDragEnd(e);}}
     >
       <article className="widget bookmark-widget group/widget">
         <div className="widget__container">
@@ -136,10 +139,6 @@ export function LinkCollectionWidget({
               {isCollapsed ? <ChevronDown className="widget-header__chevron" /> : <ChevronUp className="widget-header__chevron" />}
             </div>
             <div className="widget-header__controls">
-              <Button variant="ghost" size="icon" className="widget-header__control h-7 w-7" onClick={(e) => { e.stopPropagation(); onOpenLinkDialog(widget.id); }}>
-                <PlusCircle className="widget-header__feather-icon h-4 w-4" />
-                <span className="sr-only">{`为 ${widget.title} 添加链接`}</span>
-              </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="widget-header__control h-7 w-7" onClick={(e) => e.stopPropagation()}>
@@ -148,6 +147,15 @@ export function LinkCollectionWidget({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onOpenLinkDialog(widget.id); }}>
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    <span>添加书签</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onOpenBulkLinkDialog(widget.id); }}>
+                    <Upload className="mr-2 h-4 w-4" />
+                    <span>批量添加书签</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onOpenWidgetTitleDialog(widget.id); }}>
                     <Edit3 className="mr-2 h-4 w-4" />
                     <span>编辑合集标题</span>
