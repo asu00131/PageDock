@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from '@/lib/utils';
 import { BulkLinkDialog } from '@/components/BulkLinkDialog';
+import { JsonImportDialog } from '@/components/JsonImportDialog';
 
 
 // For migrating old data structures
@@ -97,6 +98,7 @@ export default function HomePage() {
   const [isCalendarIcsDialogOpen, setIsCalendarIcsDialogOpen] = useState(false);
   const [isLinkDisplaySettingsDialogOpen, setIsLinkDisplaySettingsDialogOpen] = useState(false); 
   const [isEmbedDialogOpen, setIsEmbedDialogOpen] = useState(false);
+  const [isJsonImportDialogOpen, setIsJsonImportDialogOpen] = useState(false);
   
   const [editingLink, setEditingLink] = useState<LinkItem | undefined>(undefined);
   const [editingWidget, setEditingWidget] = useState<AppWidget | undefined>(undefined); 
@@ -327,6 +329,9 @@ export default function HomePage() {
     setIsEmbedDialogOpen(false);
     setEditingWidget(undefined);
   };
+  
+  const handleOpenJsonImportDialog = () => setIsJsonImportDialogOpen(true);
+  const handleCloseJsonImportDialog = () => setIsJsonImportDialogOpen(false);
 
   const handleSubmitLink = (data: Omit<LinkItem, 'id'>, linkId?: string) => {
     if (!currentLinkCollectionWidgetId) return;
@@ -775,41 +780,20 @@ export default function HomePage() {
     }
   };
 
-  const handleImportJsonFromClipboard = async () => {
-    if (!navigator.clipboard?.readText) {
-      toast({
-        variant: "destructive",
-        title: "浏览器不支持",
-        description: "您的浏览器不支持从剪贴板读取。",
-      });
-      return;
-    }
-
+  const handleSubmitJsonImport = (jsonString: string) => {
+    if (!isClientHydratedAndSetup) return;
     try {
-      const clipboardText = await navigator.clipboard.readText();
-      if (!clipboardText) {
-        toast({
-          variant: "destructive",
-          title: "剪贴板为空",
-          description: "剪贴板中没有内容可供导入。",
-        });
-        return;
-      }
-
-      const importedData = JSON.parse(clipboardText);
+      const importedData = JSON.parse(jsonString);
       if (isValidWidgetArray(importedData)) {
         setWidgets(importedData);
-        toast({ title: "配置已导入", description: "小部件已成功从剪贴板加载。" });
+        toast({ title: "配置已导入", description: "小部件已成功加载。" });
+        handleCloseJsonImportDialog(); 
       } else {
         throw new Error("无效的文件格式或内容。");
       }
     } catch (error) {
-      console.error("Error importing JSON from clipboard:", error);
-      toast({
-        variant: "destructive",
-        title: "导入错误",
-        description: error instanceof Error ? error.message : "无法解析剪贴板中的 JSON。",
-      });
+      console.error("Error importing JSON from text:", error);
+      toast({ variant: "destructive", title: "导入错误", description: error instanceof Error ? error.message : "无法解析 JSON 文本。" });
     }
   };
 
@@ -1075,7 +1059,7 @@ export default function HomePage() {
             导入 JSON
           </Button>
           <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".json" style={{ display: 'none' }} />
-          <Button size="lg" variant="outline" onClick={handleImportJsonFromClipboard}>
+          <Button size="lg" variant="outline" onClick={handleOpenJsonImportDialog}>
             <ClipboardPaste className="mr-2 h-5 w-5" />
             从剪贴板导入
           </Button>
@@ -1284,6 +1268,14 @@ export default function HomePage() {
           onClose={handleCloseEmbedDialog}
           onSubmit={handleSubmitEmbedDialog}
           defaultValues={editingWidget}
+        />
+      )}
+
+      {isJsonImportDialogOpen && (
+        <JsonImportDialog
+            isOpen={isJsonImportDialogOpen}
+            onClose={handleCloseJsonImportDialog}
+            onSubmit={handleSubmitJsonImport}
         />
       )}
       
