@@ -1265,7 +1265,7 @@ export default function HomePage() {
                   onOpenWidgetTitleDialog={() => handleOpenWidgetTitleDialog(widget.id)}
                   onDeleteWidget={handleDeleteWidget}
                   onAddItem={handleAddTodoItem}
-                  onToggleItem={onToggleTodoItem}
+                  onToggleItem={handleToggleTodoItem}
                   onDeleteItem={handleDeleteTodoItem}
                   onUpdateItemText={handleUpdateTodoItemText}
                   onReorderItems={handleReorderTodoItems}
@@ -1399,6 +1399,7 @@ export default function HomePage() {
     
 
     
+
 
 
 
