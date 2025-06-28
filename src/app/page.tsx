@@ -1038,55 +1038,53 @@ export default function HomePage() {
     const widgetToCheck = widgets.find(w => isLinkCollectionWidget(w) && w.id === widgetId) as LinkCollectionAppWidget | undefined;
     if (!widgetToCheck) return;
 
-    toast({ title: '正在检查链接...', description: `正在验证“${widgetToCheck.title}”中的链接。` });
+    toast({ title: '正在检查链接...', description: `正在验证“${widgetToCheck.title}”中的链接。将尝试多个代理以确保准确性。` });
 
     const links = widgetToCheck.data.links;
-    const validationPromises = links.map(link => {
+
+    const proxies = [
+        (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+        (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+    ];
+
+    const checkLink = async (link: LinkItem): Promise<{ linkId: string, ok: boolean }> => {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8-second timeout
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10-second timeout for all proxies
 
-        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(link.url)}`;
-        
-        return fetch(proxyUrl, { 
-            method: 'GET',
-            cache: 'no-cache',
-            signal: controller.signal 
-        })
-        .then(response => {
+        const fetchPromises = proxies.map(proxyBuilder =>
+            fetch(proxyBuilder(link.url), {
+                method: 'GET',
+                cache: 'no-cache',
+                signal: controller.signal,
+            }).then(response => {
+                if (!response.ok) {
+                    return Promise.reject(new Error(`Proxy failed with status ${response.status}`));
+                }
+                return response;
+            })
+        );
+
+        try {
+            await Promise.any(fetchPromises);
             clearTimeout(timeoutId);
-            return {
-                linkId: link.id,
-                url: link.url,
-                status: response.status,
-                ok: response.ok,
-            };
-        })
-        .catch(error => {
+            return { linkId: link.id, ok: true };
+        } catch (error) {
             clearTimeout(timeoutId);
-            return {
-                linkId: link.id,
-                url: link.url,
-                status: 0,
-                ok: false,
-                error: error,
-            };
-        });
-    });
+            console.error(`Link ${link.url} failed on all proxies.`, error);
+            return { linkId: link.id, ok: false };
+        }
+    };
 
-    const results = await Promise.allSettled(validationPromises);
+    const validationResults = await Promise.all(links.map(link => checkLink(link)));
 
-    const validLinks: LinkItem[] = [];
     const invalidLinkIds = new Set<string>();
-
-    results.forEach((result, index) => {
-        if (result.status === 'fulfilled' && result.value.ok) {
-            validLinks.push(links[index]);
-        } else {
-            invalidLinkIds.add(links[index].id);
+    validationResults.forEach(result => {
+        if (!result.ok) {
+            invalidLinkIds.add(result.linkId);
         }
     });
     
-    const invalidCount = links.length - validLinks.length;
+    const invalidCount = invalidLinkIds.size;
 
     if (invalidCount > 0) {
         setWidgets(prevWidgets =>
@@ -1425,4 +1423,5 @@ export default function HomePage() {
     
 
     
+
 
