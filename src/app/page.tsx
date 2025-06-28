@@ -784,13 +784,65 @@ export default function HomePage() {
     if (!isClientHydratedAndSetup) return;
     try {
       const importedData = JSON.parse(jsonString);
+
+      // Attempt to parse as PageDock native format first
       if (isValidWidgetArray(importedData)) {
         setWidgets(importedData);
         toast({ title: "配置已导入", description: "小部件已成功加载。" });
-        handleCloseJsonImportDialog(); 
-      } else {
-        throw new Error("无效的文件格式或内容。");
+        handleCloseJsonImportDialog();
+        return;
       }
+      
+      // Attempt to parse as start.me format
+      if (importedData.page && Array.isArray(importedData.page.columns)) {
+        const startMeWidgets = importedData.page.columns.flatMap((col: any) => col.widgets || []);
+        
+        const newWidgets: AppWidget[] = startMeWidgets
+            .filter((widget: any) => widget.widget_type === 'urllist' && widget.items?.links?.length > 0)
+            .map((widget: any): LinkCollectionAppWidget => {
+                const links: LinkItem[] = widget.items.links.map((link: any) => ({
+                    id: String(link.item_id) || crypto.randomUUID(),
+                    title: link.title || '无标题',
+                    url: link.url,
+                }));
+        
+                return {
+                    id: String(widget.public_id) || crypto.randomUUID(),
+                    type: 'linkCollection',
+                    title: widget.title || '导入的合集',
+                    data: {
+                        links: links,
+                        displaySettings: {
+                            displayMode: 'cloud',
+                            iconSize: 'small',
+                            visibleLinksCount: 0,
+                            titleLines: -1,
+                        },
+                    },
+                    isCollapsed: false,
+                };
+            });
+
+        if (newWidgets.length > 0) {
+            setWidgets(prev => [...prev, ...newWidgets]);
+            toast({
+                title: "导入成功",
+                description: `已从 Start.me 成功导入 ${newWidgets.length} 个书签合集。`,
+            });
+            handleCloseJsonImportDialog();
+        } else {
+             toast({
+                variant: "destructive",
+                title: "未找到书签",
+                description: "在提供的 Start.me 数据中未找到可导入的书签小部件。",
+            });
+        }
+        return; // Exit after handling
+      }
+
+      // If neither format is recognized
+      throw new Error("无效的文件格式或内容。");
+
     } catch (error) {
       console.error("Error importing JSON from text:", error);
       toast({ variant: "destructive", title: "导入错误", description: error instanceof Error ? error.message : "无法解析 JSON 文本。" });
