@@ -1034,6 +1034,75 @@ export default function HomePage() {
     setDragOverWidgetId(null);
   };
 
+  const handleCheckLinks = async (widgetId: string) => {
+    const widgetToCheck = widgets.find(w => isLinkCollectionWidget(w) && w.id === widgetId) as LinkCollectionAppWidget | undefined;
+    if (!widgetToCheck) return;
+
+    toast({ title: '正在检查链接...', description: `正在验证“${widgetToCheck.title}”中的链接。` });
+
+    const links = widgetToCheck.data.links;
+    const validationPromises = links.map(link => {
+        // Using a CORS proxy to check URL status client-side
+        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(link.url)}`;
+        return fetch(proxyUrl, { method: 'HEAD', cache: 'no-cache' })
+            .then(response => ({
+                linkId: link.id,
+                url: link.url,
+                status: response.status,
+                ok: response.ok,
+            }))
+            .catch(error => ({
+                linkId: link.id,
+                url: link.url,
+                status: 0, // Network error or other failure
+                ok: false,
+                error: error,
+            }));
+    });
+
+    const results = await Promise.allSettled(validationPromises);
+
+    const validLinks: LinkItem[] = [];
+    const invalidLinkIds = new Set<string>();
+
+    results.forEach((result, index) => {
+        if (result.status === 'fulfilled' && result.value.ok) {
+            validLinks.push(links[index]);
+        } else {
+            invalidLinkIds.add(links[index].id);
+        }
+    });
+    
+    const invalidCount = links.length - validLinks.length;
+
+    if (invalidCount > 0) {
+        setWidgets(prevWidgets =>
+            prevWidgets.map(widget => {
+                if (isLinkCollectionWidget(widget) && widget.id === widgetId) {
+                    return {
+                        ...widget,
+                        data: {
+                            ...widget.data,
+                            links: widget.data.links.filter(link => !invalidLinkIds.has(link.id)),
+                        },
+                    };
+                }
+                return widget;
+            })
+        );
+        toast({
+            variant: 'destructive',
+            title: '链接检查完成',
+            description: `移除了 ${invalidCount} 个无效或无法访问的链接。`,
+        });
+    } else {
+        toast({
+            title: '链接检查完成',
+            description: '所有链接均有效。',
+        });
+    }
+  };
+
   const renderEmptyState = () => (
     <div className="flex flex-col items-center justify-center text-center p-10 border-2 border-dashed border-muted rounded-lg min-h-[200px]">
       <FolderPlus className="h-12 w-12 text-muted-foreground mb-4" />
@@ -1182,6 +1251,7 @@ export default function HomePage() {
                   onOpenLinkDisplaySettingsDialog={() => handleOpenLinkDisplaySettingsDialog(widget.id)}
                   onDeleteWidget={handleDeleteWidget}
                   onMoveLink={handleMoveLink}
+                  onCheckLinks={handleCheckLinks}
                   onEditLink={(widgetId, linkId) => {
                       const collWidget = widgets.find(w => w.id === widgetId) as LinkCollectionAppWidget | undefined;
                       const linkToEdit = collWidget?.data.links.find(l => l.id === linkId);

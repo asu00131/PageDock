@@ -4,7 +4,7 @@
 import type { LinkCollectionAppWidget, LinkItem } from '@/types';
 import { LinkGrid } from './LinkGrid';
 import { Button } from '@/components/ui/button';
-import { Edit3, MoreVertical, PlusCircle, Trash2, Bookmark, ChevronDown, ChevronUp, GripVertical, SlidersHorizontal, ListOrdered, Check, Upload } from 'lucide-react'; 
+import { Edit3, MoreVertical, PlusCircle, Trash2, Bookmark, ChevronDown, ChevronUp, GripVertical, SlidersHorizontal, ListOrdered, Check, Upload, Unlink } from 'lucide-react'; 
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,6 +49,7 @@ interface LinkCollectionWidgetProps extends WidgetDragProps {
   onEditLink: (widgetId: string, linkId: string) => void;
   onDeleteLink: (widgetId: string, linkId: string) => void;
   onMoveLink: (source: { widgetId: string; linkId: string }, target: { widgetId: string; linkId: string | null }) => void;
+  onCheckLinks: (widgetId: string) => void;
   isCollapsed?: boolean;
   onToggleCollapse: (widgetId: string) => void;
 }
@@ -63,6 +64,7 @@ export function LinkCollectionWidget({
   onEditLink,
   onDeleteLink,
   onMoveLink,
+  onCheckLinks,
   isCollapsed,
   onToggleCollapse,
   onWidgetDragStart,
@@ -170,6 +172,10 @@ export function LinkCollectionWidget({
                       : <ListOrdered className="mr-2 h-4 w-4" />
                     }
                     <span>{isItemSortingActive ? "完成排序" : "书签排序"}</span>
+                  </DropdownMenuItem>
+                   <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onCheckLinks(widget.id); }}>
+                    <Unlink className="mr-2 h-4 w-4" />
+                    <span>检查链接有效性</span>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <AlertDialog>
