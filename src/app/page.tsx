@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from '@/lib/utils';
 import { BulkLinkDialog } from '@/components/BulkLinkDialog';
+import { BulkDeleteDialog } from '@/components/BulkDeleteDialog';
 import { JsonImportDialog } from '@/components/JsonImportDialog';
 
 
@@ -93,6 +94,7 @@ export default function HomePage() {
   
   const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
   const [isBulkLinkDialogOpen, setIsBulkLinkDialogOpen] = useState(false);
+  const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
   const [isWidgetTitleDialogOpen, setIsWidgetTitleDialogOpen] = useState(false);
   const [isNoteEditDialogOpen, setIsNoteEditDialogOpen] = useState(false);
   const [isCalendarIcsDialogOpen, setIsCalendarIcsDialogOpen] = useState(false);
@@ -265,6 +267,16 @@ export default function HomePage() {
     setCurrentLinkCollectionWidgetId(undefined);
   };
 
+  const handleOpenBulkDeleteDialog = (widgetId: string) => {
+    setCurrentLinkCollectionWidgetId(widgetId);
+    setIsBulkDeleteDialogOpen(true);
+  };
+
+  const handleCloseBulkDeleteDialog = () => {
+    setIsBulkDeleteDialogOpen(false);
+    setCurrentLinkCollectionWidgetId(undefined);
+  };
+
   const handleOpenWidgetTitleDialog = (widgetId: string) => {
     const widgetToEdit = widgets.find(w => w.id === widgetId);
     if (widgetToEdit) {
@@ -402,6 +414,42 @@ export default function HomePage() {
     handleCloseBulkLinkDialog();
   };
 
+  const handleSubmitBulkDelete = (urlsString: string) => {
+    if (!currentLinkCollectionWidgetId) return;
+
+    const urlsToDelete = new Set(urlsString.split('\n').map(u => u.trim()).filter(Boolean));
+    if (urlsToDelete.size === 0) {
+      toast({ variant: "destructive", title: "无有效链接", description: "请输入至少一个有效的网址进行删除。" });
+      return;
+    }
+    
+    let deletedCount = 0;
+    setWidgets(prevWidgets =>
+        prevWidgets.map(widget => {
+          if (isLinkCollectionWidget(widget) && widget.id === currentLinkCollectionWidgetId) {
+            const originalCount = widget.data.links.length;
+            const updatedLinks = widget.data.links.filter(link => !urlsToDelete.has(link.url));
+            deletedCount = originalCount - updatedLinks.length;
+            return {
+              ...widget,
+              data: {
+                ...widget.data,
+                links: updatedLinks,
+              }
+            };
+          }
+          return widget;
+        })
+    );
+    
+    if (deletedCount > 0) {
+        toast({ title: "书签已删除", description: `成功删除了 ${deletedCount} 个书签。` });
+    } else {
+        toast({ variant: "destructive", title: "未找到匹配项", description: "在合集中未找到要删除的网址。" });
+    }
+
+    handleCloseBulkDeleteDialog();
+  };
 
   const handleDeleteLink = (widgetId: string, linkId: string) => {
     setWidgets(prevWidgets =>
@@ -1034,86 +1082,6 @@ export default function HomePage() {
     setDragOverWidgetId(null);
   };
 
-  const handleCheckLinks = async (widgetId: string) => {
-    const widgetToCheck = widgets.find(w => isLinkCollectionWidget(w) && w.id === widgetId) as LinkCollectionAppWidget | undefined;
-    if (!widgetToCheck) return;
-
-    toast({ title: '正在检查链接...', description: `正在验证“${widgetToCheck.title}”中的链接。将尝试多个代理以确保准确性。` });
-
-    const links = widgetToCheck.data.links;
-
-    const proxies = [
-        (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-        (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-    ];
-
-    const checkLink = async (link: LinkItem): Promise<{ linkId: string, ok: boolean }> => {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10-second timeout for all proxies
-
-        const fetchPromises = proxies.map(proxyBuilder =>
-            fetch(proxyBuilder(link.url), {
-                method: 'GET',
-                cache: 'no-cache',
-                signal: controller.signal,
-            }).then(response => {
-                if (!response.ok) {
-                    return Promise.reject(new Error(`Proxy failed with status ${response.status}`));
-                }
-                return response;
-            })
-        );
-
-        try {
-            await Promise.any(fetchPromises);
-            clearTimeout(timeoutId);
-            return { linkId: link.id, ok: true };
-        } catch (error) {
-            clearTimeout(timeoutId);
-            console.error(`Link ${link.url} failed on all proxies.`, error);
-            return { linkId: link.id, ok: false };
-        }
-    };
-
-    const validationResults = await Promise.all(links.map(link => checkLink(link)));
-
-    const invalidLinkIds = new Set<string>();
-    validationResults.forEach(result => {
-        if (!result.ok) {
-            invalidLinkIds.add(result.linkId);
-        }
-    });
-    
-    const invalidCount = invalidLinkIds.size;
-
-    if (invalidCount > 0) {
-        setWidgets(prevWidgets =>
-            prevWidgets.map(widget => {
-                if (isLinkCollectionWidget(widget) && widget.id === widgetId) {
-                    return {
-                        ...widget,
-                        data: {
-                            ...widget.data,
-                            links: widget.data.links.filter(link => !invalidLinkIds.has(link.id)),
-                        },
-                    };
-                }
-                return widget;
-            })
-        );
-        toast({
-            variant: 'destructive',
-            title: '链接检查完成',
-            description: `移除了 ${invalidCount} 个无效或无法访问的链接。`,
-        });
-    } else {
-        toast({
-            title: '链接检查完成',
-            description: '所有链接均有效。',
-        });
-    }
-  };
-
   const renderEmptyState = () => (
     <div className="flex flex-col items-center justify-center text-center p-10 border-2 border-dashed border-muted rounded-lg min-h-[200px]">
       <FolderPlus className="h-12 w-12 text-muted-foreground mb-4" />
@@ -1258,11 +1226,11 @@ export default function HomePage() {
                   widget={widget}
                   onOpenLinkDialog={handleOpenLinkDialog}
                   onOpenBulkLinkDialog={handleOpenBulkLinkDialog}
+                  onOpenBulkDeleteDialog={handleOpenBulkDeleteDialog}
                   onOpenWidgetTitleDialog={() => handleOpenWidgetTitleDialog(widget.id)}
                   onOpenLinkDisplaySettingsDialog={() => handleOpenLinkDisplaySettingsDialog(widget.id)}
                   onDeleteWidget={handleDeleteWidget}
                   onMoveLink={handleMoveLink}
-                  onCheckLinks={handleCheckLinks}
                   onEditLink={(widgetId, linkId) => {
                       const collWidget = widgets.find(w => w.id === widgetId) as LinkCollectionAppWidget | undefined;
                       const linkToEdit = collWidget?.data.links.find(l => l.id === linkId);
@@ -1297,7 +1265,7 @@ export default function HomePage() {
                   onOpenWidgetTitleDialog={() => handleOpenWidgetTitleDialog(widget.id)}
                   onDeleteWidget={handleDeleteWidget}
                   onAddItem={handleAddTodoItem}
-                  onToggleItem={handleToggleTodoItem}
+                  onToggleItem={onToggleTodoItem}
                   onDeleteItem={handleDeleteTodoItem}
                   onUpdateItemText={handleUpdateTodoItemText}
                   onReorderItems={handleReorderTodoItems}
@@ -1355,6 +1323,14 @@ export default function HomePage() {
           isOpen={isBulkLinkDialogOpen}
           onClose={handleCloseBulkLinkDialog}
           onSubmit={handleSubmitBulkLinks}
+        />
+      )}
+
+      {isBulkDeleteDialogOpen && currentLinkCollectionWidgetId && (
+        <BulkDeleteDialog
+          isOpen={isBulkDeleteDialogOpen}
+          onClose={handleCloseBulkDeleteDialog}
+          onSubmit={handleSubmitBulkDelete}
         />
       )}
 
@@ -1423,5 +1399,6 @@ export default function HomePage() {
     
 
     
+
 
 
