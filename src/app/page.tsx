@@ -1042,22 +1042,35 @@ export default function HomePage() {
 
     const links = widgetToCheck.data.links;
     const validationPromises = links.map(link => {
-        // Using a CORS proxy to check URL status client-side
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8-second timeout
+
         const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(link.url)}`;
-        return fetch(proxyUrl, { method: 'HEAD', cache: 'no-cache' })
-            .then(response => ({
+        
+        return fetch(proxyUrl, { 
+            method: 'GET',
+            cache: 'no-cache',
+            signal: controller.signal 
+        })
+        .then(response => {
+            clearTimeout(timeoutId);
+            return {
                 linkId: link.id,
                 url: link.url,
                 status: response.status,
                 ok: response.ok,
-            }))
-            .catch(error => ({
+            };
+        })
+        .catch(error => {
+            clearTimeout(timeoutId);
+            return {
                 linkId: link.id,
                 url: link.url,
-                status: 0, // Network error or other failure
+                status: 0,
                 ok: false,
                 error: error,
-            }));
+            };
+        });
     });
 
     const results = await Promise.allSettled(validationPromises);
@@ -1412,3 +1425,4 @@ export default function HomePage() {
     
 
     
+
