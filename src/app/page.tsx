@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import type { AppWidget, LinkCollectionAppWidget, NoteAppWidget, TodoListAppWidget, CalendarIcsAppWidget, EmbedAppWidget, LinkItem, TodoItem, WidgetType, LinkCollectionDisplaySettings, EmbedWidgetData, IframeEmbedData, ImageEmbedData, CodeEmbedData, CalendarEvent } from '@/types';
+import type { AppWidget, LinkCollectionAppWidget, NoteAppWidget, TodoListAppWidget, CalendarIcsAppWidget, EmbedAppWidget, LinkItem, TodoItem, WidgetType, LinkCollectionDisplaySettings, EmbedWidgetData, IframeEmbedData, ImageEmbedData, CodeEmbedData, CalendarEvent, LinkCollectionAppWidget } from '@/types';
 import { isLinkCollectionWidget, isNoteWidget, isTodoListWidget, isCalendarIcsWidget, isEmbedWidget } from '@/types';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Button } from '@/components/ui/button';
@@ -1226,7 +1226,7 @@ export default function HomePage() {
                   widget={widget}
                   onOpenLinkDialog={handleOpenLinkDialog}
                   onOpenBulkLinkDialog={handleOpenBulkLinkDialog}
-                  onOpenBulkDeleteDialog={handleOpenBulkDeleteDialog}
+                  onOpenBulkDeleteDialog={() => handleOpenBulkDeleteDialog(widget.id)}
                   onOpenWidgetTitleDialog={() => handleOpenWidgetTitleDialog(widget.id)}
                   onOpenLinkDisplaySettingsDialog={() => handleOpenLinkDisplaySettingsDialog(widget.id)}
                   onDeleteWidget={handleDeleteWidget}
@@ -1331,6 +1331,9 @@ export default function HomePage() {
           isOpen={isBulkDeleteDialogOpen}
           onClose={handleCloseBulkDeleteDialog}
           onSubmit={handleSubmitBulkDelete}
+          links={
+            (widgets.find(w => isLinkCollectionWidget(w) && w.id === currentLinkCollectionWidgetId))?.data.links || []
+          }
         />
       )}
 
@@ -1399,6 +1402,7 @@ export default function HomePage() {
     
 
     
+
 
 
 

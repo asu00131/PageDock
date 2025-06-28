@@ -1,6 +1,7 @@
 
 "use client";
 
+import type { LinkItem } from '@/types';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -23,7 +24,7 @@ import {
 } from '@/components/ui/form';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from "@/hooks/use-toast";
-import { ClipboardPaste } from 'lucide-react';
+import { ClipboardPaste, ClipboardList } from 'lucide-react';
 
 const bulkDeleteSchema = z.object({
   urls: z.string().min(1, { message: '请输入至少一个网址。' }),
@@ -35,9 +36,10 @@ interface BulkDeleteDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (urls: string) => void;
+  links: LinkItem[];
 }
 
-export function BulkDeleteDialog({ isOpen, onClose, onSubmit }: BulkDeleteDialogProps) {
+export function BulkDeleteDialog({ isOpen, onClose, onSubmit, links }: BulkDeleteDialogProps) {
   const form = useForm<BulkDeleteFormData>({
     resolver: zodResolver(bulkDeleteSchema),
     defaultValues: {
@@ -45,6 +47,32 @@ export function BulkDeleteDialog({ isOpen, onClose, onSubmit }: BulkDeleteDialog
     },
   });
   const { toast } = useToast();
+
+  const handleCopyAllLinks = async () => {
+    if (!links || links.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "无链接可复制",
+        description: "此合集中没有链接。",
+      });
+      return;
+    }
+    const allUrls = links.map(link => link.url).join('\n');
+    try {
+      await navigator.clipboard.writeText(allUrls);
+      toast({
+        title: "已复制",
+        description: `${links.length} 个链接已复制到剪贴板。`,
+      });
+    } catch (err) {
+      console.error('Failed to copy links: ', err);
+      toast({
+        variant: "destructive",
+        title: "复制失败",
+        description: "浏览器权限可能阻止了访问。请手动复制。",
+      });
+    }
+  };
 
   const handlePasteFromClipboard = async () => {
     try {
@@ -81,7 +109,7 @@ export function BulkDeleteDialog({ isOpen, onClose, onSubmit }: BulkDeleteDialog
         <DialogHeader>
           <DialogTitle>批量删除书签</DialogTitle>
           <DialogDescription>
-            在此处粘贴要删除的网址列表，每行一个。
+            粘贴要删除的网址列表（每行一个），或先复制所有链接到剪贴板以便在外部检查。
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -93,10 +121,16 @@ export function BulkDeleteDialog({ isOpen, onClose, onSubmit }: BulkDeleteDialog
                 <FormItem>
                   <div className="flex justify-between items-center">
                     <FormLabel>要删除的网址列表</FormLabel>
-                    <Button type="button" variant="outline" size="sm" onClick={handlePasteFromClipboard}>
-                      <ClipboardPaste className="mr-2 h-4 w-4" />
-                      从剪贴板粘贴
-                    </Button>
+                    <div className="flex space-x-2">
+                        <Button type="button" variant="outline" size="sm" onClick={handleCopyAllLinks}>
+                          <ClipboardList className="mr-2 h-4 w-4" />
+                          复制所有
+                        </Button>
+                        <Button type="button" variant="outline" size="sm" onClick={handlePasteFromClipboard}>
+                          <ClipboardPaste className="mr-2 h-4 w-4" />
+                          粘贴
+                        </Button>
+                    </div>
                   </div>
                   <FormControl>
                     <Textarea 
