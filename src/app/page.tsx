@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import type { AppWidget, LinkCollectionAppWidget, NoteAppWidget, TodoListAppWidget, CalendarIcsAppWidget, EmbedAppWidget, LinkItem, TodoItem, WidgetType, LinkCollectionDisplaySettings, EmbedWidgetData, IframeEmbedData, ImageEmbedData, CodeEmbedData, CalendarEvent, LinkCollectionAppWidget } from '@/types';
+import type { AppWidget, LinkCollectionAppWidget, NoteAppWidget, TodoListAppWidget, CalendarIcsAppWidget, EmbedAppWidget, LinkItem, TodoItem, WidgetType, LinkCollectionDisplaySettings, EmbedWidgetData, IframeEmbedData, ImageEmbedData, CodeEmbedData, CalendarEvent } from '@/types';
 import { isLinkCollectionWidget, isNoteWidget, isTodoListWidget, isCalendarIcsWidget, isEmbedWidget } from '@/types';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Button } from '@/components/ui/button';
@@ -1402,6 +1402,7 @@ export default function HomePage() {
     
 
     
+
 
 
 
