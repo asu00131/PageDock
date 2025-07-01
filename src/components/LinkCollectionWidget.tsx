@@ -4,7 +4,7 @@
 import type { LinkCollectionAppWidget, LinkItem } from '@/types';
 import { LinkGrid } from './LinkGrid';
 import { Button } from '@/components/ui/button';
-import { Edit3, MoreVertical, PlusCircle, Trash2, Bookmark, ChevronDown, ChevronUp, GripVertical, SlidersHorizontal, ListOrdered, Check, Upload } from 'lucide-react'; 
+import { Edit3, MoreVertical, PlusCircle, Trash2, Bookmark, ChevronDown, ChevronUp, GripVertical, SlidersHorizontal, ListOrdered, Check, Upload, Sparkles } from 'lucide-react'; 
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -50,6 +50,8 @@ interface LinkCollectionWidgetProps extends WidgetDragProps {
   onEditLink: (widgetId: string, linkId: string) => void;
   onDeleteLink: (widgetId: string, linkId: string) => void;
   onMoveLink: (source: { widgetId: string; linkId: string }, target: { widgetId: string; linkId: string | null }) => void;
+  onOpenAiCategorizeDialog: (widgetId: string) => void;
+  isAiCategorizing: boolean;
   isCollapsed?: boolean;
   onToggleCollapse: (widgetId: string) => void;
 }
@@ -65,6 +67,8 @@ export function LinkCollectionWidget({
   onEditLink,
   onDeleteLink,
   onMoveLink,
+  onOpenAiCategorizeDialog,
+  isAiCategorizing,
   isCollapsed,
   onToggleCollapse,
   onWidgetDragStart,
@@ -156,6 +160,10 @@ export function LinkCollectionWidget({
                   <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onOpenBulkLinkDialog(widget.id); }}>
                     <Upload className="mr-2 h-4 w-4" />
                     <span>批量添加书签</span>
+                  </DropdownMenuItem>
+                   <DropdownMenuItem onClick={() => onOpenAiCategorizeDialog(widget.id)} disabled={isAiCategorizing}>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    <span>AI 一键分类</span>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onOpenWidgetTitleDialog(widget.id); }}>

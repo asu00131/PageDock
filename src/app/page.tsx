@@ -17,7 +17,7 @@ import { CalendarIcsWidget } from '@/components/CalendarIcsWidget';
 import { LinkDisplaySettingsDialog } from '@/components/LinkDisplaySettingsDialog'; 
 import { EmbedWidget } from '@/components/EmbedWidget';
 import { EmbedDialog } from '@/components/EmbedDialog';
-import { AppWindow, FolderPlus, PlusSquare, Bookmark, StickyNote, ListChecks, CalendarDays, UploadCloud, DownloadCloud, LayoutDashboard, Edit, GripVertical, Check, Code2, ClipboardPaste } from 'lucide-react';
+import { AppWindow, FolderPlus, PlusSquare, Bookmark, StickyNote, ListChecks, CalendarDays, UploadCloud, DownloadCloud, LayoutDashboard, Edit, GripVertical, Check, Code2, Sparkles } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import {
   DropdownMenu,
@@ -27,8 +27,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from '@/lib/utils';
 import { BulkLinkDialog } from '@/components/BulkLinkDialog';
+import { AiCategorizeConfirmationDialog } from '@/components/AiCategorizeConfirmationDialog';
+import { categorizeLinks, type CategorizeLinksOutput } from '@/ai/flows/categorize-links-flow';
 import { BulkDeleteDialog } from '@/components/BulkDeleteDialog';
-import { JsonImportDialog } from '@/components/JsonImportDialog';
 
 
 // For migrating old data structures
@@ -100,7 +101,8 @@ export default function HomePage() {
   const [isCalendarIcsDialogOpen, setIsCalendarIcsDialogOpen] = useState(false);
   const [isLinkDisplaySettingsDialogOpen, setIsLinkDisplaySettingsDialogOpen] = useState(false); 
   const [isEmbedDialogOpen, setIsEmbedDialogOpen] = useState(false);
-  const [isJsonImportDialogOpen, setIsJsonImportDialogOpen] = useState(false);
+  const [isAiCategorizeDialogOpen, setIsAiCategorizeDialogOpen] = useState(false);
+  const [isAiCategorizing, setIsAiCategorizing] = useState(false);
   
   const [editingLink, setEditingLink] = useState<LinkItem | undefined>(undefined);
   const [editingWidget, setEditingWidget] = useState<AppWidget | undefined>(undefined); 
@@ -244,6 +246,92 @@ export default function HomePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // Expose the import function to the window object for scripting
+      (window as any).importPageDockJson = (jsonString: string) => {
+        if (!isClientHydratedAndSetup) {
+          toast({ variant: "destructive", title: "App not ready", description: "Please wait a moment for the app to initialize." });
+          return;
+        }
+        if (!jsonString || typeof jsonString !== 'string') {
+            toast({ variant: "destructive", title: "导入错误", description: "提供的输入不是有效的JSON字符串。" });
+            return;
+        }
+        
+        try {
+          const importedData = JSON.parse(jsonString);
+
+          // Attempt to parse as PageDock native format first
+          if (isValidWidgetArray(importedData)) {
+            setWidgets(importedData);
+            toast({ title: "配置已导入", description: "小部件已成功加载。" });
+            return;
+          }
+          
+          // Attempt to parse as start.me format
+          if (importedData.page && Array.isArray(importedData.page.columns)) {
+            const startMeWidgets = importedData.page.columns.flatMap((col: any) => col.widgets || []);
+            
+            const newWidgets: AppWidget[] = startMeWidgets
+                .filter((widget: any) => widget.widget_type === 'urllist' && widget.items?.links?.length > 0)
+                .map((widget: any): LinkCollectionAppWidget => {
+                    const links: LinkItem[] = widget.items.links.map((link: any) => ({
+                        id: String(link.item_id) || crypto.randomUUID(),
+                        title: link.title || '无标题',
+                        url: link.url,
+                    }));
+            
+                    return {
+                        id: String(widget.public_id) || crypto.randomUUID(),
+                        type: 'linkCollection',
+                        title: widget.title || '导入的合集',
+                        data: {
+                            links: links,
+                            displaySettings: {
+                                displayMode: 'cloud',
+                                iconSize: 'small',
+                                visibleLinksCount: 0,
+                                titleLines: -1,
+                            },
+                        },
+                        isCollapsed: false,
+                    };
+                });
+
+            if (newWidgets.length > 0) {
+                setWidgets(prev => [...prev, ...newWidgets]);
+                toast({
+                    title: "导入成功",
+                    description: `已从 Start.me 成功导入 ${newWidgets.length} 个书签合集。`,
+                });
+            } else {
+                 toast({
+                    variant: "destructive",
+                    title: "未找到书签",
+                    description: "在提供的 Start.me 数据中未找到可导入的书签小部件。",
+                });
+            }
+            return; // Exit after handling
+          }
+
+          // If neither format is recognized
+          throw new Error("无效的文件格式或内容。");
+
+        } catch (error) {
+          console.error("Error importing JSON from script:", error);
+          toast({ variant: "destructive", title: "导入错误", description: error instanceof Error ? error.message : "无法解析 JSON 文本。" });
+        }
+      };
+    }
+
+    // Cleanup function to remove the global function when the component unmounts
+    return () => {
+      if (typeof window !== 'undefined') {
+        delete (window as any).importPageDockJson;
+      }
+    };
+  }, [isClientHydratedAndSetup, setWidgets, toast]);
 
   const handleOpenLinkDialog = (widgetId: string, link?: LinkItem) => {
     setCurrentLinkCollectionWidgetId(widgetId);
@@ -341,9 +429,19 @@ export default function HomePage() {
     setIsEmbedDialogOpen(false);
     setEditingWidget(undefined);
   };
+
+  const handleOpenAiCategorizeDialog = (widgetId: string) => {
+    const widgetToEdit = widgets.find(w => w.id === widgetId);
+    if (widgetToEdit && isLinkCollectionWidget(widgetToEdit)) {
+        setEditingWidget(widgetToEdit);
+        setIsAiCategorizeDialogOpen(true);
+    }
+  };
   
-  const handleOpenJsonImportDialog = () => setIsJsonImportDialogOpen(true);
-  const handleCloseJsonImportDialog = () => setIsJsonImportDialogOpen(false);
+  const handleCloseAiCategorizeDialog = () => {
+    setIsAiCategorizeDialogOpen(false);
+    setEditingWidget(undefined);
+  };
 
   const handleSubmitLink = (data: Omit<LinkItem, 'id'>, linkId?: string) => {
     if (!currentLinkCollectionWidgetId) return;
@@ -773,6 +871,74 @@ export default function HomePage() {
     }));
   };
 
+  const handleAiCategorize = async (widgetId: string) => {
+    const linkCollectionWidget = widgets.find(w => w.id === widgetId);
+    if (!linkCollectionWidget || !isLinkCollectionWidget(linkCollectionWidget) || linkCollectionWidget.data.links.length === 0) {
+        toast({ variant: "destructive", title: "无链接", description: "此合集中没有可分类的链接。" });
+        return;
+    }
+    
+    setIsAiCategorizing(true);
+    handleCloseAiCategorizeDialog();
+
+    try {
+        const linksToCategorize = linkCollectionWidget.data.links.map(({ id, url, title }) => ({ id, url, title }));
+        const result: CategorizeLinksOutput = await categorizeLinks({ links: linksToCategorize });
+
+        if (!result.categories || result.categories.length === 0) {
+            toast({ variant: "destructive", title: "分类失败", description: "AI 未能将您的书签分到任何类别。" });
+            return;
+        }
+
+        const linkMap = new Map(linkCollectionWidget.data.links.map(l => [l.id, l]));
+        const newCategorizedWidgets: LinkCollectionAppWidget[] = [];
+
+        for (const categoryResult of result.categories) {
+            const linksForCategory = categoryResult.linkIds
+                .map(id => linkMap.get(id))
+                .filter((l): l is LinkItem => l !== undefined);
+
+            if (linksForCategory.length > 0) {
+                const maxLinksPerWidget = 256;
+                const numChunks = Math.ceil(linksForCategory.length / maxLinksPerWidget);
+                
+                for (let i = 0; i < numChunks; i++) {
+                    const chunkedLinks = linksForCategory.slice(i * maxLinksPerWidget, (i + 1) * maxLinksPerWidget);
+                    const widgetTitle = numChunks > 1 ? `${categoryResult.category} (${i + 1})` : categoryResult.category;
+                    
+                    newCategorizedWidgets.push({
+                        id: crypto.randomUUID(),
+                        type: 'linkCollection',
+                        title: widgetTitle,
+                        data: {
+                            links: chunkedLinks,
+                            displaySettings: linkCollectionWidget.data.displaySettings,
+                        },
+                        isCollapsed: false,
+                    });
+                }
+            }
+        }
+        
+        // Replace the original widget with the new categorized ones
+        setWidgets(prev => {
+            const widgetIndex = prev.findIndex(w => w.id === widgetId);
+            if (widgetIndex === -1) return prev; // Should not happen
+            const newWidgets = [...prev];
+            newWidgets.splice(widgetIndex, 1, ...newCategorizedWidgets);
+            return newWidgets;
+        });
+
+        toast({ title: "分类完成", description: `您的书签已成功整理为 ${newCategorizedWidgets.length} 个新合集。` });
+
+    } catch (error) {
+        console.error("AI Categorization failed:", error);
+        toast({ variant: "destructive", title: "AI 分类出错", description: "处理您的请求时发生错误。" });
+    } finally {
+        setIsAiCategorizing(false);
+    }
+  };
+
   const handleExportJson = () => {
     if (!isClientHydratedAndSetup) return;
     const jsonString = JSON.stringify(widgets, null, 2);
@@ -827,76 +993,6 @@ export default function HomePage() {
       reader.readAsText(file);
     }
   };
-
-  const handleSubmitJsonImport = (jsonString: string) => {
-    if (!isClientHydratedAndSetup) return;
-    try {
-      const importedData = JSON.parse(jsonString);
-
-      // Attempt to parse as PageDock native format first
-      if (isValidWidgetArray(importedData)) {
-        setWidgets(importedData);
-        toast({ title: "配置已导入", description: "小部件已成功加载。" });
-        handleCloseJsonImportDialog();
-        return;
-      }
-      
-      // Attempt to parse as start.me format
-      if (importedData.page && Array.isArray(importedData.page.columns)) {
-        const startMeWidgets = importedData.page.columns.flatMap((col: any) => col.widgets || []);
-        
-        const newWidgets: AppWidget[] = startMeWidgets
-            .filter((widget: any) => widget.widget_type === 'urllist' && widget.items?.links?.length > 0)
-            .map((widget: any): LinkCollectionAppWidget => {
-                const links: LinkItem[] = widget.items.links.map((link: any) => ({
-                    id: String(link.item_id) || crypto.randomUUID(),
-                    title: link.title || '无标题',
-                    url: link.url,
-                }));
-        
-                return {
-                    id: String(widget.public_id) || crypto.randomUUID(),
-                    type: 'linkCollection',
-                    title: widget.title || '导入的合集',
-                    data: {
-                        links: links,
-                        displaySettings: {
-                            displayMode: 'cloud',
-                            iconSize: 'small',
-                            visibleLinksCount: 0,
-                            titleLines: -1,
-                        },
-                    },
-                    isCollapsed: false,
-                };
-            });
-
-        if (newWidgets.length > 0) {
-            setWidgets(prev => [...prev, ...newWidgets]);
-            toast({
-                title: "导入成功",
-                description: `已从 Start.me 成功导入 ${newWidgets.length} 个书签合集。`,
-            });
-            handleCloseJsonImportDialog();
-        } else {
-             toast({
-                variant: "destructive",
-                title: "未找到书签",
-                description: "在提供的 Start.me 数据中未找到可导入的书签小部件。",
-            });
-        }
-        return; // Exit after handling
-      }
-
-      // If neither format is recognized
-      throw new Error("无效的文件格式或内容。");
-
-    } catch (error) {
-      console.error("Error importing JSON from text:", error);
-      toast({ variant: "destructive", title: "导入错误", description: error instanceof Error ? error.message : "无法解析 JSON 文本。" });
-    }
-  };
-
 
   const handleToggleLayoutEditing = () => {
     setIsLayoutEditing(prev => {
@@ -1110,10 +1206,6 @@ export default function HomePage() {
               导入 JSON
             </Button>
             <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".json" style={{ display: 'none' }} />
-            <Button size="lg" variant="outline" disabled>
-                <ClipboardPaste className="mr-2 h-5 w-5" />
-                从剪贴板导入
-            </Button>
             <Button size="lg" variant="outline" onClick={handleExportJson} disabled>
               <DownloadCloud className="mr-2 h-5 w-5" />
               导出 JSON
@@ -1136,7 +1228,7 @@ export default function HomePage() {
   }
 
   return (
-    <div className={cn("container mx-auto px-4 py-8 min-h-screen", isLayoutEditing ? "is-layout-editing" : "")}>
+    <div className={cn("container mx-auto px-4 py-8 min-h-screen", isLayoutEditing ? "is-layout-editing" : "", isAiCategorizing ? "cursor-wait" : "")}>
       <header className="mb-8">
         <div className="flex items-center gap-3 mb-2">
           <AppWindow className="h-10 w-10 text-primary" />
@@ -1150,26 +1242,23 @@ export default function HomePage() {
             size="lg" 
             variant={isLayoutEditing ? "default" : "outline"} 
             onClick={handleToggleLayoutEditing}
+            disabled={isAiCategorizing}
           >
             {isLayoutEditing ? <Check className="mr-2 h-5 w-5" /> : <Edit className="mr-2 h-5 w-5" />}
             {isLayoutEditing ? "完成编辑" : "编辑布局"}
           </Button>
-         <Button size="lg" variant="outline" onClick={handleImportJsonClick}>
+         <Button size="lg" variant="outline" onClick={handleImportJsonClick} disabled={isAiCategorizing}>
             <UploadCloud className="mr-2 h-5 w-5" />
             导入 JSON
           </Button>
           <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".json" style={{ display: 'none' }} />
-          <Button size="lg" variant="outline" onClick={handleOpenJsonImportDialog}>
-            <ClipboardPaste className="mr-2 h-5 w-5" />
-            从剪贴板导入
-          </Button>
-          <Button size="lg" variant="outline" onClick={handleExportJson} disabled={widgets.length === 0}>
+          <Button size="lg" variant="outline" onClick={handleExportJson} disabled={widgets.length === 0 || isAiCategorizing}>
             <DownloadCloud className="mr-2 h-5 w-5" />
             导出 JSON
           </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button size="lg">
+            <Button size="lg" disabled={isAiCategorizing}>
               <PlusSquare className="mr-2 h-5 w-5" />
               添加工具
             </Button>
@@ -1239,6 +1328,8 @@ export default function HomePage() {
                       }
                   }}
                   onDeleteLink={handleDeleteLink}
+                  onOpenAiCategorizeDialog={() => handleOpenAiCategorizeDialog(widget.id)}
+                  isAiCategorizing={isAiCategorizing}
                   isCollapsed={widget.isCollapsed}
                   onToggleCollapse={handleToggleWidgetCollapse}
                   {...widgetDragProps}
@@ -1383,11 +1474,12 @@ export default function HomePage() {
         />
       )}
 
-      {isJsonImportDialogOpen && (
-        <JsonImportDialog
-            isOpen={isJsonImportDialogOpen}
-            onClose={handleCloseJsonImportDialog}
-            onSubmit={handleSubmitJsonImport}
+      {isAiCategorizeDialogOpen && editingWidget && isLinkCollectionWidget(editingWidget) && (
+        <AiCategorizeConfirmationDialog
+            isOpen={isAiCategorizeDialogOpen}
+            onClose={handleCloseAiCategorizeDialog}
+            onConfirm={() => handleAiCategorize(editingWidget.id)}
+            widgetTitle={editingWidget.title}
         />
       )}
       
@@ -1397,15 +1489,3 @@ export default function HomePage() {
     </div>
   );
 }
-
-
-    
-
-    
-
-
-
-
-
-
-
