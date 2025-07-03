@@ -1324,7 +1324,7 @@ export default function HomePage() {
                   onOpenWidgetTitleDialog={() => handleOpenWidgetTitleDialog(widget.id)}
                   onOpenLinkDisplaySettingsDialog={() => handleOpenLinkDisplaySettingsDialog(widget.id)}
                   onDeleteWidget={handleDeleteWidget}
-                  onMoveLink={onMoveLink}
+                  onMoveLink={handleMoveLink}
                   onEditLink={(widgetId, linkId) => {
                       const collWidget = widgets.find(w => w.id === widgetId) as LinkCollectionAppWidget | undefined;
                       const linkToEdit = collWidget?.data.links.find(l => l.id === linkId);
