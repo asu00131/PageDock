@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
@@ -248,28 +249,36 @@ export default function HomePage() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      // Expose the import function to the window object for scripting
-      (window as any).importPageDockJson = (jsonString: string) => {
+      const handleJsonImport = (jsonData: AppWidget[] | string) => {
         if (!isClientHydratedAndSetup) {
           toast({ variant: "destructive", title: "App not ready", description: "Please wait a moment for the app to initialize." });
           return;
         }
-        if (!jsonString || typeof jsonString !== 'string') {
+        
+        let importedData: any;
+        if (typeof jsonData === 'string') {
+          if (!jsonData) {
             toast({ variant: "destructive", title: "导入错误", description: "提供的输入不是有效的JSON字符串。" });
             return;
+          }
+          try {
+            importedData = JSON.parse(jsonData);
+          } catch (error) {
+            console.error("Error parsing JSON from string:", error);
+            toast({ variant: "destructive", title: "导入错误", description: "无法解析 JSON 文本。" });
+            return;
+          }
+        } else {
+          importedData = jsonData;
         }
         
         try {
-          const importedData = JSON.parse(jsonString);
-
-          // Attempt to parse as PageDock native format first
           if (isValidWidgetArray(importedData)) {
             setWidgets(importedData);
             toast({ title: "配置已导入", description: "小部件已成功加载。" });
             return;
           }
           
-          // Attempt to parse as start.me format
           if (importedData.page && Array.isArray(importedData.page.columns)) {
             const startMeWidgets = importedData.page.columns.flatMap((col: any) => col.widgets || []);
             
@@ -312,20 +321,20 @@ export default function HomePage() {
                     description: "在提供的 Start.me 数据中未找到可导入的书签小部件。",
                 });
             }
-            return; // Exit after handling
+            return;
           }
 
-          // If neither format is recognized
           throw new Error("无效的文件格式或内容。");
 
         } catch (error) {
           console.error("Error importing JSON from script:", error);
-          toast({ variant: "destructive", title: "导入错误", description: error instanceof Error ? error.message : "无法解析 JSON 文本。" });
+          toast({ variant: "destructive", title: "导入错误", description: error instanceof Error ? error.message : "无法处理导入的数据。" });
         }
       };
+
+      (window as any).importPageDockJson = handleJsonImport;
     }
 
-    // Cleanup function to remove the global function when the component unmounts
     return () => {
       if (typeof window !== 'undefined') {
         delete (window as any).importPageDockJson;
@@ -968,16 +977,12 @@ export default function HomePage() {
       reader.onload = (e) => {
         try {
           const content = e.target?.result as string;
-          const importedData = JSON.parse(content);
-          if (isValidWidgetArray(importedData)) {
-            setWidgets(importedData);
-            toast({ title: "配置已导入", description: "小部件已成功加载。" });
-          } else {
-            throw new Error("无效的文件格式或内容。");
+          if ((window as any).importPageDockJson) {
+            (window as any).importPageDockJson(content);
           }
         } catch (error) {
-          console.error("Error importing JSON:", error);
-          toast({ variant: "destructive", title: "导入错误", description: error instanceof Error ? error.message : "无法解析 JSON 文件。" });
+          console.error("Error reading file for import:", error);
+          toast({ variant: "destructive", title: "文件读取错误", description: "无法读取所选文件。" });
         } finally {
           if (fileInputRef.current) {
             fileInputRef.current.value = "";
@@ -1319,7 +1324,7 @@ export default function HomePage() {
                   onOpenWidgetTitleDialog={() => handleOpenWidgetTitleDialog(widget.id)}
                   onOpenLinkDisplaySettingsDialog={() => handleOpenLinkDisplaySettingsDialog(widget.id)}
                   onDeleteWidget={handleDeleteWidget}
-                  onMoveLink={handleMoveLink}
+                  onMoveLink={onMoveLink}
                   onEditLink={(widgetId, linkId) => {
                       const collWidget = widgets.find(w => w.id === widgetId) as LinkCollectionAppWidget | undefined;
                       const linkToEdit = collWidget?.data.links.find(l => l.id === linkId);

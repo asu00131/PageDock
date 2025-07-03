@@ -2,7 +2,6 @@
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
-  output: 'export', // 这行代码启用静态导出
   /* config options here */
   typescript: {
     ignoreBuildErrors: true,
@@ -11,7 +10,6 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
   images: {
-    unoptimized: true, // Disable Image Optimization API for static exports
     remotePatterns: [
       {
         protocol: 'https',
@@ -30,12 +28,6 @@ const nextConfig: NextConfig = {
         hostname: 't1.gstatic.com', // For potential future use or other gstatic favicons
         port: '',
         pathname: '/faviconV2/**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'www.zs.gov.cn',
-        port: '',
-        pathname: '/**',
       }
     ],
   },
