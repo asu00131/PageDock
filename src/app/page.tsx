@@ -31,6 +31,7 @@ import { BulkLinkDialog } from '@/components/BulkLinkDialog';
 import { AiCategorizeConfirmationDialog } from '@/components/AiCategorizeConfirmationDialog';
 import { categorizeLinks, type CategorizeLinksOutput } from '@/ai/flows/categorize-links-flow';
 import { BulkDeleteDialog } from '@/components/BulkDeleteDialog';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 
 // For migrating old data structures
@@ -1243,6 +1244,7 @@ export default function HomePage() {
       </header>
 
       <div className="mb-8 flex flex-wrap justify-end gap-2">
+         <ThemeToggle />
          <Button 
             size="lg" 
             variant={isLayoutEditing ? "default" : "outline"} 
@@ -1361,7 +1363,7 @@ export default function HomePage() {
                   onOpenWidgetTitleDialog={() => handleOpenWidgetTitleDialog(widget.id)}
                   onDeleteWidget={handleDeleteWidget}
                   onAddItem={handleAddTodoItem}
-                  onToggleItem={handleToggleTodoItem}
+                  onToggleItem={handleToggleItem}
                   onDeleteItem={handleDeleteTodoItem}
                   onUpdateItemText={handleUpdateTodoItemText}
                   onReorderItems={handleReorderTodoItems}
@@ -1494,4 +1496,3 @@ export default function HomePage() {
     </div>
   );
 }
-
