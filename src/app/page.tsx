@@ -32,6 +32,7 @@ import { AiCategorizeConfirmationDialog } from '@/components/AiCategorizeConfirm
 import { categorizeLinks, type CategorizeLinksOutput } from '@/ai/flows/categorize-links-flow';
 import { BulkDeleteDialog } from '@/components/BulkDeleteDialog';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { useTheme } from "next-themes";
 
 
 // For migrating old data structures
@@ -116,6 +117,18 @@ export default function HomePage() {
   const [dragOverWidgetId, setDragOverWidgetId] = useState<string | null>(null);
   const [preDragCollapseStates, setPreDragCollapseStates] = useState<Record<string, boolean> | null>(null);
   const [isLayoutEditing, setIsLayoutEditing] = useState(false);
+  const { setTheme } = useTheme();
+
+  useEffect(() => {
+    // Theme control via URL parameter
+    if (typeof window !== 'undefined') {
+      const searchParams = new URLSearchParams(window.location.search);
+      const theme = searchParams.get('theme');
+      if (theme === 'light' || theme === 'dark') {
+        setTheme(theme);
+      }
+    }
+  }, [setTheme]);
 
 
   useEffect(() => {
@@ -1363,7 +1376,7 @@ export default function HomePage() {
                   onOpenWidgetTitleDialog={() => handleOpenWidgetTitleDialog(widget.id)}
                   onDeleteWidget={handleDeleteWidget}
                   onAddItem={handleAddTodoItem}
-                  onToggleItem={handleToggleItem}
+                  onToggleItem={handleToggleTodoItem}
                   onDeleteItem={handleDeleteTodoItem}
                   onUpdateItemText={handleUpdateTodoItemText}
                   onReorderItems={handleReorderTodoItems}
