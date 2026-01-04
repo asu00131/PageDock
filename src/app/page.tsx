@@ -1242,7 +1242,7 @@ export default function HomePage() {
         <p className="text-muted-foreground">您的个性化仪表板，可快速访问您喜爱的网页和工具。</p>
       </header>
 
-      <div className="mb-8 flex justify-end space-x-2">
+      <div className="mb-8 flex flex-wrap justify-end gap-2">
          <Button 
             size="lg" 
             variant={isLayoutEditing ? "default" : "outline"} 
@@ -1494,3 +1494,4 @@ export default function HomePage() {
     </div>
   );
 }
+
